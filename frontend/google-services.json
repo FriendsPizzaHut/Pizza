@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "249076417076",
+    "project_id": "friends-pizza-hut-33e1a",
+    "storage_bucket": "friends-pizza-hut-33e1a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:249076417076:android:513b7bbe3201bb2f450061",
+        "android_client_info": {
+          "package_name": "com.friendspizza.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRB_MHPRQea5SbT1jV-YhGcHQWTmQyqWs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
