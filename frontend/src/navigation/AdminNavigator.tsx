@@ -9,10 +9,12 @@ import AdminDashboardScreen from '../screens/admin/main/DashboardScreen';
 import OrderManagementScreen from '../screens/admin/main/OrderManagementScreen';
 import MenuManagementScreen from '../screens/admin/main/MenuManagementScreen';
 import AnalyticsScreen from '../screens/admin/main/AnalyticsScreen';
+import NotificationsScreen from '../screens/admin/main/NotificationsScreen';
 
 // Sub-screens
 import AdminOrderDetailsScreen from '../screens/admin/orders/OrderDetailsScreen';
 import AssignDeliveryScreen from '../screens/admin/orders/AssignDeliveryScreen';
+import AssignDeliveryAgentScreen from '../screens/admin/orders/AssignDeliveryAgentScreen';
 import AddMenuItemScreen from '../screens/admin/menu/AddMenuItemScreen';
 import EditMenuItemScreen from '../screens/admin/menu/EditMenuItemScreen';
 import CategoryManagementScreen from '../screens/admin/menu/CategoryManagementScreen';
@@ -42,8 +44,8 @@ function AdminTabs() {
                         case 'MenuManagement':
                             iconName = focused ? 'restaurant' : 'restaurant-outline';
                             break;
-                        case 'Analytics':
-                            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+                        case 'Profile':
+                            iconName = focused ? 'person' : 'person-outline';
                             break;
                         default:
                             iconName = 'help-outline';
@@ -70,7 +72,13 @@ function AdminTabs() {
             <Tab.Screen name="Dashboard" component={AdminDashboardScreen} />
             <Tab.Screen name="OrderManagement" component={OrderManagementScreen} />
             <Tab.Screen name="MenuManagement" component={MenuManagementScreen} />
-            <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+            <Tab.Screen
+                name="Profile"
+                component={AnalyticsScreen}
+                options={{
+                    tabBarLabel: 'Profile'
+                }}
+            />
         </Tab.Navigator>
     );
 }
@@ -85,9 +93,13 @@ export default function AdminNavigator() {
         >
             <Stack.Screen name="AdminTabs" component={AdminTabs} />
 
+            {/* Main Screens */}
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+
             {/* Order Management Sub-screens */}
             <Stack.Screen name="OrderDetails" component={AdminOrderDetailsScreen} />
             <Stack.Screen name="AssignDelivery" component={AssignDeliveryScreen} />
+            <Stack.Screen name="AssignDeliveryAgent" component={AssignDeliveryAgentScreen} />
 
             {/* Menu Management Sub-screens */}
             <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} />

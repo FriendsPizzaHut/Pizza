@@ -47,9 +47,15 @@ export type CustomerStackParamList = {
 };
 
 export type DeliveryTabParamList = {
-    Dashboard: undefined;
+    Home: undefined;
     ActiveOrders: undefined;
-    OrderHistory: undefined;
+    PaymentCollection: {
+        orderId: string;
+        customerName: string;
+        totalAmount: string;
+        orderItems: string[];
+        deliveryAddress: string;
+    } | undefined;
     Profile: undefined;
 };
 
@@ -60,8 +66,6 @@ export type DeliveryStackParamList = {
     Navigation: { orderId: string; address: string };
     CustomerContact: { orderId: string; customerPhone: string };
     // Profile Sub-screens
-    EarningsHistory: undefined;
-    VehicleInfo: undefined;
     DeliverySettings: undefined;
     SupportTickets: undefined;
 };
@@ -70,14 +74,17 @@ export type AdminTabParamList = {
     Dashboard: undefined;
     OrderManagement: undefined;
     MenuManagement: undefined;
-    Analytics: undefined;
+    Profile: undefined;
 };
 
 export type AdminStackParamList = {
     AdminTabs: undefined;
+    // Main Screens
+    Notifications: undefined;
     // Order Management Sub-screens
     OrderDetails: { orderId: string };
     AssignDelivery: { orderId: string };
+    AssignDeliveryAgent: { orderId: string; orderDetails: any };
     // Menu Management Sub-screens
     AddMenuItem: undefined;
     EditMenuItem: { itemId: string };

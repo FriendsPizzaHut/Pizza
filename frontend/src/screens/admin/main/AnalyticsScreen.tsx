@@ -1,151 +1,197 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, clearAuthState } from '../../../../redux/store';
+import { logout } from '../../../../redux/slices/authSlice';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 const { width } = Dimensions.get('window');
 
 export default function AnalyticsScreen() {
-    const todayStats = {
-        revenue: 3250.75,
-        orders: 127,
-        averageOrder: 25.60,
-        customers: 98,
+    const { name, email, role } = useSelector((state: RootState) => state.auth);
+    const dispatch = useDispatch();
+
+    const handleLogout = async () => {
+        await clearAuthState();
+        dispatch(logout());
     };
 
-    const chartData = [
-        { day: 'Mon', revenue: 2850, orders: 115 },
-        { day: 'Tue', revenue: 3100, orders: 125 },
-        { day: 'Wed', revenue: 2950, orders: 118 },
-        { day: 'Thu', revenue: 3250, orders: 131 },
-        { day: 'Fri', revenue: 3800, orders: 152 },
-        { day: 'Sat', revenue: 4200, orders: 168 },
-        { day: 'Sun', revenue: 3600, orders: 144 },
+    const profileOptions = [
+        {
+            title: 'Restaurant Settings',
+            icon: 'store',
+            iconType: 'MaterialIcons' as const,
+            color: '#cb202d',
+            bgColor: '#FFEBEE',
+            action: () => console.log('Restaurant Settings'),
+        },
+        {
+            title: 'Staff Management',
+            icon: 'people',
+            iconType: 'MaterialIcons' as const,
+            color: '#FF9800',
+            bgColor: '#FFF3E0',
+            action: () => console.log('Staff Management'),
+        },
+        {
+            title: 'Business Reports',
+            icon: 'bar-chart',
+            iconType: 'MaterialIcons' as const,
+            color: '#2196F3',
+            bgColor: '#E3F2FD',
+            action: () => console.log('Business Reports'),
+        },
+        {
+            title: 'Account Settings',
+            icon: 'settings',
+            iconType: 'MaterialIcons' as const,
+            color: '#4CAF50',
+            bgColor: '#E8F5E9',
+            action: () => console.log('Account Settings'),
+        },
     ];
 
-    const topItems = [
-        { name: 'Margherita Pizza', orders: 45, revenue: 810.00 },
-        { name: 'Pepperoni Pizza', orders: 38, revenue: 722.00 },
-        { name: 'Buffalo Wings', orders: 32, revenue: 416.00 },
-        { name: 'Garlic Bread', orders: 28, revenue: 196.00 },
+    const appOptions = [
+        {
+            title: 'Notifications',
+            icon: 'notifications',
+            iconType: 'MaterialIcons' as const,
+            color: '#9C27B0',
+            bgColor: '#F3E5F5',
+            hasSwitch: true,
+        },
+        {
+            title: 'Help & Support',
+            icon: 'help-circle',
+            iconType: 'MaterialCommunityIcons' as const,
+            color: '#607D8B',
+            bgColor: '#ECEFF1',
+            hasSwitch: false,
+        },
     ];
-
-    const maxRevenue = Math.max(...chartData.map(d => d.revenue));
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#f4f4f2" />
+
+            {/* Clean Centered Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>📊 Analytics</Text>
-            </View>
+                <TouchableOpacity
+                    style={styles.editButton}
+                    activeOpacity={0.8}
+                    onPress={() => console.log('Edit Profile')}
+                >
+                    <MaterialIcons name="edit" size={18} color="#2d2d2d" />
+                </TouchableOpacity>
 
-            <ScrollView style={styles.content}>
-                <View style={styles.todaySection}>
-                    <Text style={styles.sectionTitle}>Today's Performance</Text>
-
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>${todayStats.revenue}</Text>
-                            <Text style={styles.statLabel}>Revenue</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{todayStats.orders}</Text>
-                            <Text style={styles.statLabel}>Orders</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>${todayStats.averageOrder}</Text>
-                            <Text style={styles.statLabel}>Avg Order</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statValue}>{todayStats.customers}</Text>
-                            <Text style={styles.statLabel}>Customers</Text>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.chartSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Weekly Revenue</Text>
-                        <TouchableOpacity style={styles.periodButton}>
-                            <Text style={styles.periodButtonText}>7 Days</Text>
+                {/* Centered Profile Section */}
+                <View style={styles.profileSection}>
+                    {/* Profile Avatar */}
+                    <View style={styles.avatarContainer}>
+                        <Image
+                            source={{ uri: 'https://images.pexels.com/photos/91227/pexels-photo-91227.jpeg' }}
+                            style={styles.avatar}
+                        />
+                        <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8}>
+                            <MaterialIcons name="camera-alt" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.chart}>
-                        <View style={styles.chartBars}>
-                            {chartData.map((data, index) => (
-                                <View key={index} style={styles.barContainer}>
-                                    <View
-                                        style={[
-                                            styles.bar,
-                                            { height: (data.revenue / maxRevenue) * 120 }
-                                        ]}
-                                    />
-                                    <Text style={styles.barLabel}>{data.day}</Text>
-                                    <Text style={styles.barValue}>${(data.revenue / 1000).toFixed(1)}k</Text>
-                                </View>
-                            ))}
+                    {/* Profile Info */}
+                    <View style={styles.profileInfo}>
+                        <Text style={styles.userName}>{name || 'Admin'}</Text>
+                        <View style={styles.roleBadge}>
+                            <MaterialIcons name="admin-panel-settings" size={14} color="#cb202d" />
+                            <Text style={styles.roleText}>Administrator</Text>
                         </View>
+                        <Text style={styles.userEmail}>{email || 'admin@pizzahut.com'}</Text>
                     </View>
                 </View>
+            </View>
 
-                <View style={styles.topItemsSection}>
-                    <Text style={styles.sectionTitle}>Top Selling Items</Text>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Menu Options */}
+                <View style={styles.menuSection}>
+                    <Text style={styles.sectionTitle}>Management</Text>
 
-                    {topItems.map((item, index) => (
-                        <View key={index} style={styles.itemRow}>
-                            <View style={styles.itemRank}>
-                                <Text style={styles.rankNumber}>{index + 1}</Text>
+                    {profileOptions.map((option, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.menuButton}
+                            onPress={option.action}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.menuButtonLeft}>
+                                <View style={[styles.iconContainer, { backgroundColor: option.bgColor }]}>
+                                    {option.iconType === 'MaterialIcons' ? (
+                                        <MaterialIcons name={option.icon as any} size={20} color={option.color} />
+                                    ) : (
+                                        <MaterialCommunityIcons name={option.icon as any} size={20} color={option.color} />
+                                    )}
+                                </View>
+                                <Text style={styles.menuButtonText}>{option.title}</Text>
                             </View>
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.itemName}>{item.name}</Text>
-                                <Text style={styles.itemOrders}>{item.orders} orders</Text>
-                            </View>
-                            <Text style={styles.itemRevenue}>${item.revenue}</Text>
-                        </View>
+                            <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
+                        </TouchableOpacity>
                     ))}
                 </View>
 
-                <View style={styles.insightsSection}>
-                    <Text style={styles.sectionTitle}>Key Insights</Text>
+                {/* App Settings */}
+                <View style={styles.appInfoSection}>
+                    <Text style={styles.sectionTitle}>App Settings</Text>
 
-                    <View style={styles.insightCard}>
-                        <Text style={styles.insightIcon}>📈</Text>
-                        <View style={styles.insightContent}>
-                            <Text style={styles.insightTitle}>Peak Hours</Text>
-                            <Text style={styles.insightText}>
-                                Most orders come between 6-8 PM. Consider staffing up during these hours.
-                            </Text>
+                    {appOptions.map((option, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.menuButton}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.menuButtonLeft}>
+                                <View style={[styles.iconContainer, { backgroundColor: option.bgColor }]}>
+                                    {option.iconType === 'MaterialIcons' ? (
+                                        <MaterialIcons name={option.icon as any} size={20} color={option.color} />
+                                    ) : (
+                                        <MaterialCommunityIcons name={option.icon as any} size={20} color={option.color} />
+                                    )}
+                                </View>
+                                <Text style={styles.menuButtonText}>{option.title}</Text>
+                            </View>
+                            <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
+                        </TouchableOpacity>
+                    ))}
+
+                    <TouchableOpacity style={styles.menuButton}>
+                        <View style={styles.menuButtonLeft}>
+                            <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+                                <MaterialIcons name="info" size={20} color="#2196F3" />
+                            </View>
+                            <Text style={styles.menuButtonText}>About App</Text>
                         </View>
-                    </View>
-
-                    <View style={styles.insightCard}>
-                        <Text style={styles.insightIcon}>🍕</Text>
-                        <View style={styles.insightContent}>
-                            <Text style={styles.insightTitle}>Popular Items</Text>
-                            <Text style={styles.insightText}>
-                                Pizza orders increased 15% this week. Consider adding more pizza varieties.
-                            </Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.insightCard}>
-                        <Text style={styles.insightIcon}>⏰</Text>
-                        <View style={styles.insightContent}>
-                            <Text style={styles.insightTitle}>Delivery Time</Text>
-                            <Text style={styles.insightText}>
-                                Average delivery time is 28 minutes. 12% improvement from last week.
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.actionsSection}>
-                    <TouchableOpacity style={styles.reportButton}>
-                        <Text style={styles.reportButtonText}>📄 Generate Detailed Report</Text>
+                        <Text style={styles.versionText}>v1.0.0</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.exportButton}>
-                        <Text style={styles.exportButtonText}>📊 Export Data</Text>
+                    <TouchableOpacity style={styles.menuButton}>
+                        <View style={styles.menuButtonLeft}>
+                            <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
+                                <MaterialIcons name="star-rate" size={20} color="#FF9800" />
+                            </View>
+                            <Text style={styles.menuButtonText}>Rate Us</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
                     </TouchableOpacity>
                 </View>
+
+                {/* Logout Button */}
+                <View style={styles.logoutSection}>
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <MaterialIcons name="logout" size={20} color="#fff" />
+                        <Text style={styles.logoutButtonText}>Sign Out</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Bottom Spacing */}
+                <View style={styles.bottomSpacing} />
             </ScrollView>
         </View>
     );
@@ -154,223 +200,178 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f4f4f2',
     },
     header: {
-        backgroundColor: '#2196F3',
-        padding: 20,
-        paddingTop: 60,
+        backgroundColor: '#f4f4f2',
+        paddingTop: 50,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        position: 'relative',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
-    title: {
+    editButton: {
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        backgroundColor: '#F8F8F8',
+        borderRadius: 22,
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    profileSection: {
+        alignItems: 'center',
+        paddingTop: 20,
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: 20,
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        borderWidth: 4,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    cameraButton: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        backgroundColor: '#cb202d',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    profileInfo: {
+        alignItems: 'center',
+    },
+    userName: {
         fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-        textAlign: 'center',
+        fontWeight: '800',
+        color: '#2d2d2d',
+        marginBottom: 8,
+        letterSpacing: -0.3,
+    },
+    roleBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFEBEE',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginBottom: 8,
+        gap: 4,
+    },
+    roleText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#cb202d',
+    },
+    userEmail: {
+        fontSize: 14,
+        color: '#8E8E93',
+        fontWeight: '400',
     },
     content: {
-        padding: 20,
+        flex: 1,
     },
-    todaySection: {
-        marginBottom: 25,
+    menuSection: {
+        paddingHorizontal: 16,
+        paddingTop: 32,
+        paddingBottom: 16,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    statCard: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 12,
-        alignItems: 'center',
-        width: (width - 60) / 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    statValue: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: '#2196F3',
-        marginBottom: 5,
+        fontWeight: '800',
+        color: '#2d2d2d',
+        marginBottom: 16,
+        letterSpacing: -0.3,
     },
-    statLabel: {
-        fontSize: 12,
-        color: '#666',
-        textAlign: 'center',
-    },
-    chartSection: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 15,
-        marginBottom: 25,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    sectionHeader: {
+    menuButton: {
+        backgroundColor: 'transparent',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        marginBottom: 8,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
     },
-    periodButton: {
-        backgroundColor: '#e3f2fd',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
-    },
-    periodButtonText: {
-        color: '#2196F3',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    chart: {
-        height: 180,
-    },
-    chartBars: {
+    menuButtonLeft: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'flex-end',
-        height: 140,
-    },
-    barContainer: {
         alignItems: 'center',
         flex: 1,
     },
-    bar: {
-        backgroundColor: '#2196F3',
-        width: 25,
-        borderRadius: 2,
-        marginBottom: 8,
-    },
-    barLabel: {
-        fontSize: 12,
-        color: '#666',
-        marginBottom: 2,
-    },
-    barValue: {
-        fontSize: 10,
-        color: '#2196F3',
-        fontWeight: '600',
-    },
-    topItemsSection: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 15,
-        marginBottom: 25,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    itemRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    itemRank: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#2196F3',
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 15,
+        marginRight: 12,
     },
-    rankNumber: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    itemInfo: {
-        flex: 1,
-    },
-    itemName: {
+    menuButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 2,
+        color: '#2d2d2d',
     },
-    itemOrders: {
+    appInfoSection: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+    },
+    versionText: {
         fontSize: 14,
-        color: '#666',
+        color: '#8E8E93',
+        fontWeight: '500',
     },
-    itemRevenue: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#4CAF50',
+    logoutSection: {
+        paddingHorizontal: 16,
+        paddingVertical: 16,
     },
-    insightsSection: {
-        marginBottom: 25,
-    },
-    insightCard: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
+    logoutButton: {
+        backgroundColor: '#cb202d',
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
         flexDirection: 'row',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowColor: '#cb202d',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
     },
-    insightIcon: {
-        fontSize: 24,
-        marginRight: 15,
-    },
-    insightContent: {
-        flex: 1,
-    },
-    insightTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 4,
-    },
-    insightText: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 18,
-    },
-    actionsSection: {
-        gap: 10,
-        marginBottom: 20,
-    },
-    reportButton: {
-        backgroundColor: '#2196F3',
-        padding: 15,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    reportButtonText: {
+    logoutButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
+        marginLeft: 8,
     },
-    exportButton: {
-        backgroundColor: '#4CAF50',
-        padding: 15,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    exportButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+    bottomSpacing: {
+        height: 40,
     },
 });
