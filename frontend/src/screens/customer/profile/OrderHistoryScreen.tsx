@@ -1,106 +1,234 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 
 export default function OrderHistoryScreen() {
+    const navigation = useNavigation();
+    const [filter, setFilter] = useState('all');
+
     const orders = [
         {
-            id: '#ORD-001',
-            date: '2024-01-15',
+            id: 'ORD-001',
+            date: '2024-10-05',
             time: '2:30 PM',
             status: 'Delivered',
-            total: '$24.99',
+            total: 24.99,
             items: ['Margherita Pizza (Large)', 'Garlic Bread', 'Coca Cola'],
-            statusColor: '#4CAF50',
+            firstItemImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 5,
         },
         {
-            id: '#ORD-002',
-            date: '2024-01-12',
+            id: 'ORD-002',
+            date: '2024-10-03',
             time: '7:45 PM',
             status: 'Delivered',
-            total: '$31.50',
+            total: 31.50,
             items: ['Pepperoni Pizza (Medium)', 'BBQ Wings', 'Sprite'],
-            statusColor: '#4CAF50',
+            firstItemImage: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 4,
         },
         {
-            id: '#ORD-003',
-            date: '2024-01-08',
+            id: 'ORD-003',
+            date: '2024-09-28',
             time: '1:15 PM',
             status: 'Cancelled',
-            total: '$18.99',
+            total: 18.99,
             items: ['Veggie Supreme (Small)', 'Garlic Knots'],
-            statusColor: '#ff4444',
+            firstItemImage: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'cancelled',
+            rating: null,
+        },
+        {
+            id: 'ORD-004',
+            date: '2024-09-25',
+            time: '8:20 PM',
+            status: 'Delivered',
+            total: 45.99,
+            items: ['Supreme Pizza (Large)', 'Chicken Wings', 'Pepsi', 'Garlic Bread'],
+            firstItemImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 5,
+        },
+        {
+            id: 'ORD-005',
+            date: '2024-09-20',
+            time: '6:15 PM',
+            status: 'Delivered',
+            total: 29.99,
+            items: ['BBQ Chicken Pizza (Medium)', 'Coke'],
+            firstItemImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 4,
+        },
+        {
+            id: 'ORD-006',
+            date: '2024-09-15',
+            time: '7:30 PM',
+            status: 'Delivered',
+            total: 22.50,
+            items: ['Veggie Supreme (Small)', 'Sprite'],
+            firstItemImage: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 3,
+        },
+        {
+            id: 'ORD-007',
+            date: '2024-09-10',
+            time: '5:45 PM',
+            status: 'Delivered',
+            total: 38.99,
+            items: ['Meat Lovers (Large)', 'Garlic Knots', 'Coca Cola'],
+            firstItemImage: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 5,
+        },
+        {
+            id: 'ORD-008',
+            date: '2024-08-28',
+            time: '2:20 PM',
+            status: 'Delivered',
+            total: 27.99,
+            items: ['Hawaiian Pizza (Medium)', 'Pepsi'],
+            firstItemImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            statusType: 'delivered',
+            rating: 4,
         },
     ];
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'Delivered':
-                return '✅';
-            case 'Cancelled':
-                return '❌';
-            case 'In Progress':
-                return '🚚';
-            default:
-                return '📦';
+    const getStatusColor = (statusType: string) => {
+        switch (statusType) {
+            case 'delivered': return '#22A447';
+            case 'cancelled': return '#ff4444';
+            default: return '#666';
         }
     };
 
+    const filteredOrders = orders.filter(order => {
+        if (filter === 'all') return true;
+        if (filter === 'delivered') return order.statusType === 'delivered';
+        return true;
+    });
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+
+
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+            {/* Modern Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>📜 Order History</Text>
+                <View style={styles.headerContent}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                        <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>Order History</Text>
+                    <View style={styles.placeholder} />
+                </View>
+
+                {/* Filter Tabs */}
+                <View style={styles.filterContainer}>
+                    <TouchableOpacity
+                        style={[styles.filterTab, filter === 'all' && styles.activeFilterTab]}
+                        onPress={() => setFilter('all')}
+                    >
+                        <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
+                            All Orders
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterTab, filter === 'delivered' && styles.activeFilterTab]}
+                        onPress={() => setFilter('delivered')}
+                    >
+                        <Text style={[styles.filterText, filter === 'delivered' && styles.activeFilterText]}>
+                            Delivered
+                        </Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            <ScrollView style={styles.content}>
-                {orders.map((order) => (
-                    <View key={order.id} style={styles.orderCard}>
-                        <View style={styles.orderHeader}>
-                            <View>
-                                <Text style={styles.orderId}>{order.id}</Text>
-                                <Text style={styles.orderDate}>{order.date} at {order.time}</Text>
-                            </View>
-                            <View style={styles.statusContainer}>
-                                <Text style={styles.statusIcon}>{getStatusIcon(order.status)}</Text>
-                                <Text style={[styles.status, { color: order.statusColor }]}>
-                                    {order.status}
-                                </Text>
-                            </View>
-                        </View>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Orders Count */}
+                <View style={styles.ordersCountContainer}>
+                    <Text style={styles.ordersCount}>
+                        {filteredOrders.length} {filteredOrders.length === 1 ? 'Order' : 'Orders'}
+                    </Text>
+                </View>
 
-                        <View style={styles.itemsList}>
-                            {order.items.map((item, index) => (
-                                <Text key={index} style={styles.orderItem}>• {item}</Text>
-                            ))}
-                        </View>
-
-                        <View style={styles.orderFooter}>
-                            <Text style={styles.total}>Total: {order.total}</Text>
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity style={styles.viewButton}>
-                                    <Text style={styles.viewButtonText}>View Details</Text>
-                                </TouchableOpacity>
-                                {order.status === 'Delivered' && (
-                                    <TouchableOpacity style={styles.reorderButton}>
-                                        <Text style={styles.reorderButtonText}>Reorder</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-                    </View>
-                ))}
-
-                {orders.length === 0 && (
+                {/* Orders List */}
+                {filteredOrders.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🍕</Text>
-                        <Text style={styles.emptyTitle}>No Orders Yet</Text>
+                        <MaterialIcons name="receipt-long" size={64} color="#E0E0E0" />
+                        <Text style={styles.emptyTitle}>No Orders Found</Text>
                         <Text style={styles.emptyText}>
-                            Your order history will appear here once you place your first order.
+                            {filter === 'all'
+                                ? "You haven't placed any orders yet."
+                                : "No delivered orders found."
+                            }
                         </Text>
-                        <TouchableOpacity style={styles.startOrderButton}>
-                            <Text style={styles.startOrderButtonText}>Start Ordering</Text>
-                        </TouchableOpacity>
                     </View>
+                ) : (
+                    filteredOrders.map((order) => (
+                        <TouchableOpacity key={order.id} style={styles.orderCard} activeOpacity={0.8}>
+                            {/* Top Section with Image and First Item Details */}
+                            <View style={styles.topSection}>
+                                <Image
+                                    source={{ uri: order.firstItemImage }}
+                                    style={styles.itemImage}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.firstItemDetails}>
+                                    <Text style={styles.firstItemName}>
+                                        {order.items[0]}
+                                    </Text>
+                                    <Text style={styles.orderNumber}>Order #{order.id}</Text>
+                                </View>
+                            </View>
+
+                            {/* Additional Items (if more than 1) */}
+                            {order.items.length > 1 && (
+                                <View style={styles.additionalItemsSection}>
+                                    <View style={styles.divider} />
+                                    {order.items.slice(1).map((item, index) => (
+                                        <Text key={index} style={styles.additionalItem}>
+                                            {item}
+                                        </Text>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Bottom Section with Date, Status and Total */}
+                            <View style={styles.bottomSection}>
+                                <View style={styles.divider} />
+                                <View style={styles.orderMetaRow}>
+                                    <Text style={styles.orderDateTime}>
+                                        Order placed on {formatDate(order.date)}, {order.time}
+                                    </Text>
+                                </View>
+                                <View style={styles.statusTotalRow}>
+                                    <View style={styles.statusBadgeNew}>
+                                        <Text style={styles.statusTextNew}>{order.status}</Text>
+                                    </View>
+                                    <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    ))
                 )}
+
+                {/* Bottom Spacing */}
+                <View style={styles.bottomSpacing} />
             </ScrollView>
         </View>
     );
@@ -109,137 +237,186 @@ export default function OrderHistoryScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f4f4f2',
     },
     header: {
-        backgroundColor: '#FF6B6B',
-        padding: 20,
-        paddingTop: 60,
+        backgroundColor: '#f4f4f2',
+        paddingTop: 50,
+        paddingBottom: 16,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+    },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F8F8F8',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        flex: 1,
         textAlign: 'center',
+        marginHorizontal: 16,
+    },
+    placeholder: {
+        width: 40,
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F8F8F8',
+        borderRadius: 12,
+        padding: 4,
+    },
+    filterTab: {
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    activeFilterTab: {
+        backgroundColor: '#cb202d',
+    },
+    filterText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#666',
+    },
+    activeFilterText: {
+        color: '#fff',
     },
     content: {
-        padding: 20,
+        flex: 1,
+        paddingHorizontal: 16,
+    },
+    ordersCountContainer: {
+        paddingVertical: 16,
+    },
+    ordersCount: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
     },
     orderCard: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
+        backgroundColor: '#fbfbfbff',
+        marginBottom: 12,
+        padding: 16,
+        borderRadius: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
         elevation: 3,
     },
-    orderHeader: {
+    topSection: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 12,
+        marginBottom: 8,
     },
-    orderId: {
+    itemImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        marginRight: 12,
+        backgroundColor: '#F5F5F5',
+    },
+    firstItemDetails: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    firstItemName: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: '#2d2d2d',
+        marginBottom: 4,
+        lineHeight: 20,
     },
-    orderDate: {
+    orderNumber: {
         fontSize: 14,
         color: '#666',
-        marginTop: 2,
     },
-    statusContainer: {
-        alignItems: 'center',
+    additionalItemsSection: {
+        marginBottom: 8,
     },
-    statusIcon: {
-        fontSize: 20,
+    divider: {
+        height: 1,
+        backgroundColor: '#F0F0F0',
+        marginVertical: 8,
+    },
+    additionalItem: {
+        fontSize: 14,
+        color: '#666',
         marginBottom: 4,
+        lineHeight: 18,
     },
-    status: {
-        fontSize: 14,
-        fontWeight: '600',
+    bottomSection: {
+        marginTop: 4,
     },
-    itemsList: {
-        marginBottom: 12,
+    orderMetaRow: {
+        marginBottom: 8,
     },
-    orderItem: {
-        fontSize: 14,
-        color: '#555',
-        marginBottom: 2,
+    orderDateTime: {
+        fontSize: 12,
+        color: '#8E8E93',
+        flex: 1,
     },
-    orderFooter: {
+    statusTotalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        paddingTop: 12,
     },
-    total: {
+    statusBadgeNew: {
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statusTextNew: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#2d2d2d',
+    },
+    orderTotal: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FF6B6B',
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    viewButton: {
-        backgroundColor: '#e0e0e0',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 5,
-    },
-    viewButtonText: {
-        color: '#333',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    reorderButton: {
-        backgroundColor: '#FF6B6B',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 5,
-    },
-    reorderButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '700',
+        color: '#2d2d2d',
     },
     emptyState: {
         alignItems: 'center',
-        paddingVertical: 60,
-    },
-    emptyIcon: {
-        fontSize: 60,
-        marginBottom: 20,
-    },
-    emptyTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 10,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 30,
+        justifyContent: 'center',
+        paddingVertical: 80,
         paddingHorizontal: 20,
     },
-    startOrderButton: {
-        backgroundColor: '#FF6B6B',
-        paddingHorizontal: 30,
-        paddingVertical: 15,
-        borderRadius: 25,
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginTop: 16,
+        marginBottom: 8,
     },
-    startOrderButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+    emptyText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    bottomSpacing: {
+        height: 40,
     },
 });

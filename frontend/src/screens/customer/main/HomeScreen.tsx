@@ -27,6 +27,8 @@ import { CustomerStackParamList } from '../../../types/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -453,7 +455,7 @@ export default function CustomerHomeScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <StatusBar barStyle="dark-content" backgroundColor="#f4f4f2" />
 
             {/* Clean Modern Header */}
             <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
@@ -475,7 +477,7 @@ export default function CustomerHomeScreen() {
                                 onPress={navigateToCart}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.cartIconClean}>🛒</Text>
+                                <MaterialCommunityIcons name="cart-outline" size={24} color="#2d2d2d" />
                                 <View style={styles.cartBadge}>
                                     <Text style={styles.cartBadgeText}>0</Text>
                                 </View>
@@ -492,7 +494,7 @@ export default function CustomerHomeScreen() {
                 {/* Premium Hero Banner */}
                 <View style={styles.heroBanner}>
                     <LinearGradient
-                        colors={['#E60E1C', '#C50712']}
+                        colors={['#cb202d', '#2d2d2d']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.heroGradient}
@@ -556,16 +558,22 @@ export default function CustomerHomeScreen() {
                     {loadingOffers ? (
                         <View style={styles.section}>
                             <View style={styles.sectionTitleRow}>
-                                <Text style={styles.sectionTitle}>🎉 Exclusive Offers</Text>
+                                <View style={styles.sectionTitleWithIcon}>
+                                    <MaterialIcons name="local-offer" size={24} color="#cb202d" />
+                                    <Text style={styles.sectionTitle}>Exclusive Offers</Text>
+                                </View>
                             </View>
                             <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color="#E60E1C" />
+                                <ActivityIndicator size="large" color="#cb202d" />
                             </View>
                         </View>
                     ) : !offerError && offers.length > 0 ? (
                         <View style={styles.section}>
                             <View style={styles.sectionTitleRow}>
-                                <Text style={styles.sectionTitle}>🎉 Exclusive Offers</Text>
+                                <View style={styles.sectionTitleWithIcon}>
+                                    <MaterialIcons name="local-offer" size={24} color="#cb202d" />
+                                    <Text style={styles.sectionTitle}>Exclusive Offers</Text>
+                                </View>
                                 <TouchableOpacity>
                                     <Text style={styles.seeAllText}>See All →</Text>
                                 </TouchableOpacity>
@@ -647,7 +655,10 @@ export default function CustomerHomeScreen() {
                     {/* Popular Picks */}
                     <View style={styles.section}>
                         <View style={styles.sectionTitleRow}>
-                            <Text style={styles.sectionTitle}>🔥 Popular Picks</Text>
+                            <View style={styles.sectionTitleWithIcon}>
+                                <MaterialIcons name="trending-up" size={24} color="#cb202d" />
+                                <Text style={styles.sectionTitle}>Popular Picks</Text>
+                            </View>
                             <TouchableOpacity onPress={navigateToMenu}>
                                 <Text style={styles.seeAllText}>See All →</Text>
                             </TouchableOpacity>
@@ -782,7 +793,7 @@ export default function CustomerHomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: '#f4f4f2',
     },
     scrollContainer: {
         flex: 1,
@@ -790,14 +801,14 @@ const styles = StyleSheet.create({
 
     // Header
     headerSafeArea: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#f4f4f2',
     },
     header: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#f4f4f2',
         paddingHorizontal: 20,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: '#E0E0E0',
     },
     headerContent: {
         flexDirection: 'row',
@@ -823,12 +834,12 @@ const styles = StyleSheet.create({
     addressText: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#000000',
+        color: '#2d2d2d',
         marginRight: 6,
     },
     dropdownArrow: {
         fontSize: 14,
-        color: '#000000',
+        color: '#2d2d2d',
         fontWeight: '600',
     },
     headerRight: {
@@ -844,14 +855,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         position: 'relative',
     },
-    cartIconClean: {
-        fontSize: 20,
-    },
     cartBadge: {
         position: 'absolute',
         top: 4,
         right: 4,
-        backgroundColor: '#E60E1C',
+        backgroundColor: '#cb202d',
         borderRadius: 8,
         minWidth: 16,
         height: 16,
@@ -871,7 +879,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         ...Platform.select({
             ios: {
-                shadowColor: '#E60E1C',
+                shadowColor: '#cb202d',
                 shadowOffset: { width: 0, height: 8 },
                 shadowOpacity: 0.25,
                 shadowRadius: 16,
@@ -939,12 +947,12 @@ const styles = StyleSheet.create({
     ctaText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#E60E1C',
+        color: '#cb202d',
         marginRight: 6,
     },
     ctaArrow: {
         fontSize: 18,
-        color: '#E60E1C',
+        color: '#cb202d',
         fontWeight: '700',
     },
     heroImage: {
@@ -1016,16 +1024,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         marginBottom: 16,
     },
+    sectionTitleWithIcon: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '800',
-        color: '#1A1A1A',
+        color: '#2d2d2d',
         letterSpacing: -0.3,
+        marginLeft: 8,
     },
     seeAllText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#E60E1C',
+        color: '#cb202d',
     },
 
     // Modern Offers
@@ -1148,7 +1161,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     modernPaginationDotActive: {
-        backgroundColor: '#E60E1C',
+        backgroundColor: '#cb202d',
         width: 20,
         height: 6,
         borderRadius: 3,
@@ -1237,7 +1250,7 @@ const styles = StyleSheet.create({
     modernItemName: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#1A1A1A',
+        color: '#2d2d2d',
         marginBottom: 6,
     },
     modernItemDesc: {
@@ -1254,10 +1267,10 @@ const styles = StyleSheet.create({
     modernItemPrice: {
         fontSize: 17,
         fontWeight: '800',
-        color: '#1A1A1A',
+        color: '#2d2d2d',
     },
     addButton: {
-        backgroundColor: '#E60E1C',
+        backgroundColor: '#cb202d',
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 8,
@@ -1387,7 +1400,7 @@ const styles = StyleSheet.create({
     businessTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1A1A1A',
+        color: '#2d2d2d',
         marginBottom: 6,
     },
     statusRow: {
@@ -1449,6 +1462,6 @@ const styles = StyleSheet.create({
     modernCallText: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#E60E1C',
+        color: '#cb202d',
     },
 });

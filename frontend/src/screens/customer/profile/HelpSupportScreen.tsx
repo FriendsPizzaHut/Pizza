@@ -1,148 +1,176 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { StatusBar } from 'expo-status-bar';
+import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function HelpSupportScreen() {
+    const navigation = useNavigation();
     const [selectedFaq, setSelectedFaq] = useState<number | null>(null);
-    const [message, setMessage] = useState('');
 
     const faqs = [
         {
             id: 1,
-            question: 'How long does delivery take?',
-            answer: 'Our standard delivery time is 25-35 minutes. During peak hours (lunch and dinner), it may take up to 45 minutes. You\'ll receive real-time updates on your order status.',
+            question: 'How do I track my order?',
+            answer: 'You can track your order in real-time from the \'My Orders\' section. You\'ll receive push notifications about order status updates including preparation, dispatch, and delivery.',
         },
         {
             id: 2,
             question: 'What are your delivery charges?',
-            answer: 'Delivery is free for orders above $20. For orders below $20, we charge a $2.99 delivery fee. No hidden charges!',
+            answer: 'Free delivery on orders above ₹199. Below that, delivery charges of ₹29 apply. No delivery charges for pickup orders.',
         },
         {
             id: 3,
-            question: 'Can I modify or cancel my order?',
-            answer: 'You can modify or cancel your order within 5 minutes of placing it. After that, the preparation begins and changes aren\'t possible.',
+            question: 'Can I modify my order after placing it?',
+            answer: 'You can modify your order within 2 minutes of placing it from the order confirmation screen. After that, please contact our support team for assistance.',
         },
         {
             id: 4,
             question: 'What payment methods do you accept?',
-            answer: 'We accept all major credit cards (Visa, Mastercard, American Express), PayPal, Apple Pay, Google Pay, and cash on delivery.',
+            answer: 'We accept all major credit/debit cards, UPI payments, net banking, mobile wallets like Paytm & GPay, and cash on delivery for your convenience.',
         },
         {
             id: 5,
-            question: 'Do you have vegan options?',
-            answer: 'Yes! We offer vegan cheese and a variety of vegetable toppings. All our pizza doughs are vegan-friendly except the garlic bread crust.',
+            question: 'Do you offer vegetarian and vegan options?',
+            answer: 'Yes! We have extensive vegetarian options and select vegan pizzas. Look for the green dot (veg) and \'V\' symbol (vegan) on menu items.',
+        },
+        {
+            id: 6,
+            question: 'What\'s your refund policy?',
+            answer: 'Full refund is provided if order is cancelled within 5 minutes of placing. For quality issues, we offer full refund, store credit, or replacement based on the situation.',
         },
     ];
 
     const contactOptions = [
         {
-            title: '📞 Call Us',
-            subtitle: '+1 (555) 123-PIZZA',
+            icon: 'phone',
+            title: 'Call Us',
+            subtitle: '+91 98765 43210',
             description: 'Available 24/7 for urgent matters',
+            color: '#4CAF50',
         },
         {
-            title: '💬 Live Chat',
-            subtitle: 'Chat with our support team',
-            description: 'Mon-Sun: 9 AM - 11 PM',
-        },
-        {
-            title: '📧 Email Support',
+            icon: 'email',
+            title: 'Email Support',
             subtitle: 'support@friendspizzahut.com',
             description: 'We respond within 4 hours',
+            color: '#FF9800',
         },
     ];
 
-    const handleSendMessage = () => {
-        if (message.trim()) {
-            Alert.alert(
-                'Message Sent!',
-                'Thank you for contacting us. We\'ll get back to you within 4 hours.',
-                [{ text: 'OK', onPress: () => setMessage('') }]
-            );
-        }
-    };
-
     return (
         <View style={styles.container}>
+            <StatusBar style="dark" backgroundColor="#fff" />
+
+            {/* Clean Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>❓ Help & Support</Text>
+                <View style={styles.headerContent}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                        <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>Help & Support</Text>
+                    <View style={styles.placeholder} />
+                </View>
             </View>
 
-            <ScrollView style={styles.content}>
-                {/* Quick Contact */}
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Quick Contact Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Contact</Text>
-                    {contactOptions.map((option, index) => (
-                        <TouchableOpacity key={index} style={styles.contactCard}>
-                            <View style={styles.contactInfo}>
-                                <Text style={styles.contactTitle}>{option.title}</Text>
-                                <Text style={styles.contactSubtitle}>{option.subtitle}</Text>
-                                <Text style={styles.contactDescription}>{option.description}</Text>
-                            </View>
-                            <Text style={styles.arrow}>›</Text>
-                        </TouchableOpacity>
-                    ))}
+                    <LinearGradient
+                        colors={['#4CAF50', '#45A049']}
+                        style={styles.sectionHeader}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                    >
+                        <MaterialIcons name="support-agent" size={20} color="white" />
+                        <Text style={styles.sectionTitle}>Quick Contact</Text>
+                    </LinearGradient>
+
+                    <View style={styles.sectionContent}>
+                        {contactOptions.map((option, index) => (
+                            <TouchableOpacity key={index} style={styles.contactCard}>
+                                <View style={[styles.iconContainer, { backgroundColor: option.color + '20' }]}>
+                                    <MaterialIcons name={option.icon as any} size={24} color={option.color} />
+                                </View>
+                                <View style={styles.contactInfo}>
+                                    <Text style={styles.contactTitle}>{option.title}</Text>
+                                    <Text style={styles.contactSubtitle}>{option.subtitle}</Text>
+                                    <Text style={styles.contactDescription}>{option.description}</Text>
+                                </View>
+                                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 {/* FAQ Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-                    {faqs.map((faq) => (
-                        <View key={faq.id} style={styles.faqCard}>
-                            <TouchableOpacity
-                                style={styles.faqQuestion}
-                                onPress={() => setSelectedFaq(selectedFaq === faq.id ? null : faq.id)}
-                            >
-                                <Text style={styles.faqQuestionText}>{faq.question}</Text>
-                                <Text style={[styles.faqArrow, selectedFaq === faq.id && styles.faqArrowOpen]}>
-                                    {selectedFaq === faq.id ? '−' : '+'}
-                                </Text>
-                            </TouchableOpacity>
-                            {selectedFaq === faq.id && (
-                                <View style={styles.faqAnswer}>
-                                    <Text style={styles.faqAnswerText}>{faq.answer}</Text>
-                                </View>
-                            )}
-                        </View>
-                    ))}
-                </View>
+                    <LinearGradient
+                        colors={['#2196F3', '#1976D2']}
+                        style={styles.sectionHeader}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                    >
+                        <MaterialIcons name="help-outline" size={20} color="white" />
+                        <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+                    </LinearGradient>
 
-                {/* Contact Form */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Send us a Message</Text>
-                    <View style={styles.formContainer}>
-                        <TextInput
-                            style={styles.messageInput}
-                            placeholder="Describe your issue or question..."
-                            multiline
-                            numberOfLines={6}
-                            value={message}
-                            onChangeText={setMessage}
-                            textAlignVertical="top"
-                        />
-                        <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-                            <Text style={styles.sendButtonText}>Send Message</Text>
-                        </TouchableOpacity>
+                    <View style={styles.sectionContent}>
+                        {faqs.map((faq) => (
+                            <View key={faq.id} style={styles.faqCard}>
+                                <TouchableOpacity
+                                    style={styles.faqQuestion}
+                                    onPress={() => setSelectedFaq(selectedFaq === faq.id ? null : faq.id)}
+                                >
+                                    <Text style={styles.faqQuestionText}>{faq.question}</Text>
+                                    <MaterialIcons
+                                        name={selectedFaq === faq.id ? "expand-less" : "expand-more"}
+                                        size={24}
+                                        color="#666"
+                                    />
+                                </TouchableOpacity>
+                                {selectedFaq === faq.id && (
+                                    <View style={styles.faqAnswer}>
+                                        <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ))}
                     </View>
                 </View>
 
                 {/* Additional Resources */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Additional Resources</Text>
+                    <LinearGradient
+                        colors={['#9C27B0', '#7B1FA2']}
+                        style={styles.sectionHeader}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                    >
+                        <MaterialIcons name="library-books" size={20} color="white" />
+                        <Text style={styles.sectionTitle}>Additional Resources</Text>
+                    </LinearGradient>
 
-                    <TouchableOpacity style={styles.resourceButton}>
-                        <Text style={styles.resourceButtonText}>📋 Terms of Service</Text>
-                        <Text style={styles.arrow}>›</Text>
-                    </TouchableOpacity>
+                    <View style={styles.sectionContent}>
+                        <TouchableOpacity style={styles.resourceButton}>
+                            <MaterialIcons name="description" size={20} color="#666" />
+                            <Text style={styles.resourceButtonText}>Terms of Service</Text>
+                            <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.resourceButton}>
-                        <Text style={styles.resourceButtonText}>🔒 Privacy Policy</Text>
-                        <Text style={styles.arrow}>›</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity style={styles.resourceButton}>
+                            <MaterialIcons name="privacy-tip" size={20} color="#666" />
+                            <Text style={styles.resourceButtonText}>Privacy Policy</Text>
+                            <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.resourceButton}>
-                        <Text style={styles.resourceButtonText}>📱 App Tutorial</Text>
-                        <Text style={styles.arrow}>›</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity style={styles.resourceButton}>
+                            <MaterialIcons name="help-center" size={20} color="#666" />
+                            <Text style={styles.resourceButtonText}>App Tutorial</Text>
+                            <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </View>
@@ -152,64 +180,106 @@ export default function HelpSupportScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f8f9fa',
     },
     header: {
-        backgroundColor: '#FF6B6B',
-        padding: 20,
-        paddingTop: 60,
+        backgroundColor: '#fff',
+        paddingTop: 50,
+        paddingBottom: 16,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F8F8F8',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        flex: 1,
         textAlign: 'center',
+        marginHorizontal: 16,
+    },
+    placeholder: {
+        width: 40,
     },
     content: {
         flex: 1,
+        paddingBottom: 20,
     },
     section: {
-        backgroundColor: '#fff',
-        marginVertical: 8,
-        padding: 20,
+        marginTop: 16,
+        backgroundColor: '#ffffff',
+        marginHorizontal: 16,
+        borderRadius: 12,
+        overflow: 'hidden',
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 8,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'white',
+        flex: 1,
+    },
+    sectionContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 8,
     },
     contactCard: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 15,
+        paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
     },
     contactInfo: {
         flex: 1,
     },
     contactTitle: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     contactSubtitle: {
-        fontSize: 14,
-        color: '#FF6B6B',
+        fontSize: 13,
+        color: '#666',
         fontWeight: '500',
         marginBottom: 2,
     },
     contactDescription: {
-        fontSize: 12,
-        color: '#666',
-    },
-    arrow: {
-        fontSize: 18,
-        color: '#ccc',
-        fontWeight: 'bold',
+        fontSize: 11,
+        color: '#999',
     },
     faqCard: {
         borderBottomWidth: 1,
@@ -219,67 +289,36 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 15,
+        paddingVertical: 16,
     },
     faqQuestionText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#333',
         fontWeight: '500',
         flex: 1,
-    },
-    faqArrow: {
-        fontSize: 20,
-        color: '#FF6B6B',
-        fontWeight: 'bold',
-        width: 25,
-        textAlign: 'center',
-    },
-    faqArrowOpen: {
-        transform: [{ rotate: '0deg' }],
+        marginRight: 12,
     },
     faqAnswer: {
-        paddingBottom: 15,
-        paddingRight: 25,
+        paddingBottom: 16,
+        paddingRight: 36,
     },
     faqAnswerText: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#666',
-        lineHeight: 20,
-    },
-    formContainer: {
-        marginTop: 10,
-    },
-    messageInput: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        backgroundColor: '#f9f9f9',
-        minHeight: 120,
-        marginBottom: 15,
-    },
-    sendButton: {
-        backgroundColor: '#FF6B6B',
-        padding: 15,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    sendButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+        lineHeight: 18,
     },
     resourceButton: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 15,
+        paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+        gap: 12,
     },
     resourceButtonText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#333',
+        flex: 1,
+        fontWeight: '500',
     },
 });

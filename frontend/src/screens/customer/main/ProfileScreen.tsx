@@ -1,13 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { RootState, clearAuthState } from '../../../../redux/store';
 import { logout } from '../../../../redux/slices/authSlice';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../../types/navigation';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList>;
+
+const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
     const navigation = useNavigation<NavigationProp>();
@@ -20,55 +25,138 @@ export default function ProfileScreen() {
     };
 
     const profileOptions = [
-        { title: '📍 Delivery Addresses', screen: 'DeliveryAddresses' as const },
-        { title: '💳 Payment Methods', screen: 'PaymentMethods' as const },
-        { title: '📜 Order History', screen: 'OrderHistory' as const },
-        { title: '⚙️ Account Settings', screen: 'AccountSettings' as const },
-        { title: '❓ Help & Support', screen: 'HelpSupport' as const },
+        {
+            title: 'Delivery Addresses',
+            screen: 'DeliveryAddresses' as const,
+            icon: 'location-on',
+            iconType: 'MaterialIcons' as const,
+            color: '#cb202d',
+            bgColor: '#FFEBEE'
+        },
+        {
+            title: 'Order History',
+            screen: 'OrderHistory' as const,
+            icon: 'history',
+            iconType: 'MaterialIcons' as const,
+            color: '#FF9800',
+            bgColor: '#FFF3E0'
+        },
+        {
+            title: 'Account Settings',
+            screen: 'AccountSettings' as const,
+            icon: 'settings',
+            iconType: 'MaterialIcons' as const,
+            color: '#2196F3',
+            bgColor: '#E3F2FD'
+        },
+        {
+            title: 'Help & Support',
+            screen: 'HelpSupport' as const,
+            icon: 'help-circle',
+            iconType: 'MaterialCommunityIcons' as const,
+            color: '#9C27B0',
+            bgColor: '#F3E5F5'
+        },
     ];
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#f4f4f2" />
+
+            {/* Clean Centered Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>👤 Profile</Text>
-            </View>
+                <TouchableOpacity
+                    style={styles.editButton}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('AccountSettings')}
+                >
+                    <MaterialIcons name="edit" size={18} color="#2d2d2d" />
+                </TouchableOpacity>
 
-            <ScrollView style={styles.content}>
+                {/* Centered Profile Section */}
                 <View style={styles.profileSection}>
-                    <View style={styles.profileCard}>
-                        <Text style={styles.profileLabel}>Name</Text>
-                        <Text style={styles.profileValue}>{name}</Text>
+                    {/* Profile Avatar */}
+                    <View style={styles.avatarContainer}>
+                        <Image
+                            source={{ uri: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg' }}
+                            style={styles.avatar}
+                        />
+                        <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8}>
+                            <MaterialIcons name="camera-alt" size={16} color="#fff" />
+                        </TouchableOpacity>
                     </View>
 
-                    <View style={styles.profileCard}>
-                        <Text style={styles.profileLabel}>Email</Text>
-                        <Text style={styles.profileValue}>{email}</Text>
-                    </View>
-
-                    <View style={styles.profileCard}>
-                        <Text style={styles.profileLabel}>Account Type</Text>
-                        <Text style={styles.profileValue}>{role?.toUpperCase()}</Text>
+                    {/* Profile Info */}
+                    <View style={styles.profileInfo}>
+                        <Text style={styles.userName}>{name || 'Pizza Lover'}</Text>
+                        <Text style={styles.userPhone}>+91 98765 43210</Text>
+                        <Text style={styles.userEmail}>{email || 'user@example.com'}</Text>
                     </View>
                 </View>
+            </View>
 
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Menu Options */}
                 <View style={styles.menuSection}>
-                    <Text style={styles.sectionTitle}>Account Management</Text>
+                    <Text style={styles.sectionTitle}>Account</Text>
 
                     {profileOptions.map((option, index) => (
                         <TouchableOpacity
                             key={index}
                             style={styles.menuButton}
                             onPress={() => navigation.navigate(option.screen)}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.menuButtonText}>{option.title}</Text>
-                            <Text style={styles.arrow}>›</Text>
+                            <View style={styles.menuButtonLeft}>
+                                <View style={[styles.iconContainer, { backgroundColor: option.bgColor }]}>
+                                    {option.iconType === 'MaterialIcons' ? (
+                                        <MaterialIcons name={option.icon as any} size={20} color={option.color} />
+                                    ) : (
+                                        <MaterialCommunityIcons name={option.icon as any} size={20} color={option.color} />
+                                    )}
+                                </View>
+                                <Text style={styles.menuButtonText}>{option.title}</Text>
+                            </View>
+                            <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
                         </TouchableOpacity>
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Text style={styles.logoutButtonText}>🚪 Logout</Text>
-                </TouchableOpacity>
+                {/* App Info */}
+                <View style={styles.appInfoSection}>
+                    <Text style={styles.sectionTitle}>App</Text>
+
+                    <TouchableOpacity style={styles.menuButton}>
+                        <View style={styles.menuButtonLeft}>
+                            <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+                                <MaterialIcons name="info" size={20} color="#2196F3" />
+                            </View>
+                            <Text style={styles.menuButtonText}>About App</Text>
+                        </View>
+                        <Text style={styles.versionText}>v1.0.0</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuButton}>
+                        <View style={styles.menuButtonLeft}>
+                            <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
+                                <MaterialIcons name="star-rate" size={20} color="#FF9800" />
+                            </View>
+                            <Text style={styles.menuButtonText}>Rate Us</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Logout Button */}
+                <View style={styles.logoutSection}>
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <MaterialIcons name="logout" size={20} color="#fff" />
+                        <Text style={styles.logoutButtonText}>Sign Out</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Bottom Spacing */}
+                <View style={styles.bottomSpacing} />
             </ScrollView>
         </View>
     );
@@ -77,89 +165,169 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f4f4f2',
     },
     header: {
-        backgroundColor: '#FF6B6B',
-        padding: 20,
-        paddingTop: 60,
+        backgroundColor: '#f4f4f2',
+        paddingTop: 50,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        position: 'relative',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#fff',
-        textAlign: 'center',
+    editButton: {
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        backgroundColor: '#F8F8F8',
+        borderRadius: 22,
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    profileSection: {
+        alignItems: 'center',
+        paddingTop: 20,
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginBottom: 20,
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        borderWidth: 4,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    cameraButton: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        backgroundColor: '#cb202d',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    profileInfo: {
+        alignItems: 'center',
+    },
+    userName: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#2d2d2d',
+        marginBottom: 6,
+        letterSpacing: -0.3,
+    },
+    userPhone: {
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 4,
+        fontWeight: '500',
+    },
+    userEmail: {
+        fontSize: 14,
+        color: '#8E8E93',
+        fontWeight: '400',
     },
     content: {
         flex: 1,
     },
-    profileSection: {
-        padding: 20,
-    },
-    profileCard: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    profileLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 5,
-    },
-    profileValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
     menuSection: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingTop: 32,
+        paddingBottom: 16,
     },
     sectionTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
+        fontWeight: '800',
+        color: '#2d2d2d',
+        marginBottom: 16,
+        letterSpacing: -0.3,
     },
     menuButton: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
+        backgroundColor: 'transparent',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        marginBottom: 8,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+    },
+    menuButtonLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     menuButtonText: {
         fontSize: 16,
-        color: '#333',
+        fontWeight: '600',
+        color: '#2d2d2d',
     },
-    arrow: {
-        fontSize: 18,
-        color: '#ccc',
-        fontWeight: 'bold',
+    appInfoSection: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+    },
+    versionText: {
+        fontSize: 14,
+        color: '#8E8E93',
+        fontWeight: '500',
+    },
+    logoutSection: {
+        paddingHorizontal: 16,
+        paddingVertical: 16,
     },
     logoutButton: {
-        backgroundColor: '#ff4444',
-        margin: 20,
-        padding: 15,
-        borderRadius: 10,
+        backgroundColor: '#cb202d',
+        paddingVertical: 16,
+        borderRadius: 16,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        shadowColor: '#cb202d',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
     },
     logoutButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
+        marginLeft: 8,
+    },
+    bottomSpacing: {
+        height: 40,
     },
 });
