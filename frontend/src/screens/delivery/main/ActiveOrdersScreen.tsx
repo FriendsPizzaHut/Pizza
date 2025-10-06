@@ -1,20 +1,280 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions, Image, Animated, PanResponder, Easing, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DeliveryStackParamList } from '../../../types/navigation';
+import { DeliveryStackParamList, DeliveryTabParamList } from '../../../types/navigation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-type NavigationProp = NativeStackNavigationProp<DeliveryStackParamList>;
+type NavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<DeliveryTabParamList, 'ActiveOrders'>,
+    NativeStackNavigationProp<DeliveryStackParamList>
+>;
+
+// Swipeable Slider Component
+interface SwipeToConfirmProps {
+    onConfirm: () => Promise<void>;
+    status: string;
+    buttonText: string;
+    buttonColor: string;
+    icon: string;
+}
+
+const SwipeToConfirm: React.FC<SwipeToConfirmProps> = ({ onConfirm, status, buttonText, buttonColor, icon }) => {
+    const sliderWidth = width - 64; // Account for card padding
+    const buttonSize = 56;
+    const maxSlide = sliderWidth - buttonSize - 8;
+
+    const [isCompleting, setIsCompleting] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const pan = useRef(new Animated.Value(0)).current;
+    const backgroundOpacity = useRef(new Animated.Value(1)).current;
+    const textOpacity = useRef(new Animated.Value(1)).current;
+    const iconScale = useRef(new Animated.Value(1)).current;
+    const loadingRotation = useRef(new Animated.Value(0)).current;
+    const successScale = useRef(new Animated.Value(1)).current; // Start at 1 to show icon
+
+    // Spinning animation for loader
+    const startLoadingAnimation = () => {
+        loadingRotation.setValue(0);
+        Animated.loop(
+            Animated.timing(loadingRotation, {
+                toValue: 1,
+                duration: 1000,
+                useNativeDriver: true,
+                easing: Easing.linear,
+            })
+        ).start();
+    };
+
+    // Success animation
+    const showSuccessAnimation = () => {
+        Animated.sequence([
+            Animated.spring(successScale, {
+                toValue: 1.2,
+                useNativeDriver: true,
+                tension: 100,
+                friction: 5,
+            }),
+            Animated.spring(successScale, {
+                toValue: 1,
+                useNativeDriver: true,
+                tension: 100,
+                friction: 5,
+            }),
+        ]).start();
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => !isCompleting && !isLoading,
+            onMoveShouldSetPanResponder: () => !isCompleting && !isLoading,
+            onPanResponderGrant: () => {
+                // Scale up icon on press with haptic-like feedback
+                Animated.spring(iconScale, {
+                    toValue: 1.15,
+                    useNativeDriver: true,
+                    tension: 100,
+                    friction: 5,
+                }).start();
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dx >= 0 && gestureState.dx <= maxSlide) {
+                    pan.setValue(gestureState.dx);
+                    // Smooth fade out text
+                    const newTextOpacity = Math.max(0, 1 - (gestureState.dx / (maxSlide * 0.5)));
+                    textOpacity.setValue(newTextOpacity);
+                    // Progressive background fade
+                    const newOpacity = Math.min(1, 0.3 + (gestureState.dx / maxSlide) * 0.7);
+                    backgroundOpacity.setValue(newOpacity);
+                }
+            },
+            onPanResponderRelease: async (_, gestureState) => {
+                const threshold = 0.6; // Lower threshold for easier completion
+                const velocity = gestureState.vx;
+
+                // Check if swipe is complete based on distance OR velocity
+                if (gestureState.dx > maxSlide * threshold || velocity > 0.5) {
+                    setIsCompleting(true);
+                    // Complete the slide smoothly
+                    Animated.parallel([
+                        Animated.timing(pan, {
+                            toValue: maxSlide,
+                            duration: 250,
+                            useNativeDriver: true,
+                            easing: Easing.out(Easing.cubic),
+                        }),
+                        Animated.timing(textOpacity, {
+                            toValue: 0,
+                            duration: 200,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(backgroundOpacity, {
+                            toValue: 1,
+                            duration: 250,
+                            useNativeDriver: true,
+                        }),
+                        Animated.spring(iconScale, {
+                            toValue: 1.4,
+                            useNativeDriver: true,
+                            tension: 80,
+                            friction: 5,
+                        })
+                    ]).start(async () => {
+                        // Show loading state
+                        setIsLoading(true);
+                        startLoadingAnimation();
+
+                        try {
+                            // Call the async function (will handle backend call)
+                            await onConfirm();
+
+                            // Show success animation
+                            setIsLoading(false);
+                            showSuccessAnimation();
+
+                            // Wait a bit to show success, then fade out
+                            setTimeout(() => {
+                                Animated.parallel([
+                                    Animated.timing(pan, {
+                                        toValue: 0,
+                                        duration: 400,
+                                        useNativeDriver: true,
+                                        easing: Easing.inOut(Easing.ease),
+                                    }),
+                                    Animated.timing(textOpacity, {
+                                        toValue: 1,
+                                        duration: 400,
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(backgroundOpacity, {
+                                        toValue: 1,
+                                        duration: 400,
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(iconScale, {
+                                        toValue: 1,
+                                        duration: 400,
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(successScale, {
+                                        toValue: 1,
+                                        duration: 300,
+                                        useNativeDriver: true,
+                                    }),
+                                ]).start(() => {
+                                    setIsCompleting(false);
+                                });
+                            }, 600);
+                        } catch (error) {
+                            // Handle error - snap back
+                            setIsLoading(false);
+                            Animated.parallel([
+                                Animated.spring(pan, {
+                                    toValue: 0,
+                                    useNativeDriver: true,
+                                    tension: 70,
+                                    friction: 8,
+                                }),
+                                Animated.spring(textOpacity, {
+                                    toValue: 1,
+                                    useNativeDriver: true,
+                                }),
+                                Animated.spring(backgroundOpacity, {
+                                    toValue: 1,
+                                    useNativeDriver: true,
+                                }),
+                                Animated.spring(iconScale, {
+                                    toValue: 1,
+                                    useNativeDriver: true,
+                                }),
+                            ]).start(() => {
+                                setIsCompleting(false);
+                            });
+                        }
+                    });
+                } else {
+                    // Smooth snap back with spring physics
+                    Animated.parallel([
+                        Animated.spring(pan, {
+                            toValue: 0,
+                            useNativeDriver: true,
+                            tension: 70,
+                            friction: 8,
+                            velocity: -velocity,
+                        }),
+                        Animated.spring(textOpacity, {
+                            toValue: 1,
+                            useNativeDriver: true,
+                            tension: 70,
+                            friction: 8,
+                        }),
+                        Animated.spring(backgroundOpacity, {
+                            toValue: 1,
+                            useNativeDriver: true,
+                            tension: 70,
+                            friction: 8,
+                        }),
+                        Animated.spring(iconScale, {
+                            toValue: 1,
+                            useNativeDriver: true,
+                            tension: 70,
+                            friction: 8,
+                        })
+                    ]).start();
+                }
+            },
+        })
+    ).current;
+
+    const spin = loadingRotation.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+    });
+
+    return (
+        <View style={styles.sliderContainer}>
+            <Animated.View style={[styles.sliderTrack, { backgroundColor: buttonColor + '20', opacity: backgroundOpacity }]}>
+                <Animated.View style={[styles.sliderTextContainer, { opacity: textOpacity }]}>
+                    <MaterialIcons name="chevron-right" size={20} color={buttonColor} style={styles.chevronIcon} />
+                    <Text style={[styles.sliderText, { color: buttonColor }]} numberOfLines={1}>
+                        {buttonText}
+                    </Text>
+                    <MaterialIcons name="chevron-right" size={20} color={buttonColor} style={styles.chevronIcon} />
+                </Animated.View>
+                <Animated.View
+                    style={[
+                        styles.sliderButton,
+                        {
+                            backgroundColor: buttonColor,
+                            transform: [{ translateX: pan }, { scale: iconScale }],
+                        },
+                    ]}
+                    {...panResponder.panHandlers}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Animated.View style={{ transform: [{ scale: successScale }] }}>
+                            <MaterialIcons name={icon as any} size={26} color="#fff" />
+                        </Animated.View>
+                    )}
+                </Animated.View>
+            </Animated.View>
+        </View>
+    );
+};
 
 export default function ActiveOrdersScreen() {
     const navigation = useNavigation<NavigationProp>();
 
-    const activeOrders = [
+    const [orders, setOrders] = useState([
         {
             id: '#ORD-158',
             customerName: 'Sarah Johnson',
@@ -31,6 +291,7 @@ export default function ActiveOrdersScreen() {
             earnings: '₹65.00',
             orderTime: '2:30 PM',
             currentStep: 2, // 0: going to restaurant, 1: at restaurant, 2: picked up, 3: delivered
+            paymentMethod: 'cod', // 'online' or 'cod'
         },
         {
             id: '#ORD-159',
@@ -48,31 +309,79 @@ export default function ActiveOrdersScreen() {
             earnings: '₹78.00',
             orderTime: '1:15 PM',
             currentStep: 1,
+            paymentMethod: 'online', // 'online' or 'cod'
         },
-    ];
+    ]);
 
-    const steps = ['Go to Restaurant', 'Pickup Order', 'Deliver Order', 'Complete'];
+    const handlePickup = async (orderId: string) => {
+        // Simulate backend API call with delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const handleCallCustomer = (customerPhone: string) => {
-        Alert.alert('Call Customer', `Call ${customerPhone}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Call', onPress: () => console.log('Calling customer...') }
-        ]);
+        setOrders(prevOrders =>
+            prevOrders.map(order =>
+                order.id === orderId
+                    ? { ...order, status: 'picked_up', currentStep: 2 }
+                    : order
+            )
+        );
     };
 
-    const handleCallRestaurant = (restaurantPhone: string) => {
-        Alert.alert('Call Restaurant', `Call ${restaurantPhone}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Call', onPress: () => console.log('Calling restaurant...') }
-        ]);
+    const handleDelivery = async (orderId: string) => {
+        // Simulate backend API call with delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        setOrders(prevOrders =>
+            prevOrders.map(order => {
+                if (order.id === orderId) {
+                    // Check payment method
+                    if (order.paymentMethod === 'cod') {
+                        // COD: Move to awaiting_payment state
+                        return { ...order, status: 'awaiting_payment', currentStep: 3 };
+                    } else {
+                        // Online payment: Mark as delivered
+                        return { ...order, status: 'delivered', currentStep: 3 };
+                    }
+                }
+                return order;
+            })
+        );
     };
 
-    const handlePickup = (orderId: string) => {
-        Alert.alert('Pickup Confirmed', 'Order has been picked up successfully!');
-    };
+    // Auto-remove online payment orders after 5 seconds when delivered
+    useEffect(() => {
+        const deliveredOnlineOrders = orders.filter(
+            order => order.status === 'delivered' && order.paymentMethod === 'online'
+        );
 
-    const handleDelivery = (orderId: string) => {
-        Alert.alert('Delivery Completed', 'Order has been delivered successfully!');
+        if (deliveredOnlineOrders.length > 0) {
+            const timers = deliveredOnlineOrders.map(order => {
+                return setTimeout(() => {
+                    setOrders(prevOrders =>
+                        prevOrders.filter(o => o.id !== order.id)
+                    );
+                }, 5000);
+            });
+
+            return () => {
+                timers.forEach(timer => clearTimeout(timer));
+            };
+        }
+    }, [orders]);
+
+    // Get color based on order status
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'ready_for_pickup':
+                return '#FF9800'; // Orange for pickup
+            case 'picked_up':
+                return '#0C7C59'; // Green for delivery
+            case 'awaiting_payment':
+                return '#FF9800'; // Orange for COD collection
+            case 'delivered':
+                return '#2196F3'; // Blue for completed
+            default:
+                return '#0C7C59';
+        }
     };
 
     return (
@@ -108,7 +417,7 @@ export default function ActiveOrdersScreen() {
                         resizeMode="cover"
                     />
                 </View>
-                {activeOrders.length === 0 ? (
+                {orders.length === 0 ? (
                     <View style={styles.emptyState}>
                         <MaterialIcons name="delivery-dining" size={64} color="#E0E0E0" />
                         <Text style={styles.emptyStateTitle}>No Active Orders</Text>
@@ -117,7 +426,7 @@ export default function ActiveOrdersScreen() {
                         </Text>
                     </View>
                 ) : (
-                    activeOrders.map((order, index) => (
+                    orders.map((order, index) => (
                         <View key={index} style={styles.orderCard}>
                             {/* Top Section with Customer Info */}
                             <View style={styles.topSection}>
@@ -129,7 +438,25 @@ export default function ActiveOrdersScreen() {
                                     />
                                 </View>
                                 <View style={styles.customerDetails}>
-                                    <Text style={styles.customerName}>{order.customerName}</Text>
+                                    <View style={styles.customerNameRow}>
+                                        <Text style={styles.customerName}>{order.customerName}</Text>
+                                        <View style={[
+                                            styles.paymentBadge,
+                                            { backgroundColor: order.paymentMethod === 'cod' ? '#FFF3E0' : '#E8F5E9' }
+                                        ]}>
+                                            <MaterialIcons
+                                                name={order.paymentMethod === 'cod' ? 'money' : 'check-circle'}
+                                                size={12}
+                                                color={order.paymentMethod === 'cod' ? '#FF9800' : '#4CAF50'}
+                                            />
+                                            <Text style={[
+                                                styles.paymentBadgeText,
+                                                { color: order.paymentMethod === 'cod' ? '#FF9800' : '#4CAF50' }
+                                            ]}>
+                                                {order.paymentMethod === 'cod' ? 'COD' : 'Paid'}
+                                            </Text>
+                                        </View>
+                                    </View>
                                     <Text style={styles.orderNumber}>Order {order.id}</Text>
                                 </View>
                             </View>
@@ -195,27 +522,56 @@ export default function ActiveOrdersScreen() {
                                     <Text style={styles.totalLabel}>Total</Text>
                                     <Text style={styles.totalAmount}>{order.total}</Text>
                                 </View>
-                            </View>                            {/* Action Buttons */}
-                            <View style={styles.actionsSection}>
-                                {order.status === 'ready_for_pickup' ? (
-                                    <TouchableOpacity
-                                        style={styles.pickupButton}
-                                        onPress={() => handlePickup(order.id)}
-                                    >
-                                        <MaterialIcons name="shopping-bag" size={16} color="#fff" />
-                                        <Text style={styles.pickupButtonText}>Pickup</Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity
-                                        style={styles.deliverButton}
-                                        onPress={() => handleDelivery(order.id)}
-                                    >
-                                        <MaterialIcons name="check-circle" size={16} color="#fff" />
-                                        <Text style={styles.deliverButtonText}>Complete</Text>
-                                    </TouchableOpacity>
-                                )}
                             </View>
 
+                            {/* Swipe Slider */}
+                            <View style={styles.actionsSection}>
+                                {order.status === 'ready_for_pickup' ? (
+                                    <SwipeToConfirm
+                                        key={`${order.id}-${order.status}`}
+                                        onConfirm={() => handlePickup(order.id)}
+                                        status={order.status}
+                                        buttonText="Slide to Pickup"
+                                        buttonColor={getStatusColor(order.status)}
+                                        icon="arrow-forward"
+                                    />
+                                ) : order.status === 'picked_up' ? (
+                                    <SwipeToConfirm
+                                        key={`${order.id}-${order.status}`}
+                                        onConfirm={() => handleDelivery(order.id)}
+                                        status={order.status}
+                                        buttonText="Slide to Complete"
+                                        buttonColor={getStatusColor(order.status)}
+                                        icon="check"
+                                    />
+                                ) : order.status === 'awaiting_payment' ? (
+                                    <View style={styles.paymentCollectionContainer}>
+                                        <View style={styles.codAlertBanner}>
+                                            <MaterialIcons name="money" size={24} color="#FF9800" />
+                                            <View style={styles.codAlertContent}>
+                                                <Text style={styles.codAlertTitle}>Cash on Delivery</Text>
+                                                <Text style={styles.codAlertSubtitle}>Collect payment from customer</Text>
+                                            </View>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.collectPaymentButton}
+                                            onPress={() => {
+                                                navigation.navigate('PaymentCollection', {
+                                                    orderId: order.id,
+                                                    customerName: order.customerName,
+                                                    totalAmount: order.total,
+                                                    orderItems: order.items,
+                                                    deliveryAddress: order.deliveryAddress,
+                                                });
+                                            }}
+                                        >
+                                            <MaterialIcons name="payment" size={20} color="#fff" />
+                                            <Text style={styles.collectPaymentButtonText}>Collect Cash {order.total}</Text>
+                                            <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : null}
+                            </View>
 
                         </View>
                     ))
@@ -343,12 +699,30 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
     },
+    customerNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+    },
     customerName: {
         fontSize: 16,
         fontWeight: '600',
         color: '#2d2d2d',
-        marginBottom: 4,
         lineHeight: 20,
+    },
+    paymentBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+        gap: 4,
+    },
+    paymentBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 0.3,
     },
     orderNumber: {
         fontSize: 14,
@@ -408,41 +782,9 @@ const styles = StyleSheet.create({
         color: '#2d2d2d',
     },
 
-    // Action Buttons
+    // Action Buttons (kept for reference but now using slider)
     actionsSection: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 8,
-    },
-    pickupButton: {
-        flex: 1,
-        backgroundColor: '#FF9800',
-        borderRadius: 12,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    pickupButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 6,
-    },
-    deliverButton: {
-        flex: 1,
-        backgroundColor: '#4CAF50',
-        borderRadius: 12,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    deliverButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 6,
+        marginTop: 12,
     },
 
     // Enhanced Sections
@@ -698,6 +1040,99 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 8,
         paddingVertical: 4,
+    },
+
+    // Swipe Slider Styles
+    sliderContainer: {
+        width: '100%',
+        marginTop: 4,
+    },
+    sliderTrack: {
+        height: 60,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: '#0C7C59' + '30',
+    },
+    sliderTextContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 60,
+    },
+    sliderText: {
+        fontSize: 14,
+        fontWeight: '600',
+        letterSpacing: 0.3,
+        textAlign: 'center',
+        marginHorizontal: 8,
+    },
+    chevronIcon: {
+        opacity: 0.5,
+    },
+    sliderButton: {
+        position: 'absolute',
+        left: 4,
+        width: 52,
+        height: 52,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 5,
+        elevation: 6,
+    },
+
+    // Payment Collection Styles
+    paymentCollectionContainer: {
+        gap: 12,
+    },
+    codAlertBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF3E0',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#FFE0B2',
+        gap: 12,
+    },
+    codAlertContent: {
+        flex: 1,
+    },
+    codAlertTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    codAlertSubtitle: {
+        fontSize: 13,
+        color: '#666',
+    },
+    collectPaymentButton: {
+        backgroundColor: '#FF9800',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 12,
+        shadowColor: '#FF9800',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+        gap: 8,
+    },
+    collectPaymentButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
     },
 
     bottomSpacing: {

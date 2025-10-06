@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar, Animated, Image } from 'react-native';
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { CustomerStackParamList } from '../../../types/navigation';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 interface PizzaDetails {
     id: string;
@@ -40,6 +41,7 @@ type PizzaDetailsRouteProp = RouteProp<CustomerStackParamList, 'PizzaDetails'>;
 
 export default function PizzaDetailsScreen() {
     const route = useRoute<PizzaDetailsRouteProp>();
+    const navigation = useNavigation();
     const { pizzaId } = route.params;
 
     const [selectedSize, setSelectedSize] = useState(0);
@@ -47,6 +49,7 @@ export default function PizzaDetailsScreen() {
     const [selectedToppings, setSelectedToppings] = useState<number[]>([]);
     const [quantity, setQuantity] = useState(1);
     const [pizza, setPizza] = useState<PizzaDetails | null>(null);
+    const [scrollY] = useState(new Animated.Value(0));
 
     // Mock pizza data - in real app, this would be fetched based on pizzaId
     const getPizzaDetails = (id: string): PizzaDetails => {
@@ -56,6 +59,7 @@ export default function PizzaDetailsScreen() {
                 name: 'Margherita Pizza',
                 description: 'A classic Italian pizza with fresh tomato sauce, mozzarella cheese, fresh basil leaves, and a drizzle of olive oil on our signature pizza dough.',
                 basePrice: 9.99,
+                image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80',
                 category: 'Classic Pizzas',
                 preparationTime: '15-20 mins',
                 isVegetarian: true,
@@ -78,7 +82,6 @@ export default function PizzaDetailsScreen() {
                     { name: 'Small', price: 0, servings: '1-2 people' },
                     { name: 'Medium', price: 3, servings: '2-3 people' },
                     { name: 'Large', price: 6, servings: '3-4 people' },
-                    { name: 'X-Large', price: 9, servings: '4-5 people' },
                 ],
                 crusts: [
                     { name: 'Original', price: 0 },
@@ -102,6 +105,7 @@ export default function PizzaDetailsScreen() {
                 name: 'Pepperoni Pizza',
                 description: 'Classic pepperoni pizza with premium pepperoni slices and mozzarella cheese.',
                 basePrice: 11.99,
+                image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=800&q=80',
                 category: 'Classic Pizzas',
                 preparationTime: '15-20 mins',
                 isVegetarian: false,
@@ -122,7 +126,6 @@ export default function PizzaDetailsScreen() {
                     { name: 'Small', price: 0, servings: '1-2 people' },
                     { name: 'Medium', price: 3, servings: '2-3 people' },
                     { name: 'Large', price: 6, servings: '3-4 people' },
-                    { name: 'X-Large', price: 9, servings: '4-5 people' },
                 ],
                 crusts: [
                     { name: 'Original', price: 0 },
@@ -210,435 +213,633 @@ export default function PizzaDetailsScreen() {
         return acc;
     }, {} as Record<string, (typeof pizza.toppings[0] & { index: number })[]>);
 
+    // Animated header opacity
+    const headerOpacity = scrollY.interpolate({
+        inputRange: [0, 200],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+    });
+
+    const imageScale = scrollY.interpolate({
+        inputRange: [-100, 0],
+        outputRange: [1.5, 1],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.imageSection}>
-                <View style={styles.pizzaImage}>
-                    <Text style={styles.pizzaImagePlaceholder}>🍕</Text>
-                </View>
-                <View style={styles.badges}>
-                    {pizza.isVegetarian && (
-                        <View style={[styles.badge, { backgroundColor: '#4CAF50' }]}>
-                            <Text style={styles.badgeText}>🌱 Vegetarian</Text>
-                        </View>
-                    )}
-                    {pizza.isSpicy && (
-                        <View style={[styles.badge, { backgroundColor: '#FF5722' }]}>
-                            <Text style={styles.badgeText}>🌶️ Spicy</Text>
-                        </View>
-                    )}
-                </View>
-            </View>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.3)" translucent />
 
-            <View style={styles.content}>
-                <View style={styles.headerSection}>
-                    <Text style={styles.pizzaName}>{pizza.name}</Text>
-                    <Text style={styles.category}>{pizza.category}</Text>
-                    <Text style={styles.description}>{pizza.description}</Text>
-                    <Text style={styles.prepTime}>⏱️ {pizza.preparationTime}</Text>
-                </View>
+            {/* Animated Header */}
+            <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
+                <TouchableOpacity
+                    style={styles.headerBackButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle} numberOfLines={1}>{pizza.name}</Text>
+                <View style={styles.headerPlaceholder} />
+            </Animated.View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📏 Choose Size</Text>
-                    {pizza.sizes.map((size, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={[
-                                styles.optionRow,
-                                selectedSize === index && styles.selectedOption
-                            ]}
-                            onPress={() => setSelectedSize(index)}
-                        >
-                            <View style={styles.optionInfo}>
-                                <Text style={styles.optionName}>{size.name}</Text>
-                                <Text style={styles.optionMeta}>{size.servings}</Text>
+            <Animated.ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                    { useNativeDriver: true }
+                )}
+            >
+                {/* Hero Image Section */}
+                <Animated.View style={[styles.heroSection, { transform: [{ scale: imageScale }] }]}>
+                    <View style={styles.pizzaImageContainer}>
+                        <Image
+                            source={{ uri: pizza.image || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80' }}
+                            style={styles.pizzaImage}
+                            resizeMode="cover"
+                        />
+                    </View>
+
+                    {/* Floating Back Button - On Image */}
+                    <TouchableOpacity
+                        style={styles.floatingBackButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <MaterialIcons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+
+                    {/* Badges on Image */}
+                    <View style={styles.imageBadges}>
+                        {pizza.isVegetarian && (
+                            <View style={[styles.imageBadge, { backgroundColor: '#0C7C59' }]}>
+                                <View style={styles.vegIcon}>
+                                    <View style={styles.vegDot} />
+                                </View>
+                                <Text style={styles.imageBadgeText}>Pure Veg</Text>
                             </View>
-                            <Text style={styles.optionPrice}>
-                                {size.price > 0 ? `+$${size.price.toFixed(2)}` : 'Included'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                        )}
+                        {pizza.isSpicy && (
+                            <View style={[styles.imageBadge, { backgroundColor: '#cb202d' }]}>
+                                <Text style={styles.imageBadgeText}>🌶️ Spicy</Text>
+                            </View>
+                        )}
+                    </View>
+                </Animated.View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🍞 Choose Crust</Text>
-                    {pizza.crusts.map((crust, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={[
-                                styles.optionRow,
-                                selectedCrust === index && styles.selectedOption
-                            ]}
-                            onPress={() => setSelectedCrust(index)}
-                        >
-                            <Text style={styles.optionName}>{crust.name}</Text>
-                            <Text style={styles.optionPrice}>
-                                {crust.price > 0 ? `+$${crust.price.toFixed(2)}` : 'Included'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                {/* Main Content */}
+                <View style={styles.contentContainer}>
+                    {/* Title Section */}
+                    <View style={styles.titleSection}>
+                        <View style={styles.titleRow}>
+                            <View style={styles.titleLeft}>
+                                <Text style={styles.pizzaName}>{pizza.name}</Text>
+                                <View style={styles.ratingRow}>
+                                    <View style={styles.ratingBadge}>
+                                        <MaterialIcons name="star" size={14} color="#fff" />
+                                        <Text style={styles.ratingText}>4.5</Text>
+                                    </View>
+                                    <Text style={styles.reviewsText}>(245 ratings)</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <Text style={styles.description}>{pizza.description}</Text>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🧀 Extra Toppings</Text>
-                    {Object.entries(toppingsByCategory).map(([category, toppings]) => (
-                        <View key={category}>
-                            <Text style={styles.toppingCategory}>{category}</Text>
-                            {toppings.map((topping) => (
+                        {/* Quick Info */}
+                        <View style={styles.quickInfoRow}>
+                            <View style={styles.quickInfoItem}>
+                                <MaterialIcons name="access-time" size={16} color="#cb202d" />
+                                <Text style={styles.quickInfoText}>{pizza.preparationTime}</Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Size Selection - Zomato Style */}
+                    <View style={styles.sectionCard}>
+                        <Text style={styles.cardTitle}>Choose Size</Text>
+                        <Text style={styles.cardSubtitle}>Select 1 option</Text>
+                        <View style={styles.optionsList}>
+                            {pizza.sizes.map((size, index) => (
                                 <TouchableOpacity
-                                    key={topping.index}
+                                    key={index}
                                     style={[
-                                        styles.optionRow,
-                                        selectedToppings.includes(topping.index) && styles.selectedOption
+                                        styles.radioOption,
+                                        selectedSize === index && styles.radioOptionSelected
                                     ]}
-                                    onPress={() => toggleTopping(topping.index)}
+                                    onPress={() => setSelectedSize(index)}
+                                    activeOpacity={0.7}
                                 >
-                                    <Text style={styles.optionName}>{topping.name}</Text>
-                                    <Text style={styles.optionPrice}>+${topping.price.toFixed(2)}</Text>
+                                    <View style={styles.radioLeft}>
+                                        <View style={[
+                                            styles.radioCircle,
+                                            selectedSize === index && styles.radioCircleSelected
+                                        ]}>
+                                            {selectedSize === index && <View style={styles.radioSelected} />}
+                                        </View>
+                                        <View style={styles.radioContent}>
+                                            <Text style={styles.radioTitle}>{size.name}</Text>
+                                            <Text style={styles.radioSubtitle}>{size.servings}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.radioPrice}>
+                                        {size.price > 0 ? `+₹${(size.price * 83).toFixed(0)}` : 'Free'}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
-                    ))}
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🥗 Ingredients</Text>
-                    <View style={styles.ingredientsList}>
-                        {pizza.ingredients.map((ingredient, index) => (
-                            <View key={index} style={styles.ingredientTag}>
-                                <Text style={styles.ingredientText}>{ingredient}</Text>
-                            </View>
-                        ))}
                     </View>
-                </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📊 Nutritional Info (per serving)</Text>
-                    <View style={styles.nutritionGrid}>
-                        <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionValue}>{pizza.nutritionalInfo.calories}</Text>
-                            <Text style={styles.nutritionLabel}>Calories</Text>
-                        </View>
-                        <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionValue}>{pizza.nutritionalInfo.protein}</Text>
-                            <Text style={styles.nutritionLabel}>Protein</Text>
-                        </View>
-                        <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionValue}>{pizza.nutritionalInfo.carbs}</Text>
-                            <Text style={styles.nutritionLabel}>Carbs</Text>
-                        </View>
-                        <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionValue}>{pizza.nutritionalInfo.fat}</Text>
-                            <Text style={styles.nutritionLabel}>Fat</Text>
+                    {/* Extra Toppings */}
+                    <View style={styles.sectionCard}>
+                        <Text style={styles.cardTitle}>Extra Toppings (Optional)</Text>
+                        <Text style={styles.cardSubtitle}>You can select multiple</Text>
+                        <View style={styles.optionsList}>
+                            {Object.entries(toppingsByCategory).map(([category, toppings]) => (
+                                <View key={category}>
+                                    <Text style={styles.toppingCategoryTitle}>{category}</Text>
+                                    {toppings.map((topping) => (
+                                        <TouchableOpacity
+                                            key={topping.index}
+                                            style={[
+                                                styles.checkboxOption,
+                                                selectedToppings.includes(topping.index) && styles.checkboxOptionSelected
+                                            ]}
+                                            onPress={() => toggleTopping(topping.index)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.radioLeft}>
+                                                <View style={[
+                                                    styles.checkbox,
+                                                    selectedToppings.includes(topping.index) && styles.checkboxSelected
+                                                ]}>
+                                                    {selectedToppings.includes(topping.index) && (
+                                                        <MaterialIcons name="check" size={14} color="#fff" />
+                                                    )}
+                                                </View>
+                                                <Text style={styles.radioTitle}>{topping.name}</Text>
+                                            </View>
+                                            <Text style={styles.radioPrice}>+₹{(topping.price * 83).toFixed(0)}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ))}
                         </View>
                     </View>
-                </View>
 
-                <View style={styles.quantitySection}>
-                    <Text style={styles.sectionTitle}>🔢 Quantity</Text>
-                    <View style={styles.quantityControls}>
-                        <TouchableOpacity
-                            style={styles.quantityButton}
-                            onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                        >
-                            <Text style={styles.quantityButtonText}>-</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.quantity}>{quantity}</Text>
-                        <TouchableOpacity
-                            style={styles.quantityButton}
-                            onPress={() => setQuantity(quantity + 1)}
-                        >
-                            <Text style={styles.quantityButtonText}>+</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Bottom Spacing */}
+                    <View style={styles.bottomSpacing} />
                 </View>
+            </Animated.ScrollView>
 
-                <View style={styles.priceBreakdown}>
-                    <Text style={styles.sectionTitle}>💰 Price Breakdown</Text>
-                    <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Base Price ({pizza.sizes[selectedSize].name})</Text>
-                        <Text style={styles.priceValue}>
-                            ${(pizza.basePrice + pizza.sizes[selectedSize].price).toFixed(2)}
-                        </Text>
+            {/* Floating Add to Cart Button - Zomato Style */}
+            <View style={styles.floatingFooter}>
+                <TouchableOpacity style={styles.addButton} onPress={addToCart}>
+                    <View style={styles.addButtonLeft}>
+                        <View style={styles.quantityControl}>
+                            <TouchableOpacity
+                                style={styles.quantityBtn}
+                                onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                            >
+                                <MaterialIcons name="remove" size={20} color="#fff" />
+                            </TouchableOpacity>
+                            <View style={styles.quantityDivider} />
+                            <Text style={styles.quantityText}>{quantity}</Text>
+                            <View style={styles.quantityDivider} />
+                            <TouchableOpacity
+                                style={styles.quantityBtn}
+                                onPress={() => setQuantity(quantity + 1)}
+                            >
+                                <MaterialIcons name="add" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    {pizza.crusts[selectedCrust].price > 0 && (
-                        <View style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>{pizza.crusts[selectedCrust].name} Crust</Text>
-                            <Text style={styles.priceValue}>
-                                +${pizza.crusts[selectedCrust].price.toFixed(2)}
-                            </Text>
-                        </View>
-                    )}
-                    {selectedToppings.map((index) => (
-                        <View key={index} style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>{pizza.toppings[index].name}</Text>
-                            <Text style={styles.priceValue}>
-                                +${pizza.toppings[index].price.toFixed(2)}
-                            </Text>
-                        </View>
-                    ))}
-                    {quantity > 1 && (
-                        <View style={styles.priceRow}>
-                            <Text style={styles.priceLabel}>Quantity × {quantity}</Text>
-                            <Text style={styles.priceValue}>
-                                × {quantity}
-                            </Text>
-                        </View>
-                    )}
-                    <View style={[styles.priceRow, styles.totalRow]}>
-                        <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalValue}>${calculateTotalPrice().toFixed(2)}</Text>
+                    <View style={styles.addButtonRight}>
+                        <Text style={styles.addButtonText}>Add item</Text>
+                        <Text style={styles.addButtonPrice}>₹{(calculateTotalPrice() * 83).toFixed(0)}</Text>
                     </View>
-                </View>
-            </View>
-
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.addToCartButton} onPress={addToCart}>
-                    <Text style={styles.addToCartText}>
-                        🛒 Add to Cart • ${calculateTotalPrice().toFixed(2)}
-                    </Text>
                 </TouchableOpacity>
             </View>
-        </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
-    },
-    imageSection: {
-        position: 'relative',
         backgroundColor: '#fff',
     },
-    pizzaImage: {
-        height: 300,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f0f0f0',
-    },
-    pizzaImagePlaceholder: {
-        fontSize: 120,
-    },
-    badges: {
-        position: 'absolute',
-        top: 20,
-        right: 20,
-        gap: 5,
-    },
-    badge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    content: {
-        padding: 20,
-    },
-    headerSection: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-    },
-    pizzaName: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 5,
-    },
-    category: {
-        fontSize: 16,
-        color: '#FF5722',
-        fontWeight: '600',
-        marginBottom: 10,
-    },
-    description: {
-        fontSize: 16,
-        color: '#666',
-        lineHeight: 24,
-        marginBottom: 15,
-    },
-    prepTime: {
-        fontSize: 14,
-        color: '#888',
-    },
-    section: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 15,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
-    },
-    optionRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        borderRadius: 8,
-        marginBottom: 8,
-        backgroundColor: '#f8f8f8',
-    },
-    selectedOption: {
-        backgroundColor: '#FFF3E0',
-        borderWidth: 2,
-        borderColor: '#FF5722',
-    },
-    optionInfo: {
+    scrollView: {
         flex: 1,
     },
-    optionName: {
+
+    // Animated Header
+    header: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 100,
+        paddingTop: 35,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        zIndex: 10,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    headerBackButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f8f8f8',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        flex: 1,
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 2,
+        color: '#2d2d2d',
+        marginHorizontal: 16,
+        textAlign: 'center',
     },
-    optionMeta: {
-        fontSize: 14,
-        color: '#666',
+    headerPlaceholder: {
+        width: 40,
     },
-    optionPrice: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#FF5722',
+
+    // Floating Back Button
+    floatingBackButton: {
+        position: 'absolute',
+        top: 50,
+        left: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
     },
-    toppingCategory: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#FF5722',
-        marginTop: 10,
+
+    // Hero Section
+    heroSection: {
+        position: 'relative',
+        height: 300,
+        backgroundColor: '#f8f8f8',
+        overflow: 'hidden',
+    },
+    pizzaImageContainer: {
+        flex: 1,
+        width: '100%',
+    },
+    pizzaImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imageBadges: {
+        position: 'absolute',
+        bottom: 16,
+        left: 16,
+        flexDirection: 'row',
+        gap: 8,
+    },
+    imageBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 4,
+        gap: 4,
+    },
+    imageBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    vegIcon: {
+        width: 14,
+        height: 14,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+        borderRadius: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    vegDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#fff',
+    },
+
+    // Content Container
+    contentContainer: {
+        backgroundColor: '#fff',
+    },
+
+    // Title Section
+    titleSection: {
+        padding: 16,
+        borderBottomWidth: 8,
+        borderBottomColor: '#f8f8f8',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
         marginBottom: 8,
     },
-    ingredientsList: {
+    titleLeft: {
+        flex: 1,
+    },
+    pizzaName: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginBottom: 6,
+        lineHeight: 28,
+    },
+    ratingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    ratingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#0C7C59',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
+        gap: 2,
+    },
+    ratingText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    reviewsText: {
+        fontSize: 12,
+        color: '#666',
+    },
+    description: {
+        fontSize: 14,
+        color: '#686b78',
+        lineHeight: 20,
+        marginTop: 12,
+        marginBottom: 12,
+    },
+    quickInfoRow: {
+        flexDirection: 'row',
+        gap: 16,
+        marginTop: 8,
+    },
+    quickInfoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    quickInfoText: {
+        fontSize: 13,
+        color: '#686b78',
+        fontWeight: '500',
+    },
+
+    // Section Cards
+    sectionCard: {
+        backgroundColor: '#fff',
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        borderBottomWidth: 8,
+        borderBottomColor: '#f8f8f8',
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginBottom: 4,
+    },
+    cardSubtitle: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 16,
+    },
+    optionsList: {
+        gap: 0,
+    },
+
+    // Radio Options (Size, Crust)
+    radioOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    radioOptionSelected: {
+        backgroundColor: '#fff5f5',
+    },
+    radioLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 12,
+    },
+    radioCircle: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 2,
+        borderColor: '#d4d5d9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+    },
+    radioCircleSelected: {
+        borderColor: '#cb202d',
+        backgroundColor: '#cb202d',
+    },
+    radioSelected: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#fff',
+    },
+    radioContent: {
+        flex: 1,
+    },
+    radioTitle: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    radioSubtitle: {
+        fontSize: 13,
+        color: '#666',
+    },
+    radioPrice: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#2d2d2d',
+    },
+
+    // Checkbox Options (Toppings)
+    checkboxOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    checkboxOptionSelected: {
+        backgroundColor: '#fff5f5',
+    },
+    checkbox: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#d4d5d9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+    },
+    checkboxSelected: {
+        backgroundColor: '#cb202d',
+        borderColor: '#cb202d',
+    },
+    checkboxLeft: {
+        flex: 1,
+    },
+    checkboxTitle: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    checkboxPrice: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#2d2d2d',
+    },
+    toppingCategoryTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#666',
+        marginTop: 16,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+
+    // Ingredients
+    ingredientsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
     },
-    ingredientTag: {
-        backgroundColor: '#f0f0f0',
+    ingredientChip: {
+        backgroundColor: '#f8f8f8',
         paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
+        paddingVertical: 8,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#ebebeb',
     },
     ingredientText: {
-        fontSize: 14,
-        color: '#666',
+        fontSize: 13,
+        color: '#686b78',
+        fontWeight: '500',
     },
-    nutritionGrid: {
+
+    // Floating Footer
+    floatingFooter: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        paddingBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    addButton: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        alignItems: 'center',
+        backgroundColor: '#0C7C59',
+        borderRadius: 10,
+        height: 56,
+        overflow: 'hidden',
     },
-    nutritionItem: {
+    addButtonLeft: {
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+        height: '100%',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    quantityControl: {
+        flexDirection: 'row',
         alignItems: 'center',
     },
-    nutritionValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FF5722',
-        marginBottom: 4,
-    },
-    nutritionLabel: {
-        fontSize: 12,
-        color: '#666',
-    },
-    quantitySection: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 15,
-    },
-    quantityControls: {
-        flexDirection: 'row',
+    quantityBtn: {
+        width: 40,
+        height: 56,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    quantityButton: {
-        width: 44,
-        height: 44,
-        backgroundColor: '#FF5722',
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
+    quantityDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
     },
-    quantityButtonText: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    quantity: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginHorizontal: 30,
-        color: '#333',
-    },
-    priceBreakdown: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-    },
-    priceRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 6,
-    },
-    priceLabel: {
-        fontSize: 16,
-        color: '#666',
-    },
-    priceValue: {
+    quantityText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
-    },
-    totalRow: {
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        marginTop: 10,
-        paddingTop: 15,
-    },
-    totalLabel: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    totalValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FF5722',
-    },
-    footer: {
-        padding: 20,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-    },
-    addToCartButton: {
-        backgroundColor: '#FF5722',
-        padding: 18,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    addToCartText: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
+        minWidth: 36,
+        textAlign: 'center',
+    },
+    addButtonRight: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+    },
+    addButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    addButtonPrice: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+    },
+
+    bottomSpacing: {
+        height: 100,
     },
     loadingText: {
         fontSize: 16,
-        color: '#666',
+        color: '#686b78',
         textAlign: 'center',
     },
 });

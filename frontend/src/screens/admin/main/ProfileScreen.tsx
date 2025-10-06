@@ -5,12 +5,15 @@ import { RootState, clearAuthState } from '../../../../redux/store';
 import { logout } from '../../../../redux/slices/authSlice';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width } = Dimensions.get('window');
 
-export default function AnalyticsScreen() {
+export default function ProfileScreen() {
     const { name, email, role } = useSelector((state: RootState) => state.auth);
     const dispatch = useDispatch();
+    const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
     const handleLogout = async () => {
         await clearAuthState();
@@ -24,23 +27,23 @@ export default function AnalyticsScreen() {
             iconType: 'MaterialIcons' as const,
             color: '#cb202d',
             bgColor: '#FFEBEE',
-            action: () => console.log('Restaurant Settings'),
+            action: () => navigation.navigate('RestaurantSettings'),
         },
         {
-            title: 'Staff Management',
+            title: 'User Management',
             icon: 'people',
-            iconType: 'MaterialIcons' as const,
-            color: '#FF9800',
-            bgColor: '#FFF3E0',
-            action: () => console.log('Staff Management'),
-        },
-        {
-            title: 'Business Reports',
-            icon: 'bar-chart',
             iconType: 'MaterialIcons' as const,
             color: '#2196F3',
             bgColor: '#E3F2FD',
-            action: () => console.log('Business Reports'),
+            action: () => navigation.navigate('UserManagement'),
+        },
+        {
+            title: 'Manage Offers',
+            icon: 'local-offer',
+            iconType: 'MaterialIcons' as const,
+            color: '#FF9800',
+            bgColor: '#FFF3E0',
+            action: () => navigation.navigate('OfferManagement'),
         },
         {
             title: 'Account Settings',
@@ -48,7 +51,7 @@ export default function AnalyticsScreen() {
             iconType: 'MaterialIcons' as const,
             color: '#4CAF50',
             bgColor: '#E8F5E9',
-            action: () => console.log('Account Settings'),
+            action: () => navigation.navigate('AccountSettings'),
         },
     ];
 

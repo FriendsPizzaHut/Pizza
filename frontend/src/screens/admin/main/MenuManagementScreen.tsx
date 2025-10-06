@@ -135,7 +135,7 @@ export default function MenuManagementScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.addButton}
-                        onPress={() => console.log('Add item pressed')}
+                        onPress={() => navigation.navigate('AddMenuItem')}
                     >
                         <MaterialIcons name="add" size={24} color="#fff" />
                     </TouchableOpacity>
@@ -265,7 +265,7 @@ export default function MenuManagementScreen() {
                                 <View style={styles.actionsSection}>
                                     <TouchableOpacity
                                         style={styles.editButton}
-                                        onPress={() => console.log('Edit item:', item.id)}
+                                        onPress={() => navigation.navigate('EditMenuItem', { itemId: item.id })}
                                     >
                                         <MaterialIcons name="edit" size={16} color="#2196F3" />
                                         <Text style={styles.editButtonText}>Edit</Text>

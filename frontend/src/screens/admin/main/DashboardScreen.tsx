@@ -67,7 +67,20 @@ export default function AdminDashboardScreen() {
         { day: 'Sun', revenue: 3600, orders: 144 },
     ];
 
+    const hourlyData = [
+        { hour: '9AM', orders: 12, revenue: 487 },
+        { hour: '10AM', orders: 18, revenue: 743 },
+        { hour: '11AM', orders: 24, revenue: 892 },
+        { hour: '12PM', orders: 45, revenue: 1653 },
+        { hour: '1PM', orders: 52, revenue: 1987 },
+        { hour: '2PM', orders: 38, revenue: 1456 },
+        { hour: '6PM', orders: 67, revenue: 2543 },
+        { hour: '7PM', orders: 73, revenue: 2876 },
+        { hour: '8PM', orders: 58, revenue: 2234 },
+    ];
+
     const maxRevenue = Math.max(...chartData.map(d => d.revenue));
+    const maxHourlyRevenue = Math.max(...hourlyData.map(d => d.revenue));
 
     return (
         <View style={styles.container}>
@@ -217,6 +230,73 @@ export default function AdminDashboardScreen() {
                                 <View style={styles.legendItem}>
                                     <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
                                     <Text style={styles.legendText}>Regular Day</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Hourly Sales Chart */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionTitleRow}>
+                            <View style={styles.sectionTitleWithIcon}>
+                                <MaterialIcons name="access-time" size={24} color="#cb202d" />
+                                <Text style={styles.sectionTitle}>Sales by Hour</Text>
+                            </View>
+                            <View style={styles.periodBadge}>
+                                <MaterialIcons name="today" size={14} color="#cb202d" />
+                                <Text style={styles.periodBadgeText}>Today</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.hourlyChartContainer}>
+                            {hourlyData.map((data, index) => {
+                                const barHeight = (data.revenue / maxHourlyRevenue) * 140;
+                                const isPeak = data.revenue === maxHourlyRevenue;
+
+                                return (
+                                    <View key={index} style={styles.hourlyBarWrapper}>
+                                        <View style={styles.hourlyBarWithValue}>
+                                            <Text style={[
+                                                styles.hourlyBarValueText,
+                                                isPeak && styles.hourlyBarValueTextHighlight
+                                            ]}>
+                                                ₹{(data.revenue / 1000).toFixed(1)}k
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.hourlyBar,
+                                                    {
+                                                        height: Math.max(barHeight, 20),
+                                                        backgroundColor: isPeak ? '#cb202d' : '#FF9800'
+                                                    }
+                                                ]}
+                                            >
+                                                {isPeak && (
+                                                    <View style={styles.peakIndicator}>
+                                                        <MaterialIcons name="star" size={12} color="#fff" />
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                        <Text style={styles.hourlyBarLabel}>{data.hour}</Text>
+                                        <View style={styles.hourlyOrdersBadge}>
+                                            <MaterialIcons name="shopping-cart" size={10} color="#8E8E93" />
+                                            <Text style={styles.hourlyOrdersText}>{data.orders}</Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+
+                        <View style={styles.hourlyChartFooter}>
+                            <View style={styles.hourlyChartLegend}>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: '#cb202d' }]} />
+                                    <Text style={styles.legendText}>Peak Hour</Text>
+                                </View>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
+                                    <Text style={styles.legendText}>Regular Hour</Text>
                                 </View>
                             </View>
                         </View>
@@ -957,5 +1037,86 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#F0F0F0',
         marginHorizontal: 20,
+    },
+
+    // Hourly Sales Chart
+    hourlyChartContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 200,
+        marginBottom: 16,
+        paddingHorizontal: 20,
+    },
+    hourlyBarWrapper: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    hourlyBarWithValue: {
+        alignItems: 'center',
+        marginBottom: 8,
+        width: '100%',
+    },
+    hourlyBarValueText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#666',
+        marginBottom: 6,
+    },
+    hourlyBarValueTextHighlight: {
+        color: '#cb202d',
+        fontSize: 11,
+    },
+    hourlyBar: {
+        width: '100%',
+        maxWidth: 28,
+        borderRadius: 8,
+        minHeight: 20,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingTop: 6,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.15,
+                shadowRadius: 6,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
+    },
+    hourlyBarLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginBottom: 4,
+    },
+    hourlyOrdersBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
+        gap: 3,
+    },
+    hourlyOrdersText: {
+        fontSize: 9,
+        fontWeight: '600',
+        color: '#8E8E93',
+    },
+    hourlyChartFooter: {
+        paddingTop: 16,
+        paddingHorizontal: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+        marginHorizontal: 16,
+    },
+    hourlyChartLegend: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 24,
     },
 });

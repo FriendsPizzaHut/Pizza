@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar, Platform, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 export default function EditMenuItemScreen() {
+    const navigation = useNavigation<NativeStackNavigationProp<any>>();
     const [itemData, setItemData] = useState({
         name: 'Margherita Pizza',
         description: 'Classic pizza with tomato sauce, mozzarella cheese, and fresh basil leaves',
-        category: 'Pizza',
+        category: 'Pizzas',
         price: '12.99',
         preparationTime: '15',
         ingredients: 'Pizza dough, tomato sauce, mozzarella cheese, fresh basil, olive oil',
@@ -14,50 +19,115 @@ export default function EditMenuItemScreen() {
         isAvailable: true,
     });
 
-    const categories = ['Pizza', 'Sides', 'Drinks', 'Desserts'];
+    const categories = ['Pizzas', 'Sides', 'Beverages', 'Desserts'];
 
     const handleSaveChanges = () => {
+        // Validate required fields
+        if (!itemData.name || !itemData.price || !itemData.preparationTime) {
+            Alert.alert('Missing Information', 'Please fill in all required fields (Name, Price, Prep Time)');
+            return;
+        }
+
         // Handle save changes
-        console.log('Saving changes:', itemData);
+        Alert.alert(
+            'Success',
+            'Changes have been saved successfully!',
+            [
+                {
+                    text: 'OK',
+                    onPress: () => navigation.goBack(),
+                },
+            ]
+        );
     };
 
     const handleDeleteItem = () => {
-        // Handle delete item
-        console.log('Deleting item');
+        Alert.alert(
+            'Delete Item',
+            'Are you sure you want to delete this menu item? This action cannot be undone.',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        console.log('Deleting item');
+                        navigation.goBack();
+                    },
+                },
+            ]
+        );
     };
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>✏️ Edit Menu Item</Text>
-            </View>
+            <StatusBar barStyle="dark-content" backgroundColor="#f4f4f2" />
 
-            <ScrollView style={styles.content}>
+            {/* Header */}
+            <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                    </TouchableOpacity>
+                    <View style={styles.headerCenter}>
+                        <Text style={styles.headerTitle}>Edit Menu Item</Text>
+                        <Text style={styles.headerSubtitle}>Update item details</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.deleteIconButton}
+                        onPress={handleDeleteItem}
+                    >
+                        <MaterialIcons name="delete-outline" size={24} color="#F44336" />
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.form}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Item Name *</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={itemData.name}
-                            onChangeText={(text) => setItemData({ ...itemData, name: text })}
-                            placeholder="Enter item name"
-                        />
+                    {/* Basic Information */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="info" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Basic Information</Text>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Item Name <Text style={styles.required}>*</Text></Text>
+                            <TextInput
+                                style={styles.input}
+                                value={itemData.name}
+                                onChangeText={(text) => setItemData({ ...itemData, name: text })}
+                                placeholder="e.g., Margherita Pizza"
+                                placeholderTextColor="#999"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Description</Text>
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                value={itemData.description}
+                                onChangeText={(text) => setItemData({ ...itemData, description: text })}
+                                placeholder="Describe your menu item..."
+                                placeholderTextColor="#999"
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Description</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            value={itemData.description}
-                            onChangeText={(text) => setItemData({ ...itemData, description: text })}
-                            placeholder="Enter item description"
-                            multiline
-                            numberOfLines={3}
-                        />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Category *</Text>
+                    {/* Category Selection */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="category" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Category <Text style={styles.required}>*</Text></Text>
+                        </View>
                         <View style={styles.categoryContainer}>
                             {categories.map((category) => (
                                 <TouchableOpacity
@@ -79,70 +149,107 @@ export default function EditMenuItemScreen() {
                         </View>
                     </View>
 
-                    <View style={styles.row}>
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>Price ($) *</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={itemData.price}
-                                onChangeText={(text) => setItemData({ ...itemData, price: text })}
-                                placeholder="0.00"
-                                keyboardType="numeric"
-                            />
+                    {/* Pricing & Time */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="attach-money" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Pricing & Time</Text>
                         </View>
 
-                        <View style={[styles.inputGroup, styles.halfWidth]}>
-                            <Text style={styles.label}>Prep Time (mins) *</Text>
+                        <View style={styles.row}>
+                            <View style={[styles.inputGroup, styles.halfWidth]}>
+                                <Text style={styles.label}>Price ($) <Text style={styles.required}>*</Text></Text>
+                                <View style={styles.inputWithIcon}>
+                                    <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, styles.inputWithPadding]}
+                                        value={itemData.price}
+                                        onChangeText={(text) => setItemData({ ...itemData, price: text })}
+                                        placeholder="0.00"
+                                        placeholderTextColor="#999"
+                                        keyboardType="decimal-pad"
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={[styles.inputGroup, styles.halfWidth]}>
+                                <Text style={styles.label}>Prep Time <Text style={styles.required}>*</Text></Text>
+                                <View style={styles.inputWithIcon}>
+                                    <MaterialIcons name="schedule" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, styles.inputWithPadding]}
+                                        value={itemData.preparationTime}
+                                        onChangeText={(text) => setItemData({ ...itemData, preparationTime: text })}
+                                        placeholder="15 mins"
+                                        placeholderTextColor="#999"
+                                        keyboardType="number-pad"
+                                    />
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Ingredients */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="restaurant" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Ingredients</Text>
+                        </View>
+                        <View style={styles.inputGroup}>
                             <TextInput
-                                style={styles.input}
-                                value={itemData.preparationTime}
-                                onChangeText={(text) => setItemData({ ...itemData, preparationTime: text })}
-                                placeholder="15"
-                                keyboardType="numeric"
+                                style={[styles.input, styles.textArea]}
+                                value={itemData.ingredients}
+                                onChangeText={(text) => setItemData({ ...itemData, ingredients: text })}
+                                placeholder="e.g., Tomato sauce, Mozzarella, Basil..."
+                                placeholderTextColor="#999"
+                                multiline
+                                numberOfLines={2}
                             />
                         </View>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Ingredients</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            value={itemData.ingredients}
-                            onChangeText={(text) => setItemData({ ...itemData, ingredients: text })}
-                            placeholder="List main ingredients (comma separated)"
-                            multiline
-                            numberOfLines={2}
-                        />
-                    </View>
-
-                    <View style={styles.imageSection}>
-                        <Text style={styles.label}>Item Image</Text>
-                        <View style={styles.currentImage}>
+                    {/* Image Upload */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="image" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Item Image</Text>
+                        </View>
+                        <View style={styles.currentImageContainer}>
                             <View style={styles.imagePlaceholder}>
-                                <Text style={styles.imageText}>📷 Current Image</Text>
+                                <MaterialIcons name="image" size={40} color="#ccc" />
+                                <Text style={styles.imageText}>Current Image</Text>
                             </View>
                             <TouchableOpacity style={styles.changeImageButton}>
+                                <MaterialIcons name="edit" size={18} color="#fff" />
                                 <Text style={styles.changeImageText}>Change Image</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View style={styles.optionsSection}>
-                        <Text style={styles.label}>Item Options</Text>
+                    {/* Item Options */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="tune" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Item Options</Text>
+                        </View>
 
                         <TouchableOpacity
                             style={styles.optionRow}
                             onPress={() => setItemData({ ...itemData, isVegetarian: !itemData.isVegetarian })}
                         >
+                            <MaterialIcons name="eco" size={20} color="#4CAF50" />
                             <View style={styles.optionInfo}>
-                                <Text style={styles.optionTitle}>🌱 Vegetarian</Text>
+                                <Text style={styles.optionTitle}>Vegetarian</Text>
                                 <Text style={styles.optionSubtext}>Mark as vegetarian item</Text>
                             </View>
                             <View style={[
-                                styles.checkbox,
-                                itemData.isVegetarian && styles.checkedBox
+                                styles.switch,
+                                itemData.isVegetarian && styles.switchActive
                             ]}>
-                                {itemData.isVegetarian && <Text style={styles.checkmark}>✓</Text>}
+                                <View style={[
+                                    styles.switchThumb,
+                                    itemData.isVegetarian && styles.switchThumbActive
+                                ]} />
                             </View>
                         </TouchableOpacity>
 
@@ -150,15 +257,19 @@ export default function EditMenuItemScreen() {
                             style={styles.optionRow}
                             onPress={() => setItemData({ ...itemData, isSpicy: !itemData.isSpicy })}
                         >
+                            <MaterialIcons name="local-fire-department" size={20} color="#FF5722" />
                             <View style={styles.optionInfo}>
-                                <Text style={styles.optionTitle}>🌶️ Spicy</Text>
+                                <Text style={styles.optionTitle}>Spicy</Text>
                                 <Text style={styles.optionSubtext}>Mark as spicy item</Text>
                             </View>
                             <View style={[
-                                styles.checkbox,
-                                itemData.isSpicy && styles.checkedBox
+                                styles.switch,
+                                itemData.isSpicy && styles.switchActive
                             ]}>
-                                {itemData.isSpicy && <Text style={styles.checkmark}>✓</Text>}
+                                <View style={[
+                                    styles.switchThumb,
+                                    itemData.isSpicy && styles.switchThumbActive
+                                ]} />
                             </View>
                         </TouchableOpacity>
 
@@ -166,81 +277,140 @@ export default function EditMenuItemScreen() {
                             style={styles.optionRow}
                             onPress={() => setItemData({ ...itemData, isAvailable: !itemData.isAvailable })}
                         >
+                            <MaterialIcons name="check-circle" size={20} color="#2196F3" />
                             <View style={styles.optionInfo}>
-                                <Text style={styles.optionTitle}>✅ Available</Text>
+                                <Text style={styles.optionTitle}>Available</Text>
                                 <Text style={styles.optionSubtext}>Item available for ordering</Text>
                             </View>
                             <View style={[
-                                styles.checkbox,
-                                itemData.isAvailable && styles.checkedBox
+                                styles.switch,
+                                itemData.isAvailable && styles.switchActive
                             ]}>
-                                {itemData.isAvailable && <Text style={styles.checkmark}>✓</Text>}
+                                <View style={[
+                                    styles.switchThumb,
+                                    itemData.isAvailable && styles.switchThumbActive
+                                ]} />
                             </View>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.statsSection}>
-                        <Text style={styles.label}>Item Statistics</Text>
+                    {/* Item Statistics */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="bar-chart" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Item Statistics</Text>
+                        </View>
                         <View style={styles.statsGrid}>
                             <View style={styles.statCard}>
+                                <MaterialIcons name="shopping-cart" size={24} color="#4CAF50" />
                                 <Text style={styles.statNumber}>87</Text>
                                 <Text style={styles.statLabel}>Orders Today</Text>
                             </View>
                             <View style={styles.statCard}>
+                                <MaterialIcons name="trending-up" size={24} color="#2196F3" />
                                 <Text style={styles.statNumber}>342</Text>
                                 <Text style={styles.statLabel}>This Week</Text>
                             </View>
                             <View style={styles.statCard}>
+                                <MaterialIcons name="star" size={24} color="#FF9800" />
                                 <Text style={styles.statNumber}>4.8</Text>
                                 <Text style={styles.statLabel}>Rating</Text>
                             </View>
                             <View style={styles.statCard}>
+                                <MaterialIcons name="attach-money" size={24} color="#cb202d" />
                                 <Text style={styles.statNumber}>$1,247</Text>
                                 <Text style={styles.statLabel}>Revenue</Text>
                             </View>
                         </View>
                     </View>
 
-                    <View style={styles.previewSection}>
-                        <Text style={styles.label}>Preview</Text>
+                    {/* Preview */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="visibility" size={20} color="#cb202d" />
+                            <Text style={styles.sectionTitle}>Customer Preview</Text>
+                        </View>
                         <View style={styles.previewCard}>
-                            <View style={styles.previewImage}>
-                                <Text style={styles.previewImageText}>📷</Text>
+                            {/* Image Section at Top */}
+                            <View style={styles.previewImageSection}>
+                                <View style={styles.previewImagePlaceholder}>
+                                    <MaterialIcons name="image" size={48} color="#ccc" />
+                                    <Text style={styles.previewImageText}>Preview Image</Text>
+                                </View>
+
+                                {/* Badges over image */}
+                                <View style={styles.previewBadgesContainer}>
+                                    <View style={[styles.previewVegIndicator, { borderColor: itemData.isVegetarian ? '#0F8A65' : '#D32F2F' }]}>
+                                        <View style={[styles.previewVegDot, { backgroundColor: itemData.isVegetarian ? '#0F8A65' : '#D32F2F' }]} />
+                                    </View>
+                                </View>
+
+                                {/* ADD button over image */}
+                                <View style={styles.previewAddButton}>
+                                    <Text style={styles.previewAddButtonText}>ADD</Text>
+                                </View>
                             </View>
-                            <View style={styles.previewContent}>
+
+                            {/* Content Section Below Image */}
+                            <View style={styles.previewContentSection}>
+                                {/* Pizza Name */}
                                 <Text style={styles.previewName}>
                                     {itemData.name || 'Item Name'}
                                 </Text>
-                                <Text style={styles.previewDescription}>
-                                    {itemData.description || 'Item description will appear here'}
-                                </Text>
-                                <View style={styles.previewTags}>
-                                    {itemData.isVegetarian && (
-                                        <View style={styles.previewTag}>
-                                            <Text style={styles.previewTagText}>🌱 Veg</Text>
-                                        </View>
-                                    )}
-                                    {itemData.isSpicy && (
-                                        <View style={styles.previewTag}>
-                                            <Text style={styles.previewTagText}>🌶️ Spicy</Text>
-                                        </View>
+
+                                {/* Rating and Time */}
+                                <View style={styles.previewRatingContainer}>
+                                    <View style={styles.previewRatingBadge}>
+                                        <Text style={styles.previewRatingText}>★ 4.8</Text>
+                                    </View>
+                                    <Text style={styles.previewReviews}>(342)</Text>
+                                    {itemData.preparationTime && (
+                                        <Text style={styles.previewPrepTime}>• {itemData.preparationTime} min</Text>
                                     )}
                                 </View>
-                                <Text style={styles.previewPrice}>
-                                    ${itemData.price || '0.00'}
+
+                                {/* Description */}
+                                <Text style={styles.previewDescription} numberOfLines={2}>
+                                    {itemData.description || 'Item description will appear here...'}
                                 </Text>
+
+                                {/* Tags */}
+                                {(itemData.isSpicy || itemData.isVegetarian) && (
+                                    <View style={styles.previewTagsRow}>
+                                        {itemData.isVegetarian && (
+                                            <View style={styles.previewTag}>
+                                                <MaterialIcons name="eco" size={12} color="#4CAF50" />
+                                                <Text style={styles.previewTagText}>Vegetarian</Text>
+                                            </View>
+                                        )}
+                                        {itemData.isSpicy && (
+                                            <View style={styles.previewTag}>
+                                                <MaterialIcons name="local-fire-department" size={12} color="#FF5722" />
+                                                <Text style={styles.previewTagText}>Spicy</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+
+                                {/* Price Section */}
+                                <View style={styles.previewPriceContainer}>
+                                    <Text style={styles.previewPrice}>
+                                        ${itemData.price || '0.00'}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
                     </View>
+                    {/* Bottom spacing */}
+                    <View style={{ height: 100 }} />
                 </View>
             </ScrollView>
 
+            {/* Floating Save Button */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteItem}>
-                    <Text style={styles.deleteButtonText}>🗑️ Delete Item</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
-                    <Text style={styles.saveButtonText}>💾 Save Changes</Text>
+                    <MaterialIcons name="check" size={20} color="#fff" />
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -250,267 +420,453 @@ export default function EditMenuItemScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f4f4f2',
+    },
+
+    // Header
+    headerSafeArea: {
+        backgroundColor: '#f4f4f2',
     },
     header: {
-        backgroundColor: '#FF9800',
-        padding: 20,
-        paddingTop: 60,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-        textAlign: 'center',
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F8F8F8',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginTop: 2,
+    },
+    deleteIconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFEBEE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
     content: {
         flex: 1,
     },
     form: {
-        padding: 20,
+        padding: 16,
     },
+
+    // Section Style
+    section: {
+        marginBottom: 24,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+    },
+    // Input Fields
     inputGroup: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     label: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
-        color: '#333',
+        color: '#2d2d2d',
         marginBottom: 8,
     },
+    required: {
+        color: '#cb202d',
+    },
     input: {
-        backgroundColor: '#fff',
+        backgroundColor: '#F8F9FA',
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderColor: '#E0E0E0',
         borderRadius: 12,
-        padding: 15,
-        fontSize: 16,
-        color: '#333',
+        padding: 12,
+        fontSize: 14,
+        color: '#2d2d2d',
     },
     textArea: {
         height: 80,
         textAlignVertical: 'top',
+        paddingTop: 12,
     },
+    inputWithIcon: {
+        position: 'relative',
+    },
+    inputIcon: {
+        position: 'absolute',
+        left: 12,
+        top: 12,
+        zIndex: 1,
+    },
+    inputWithPadding: {
+        paddingLeft: 40,
+    },
+
     row: {
         flexDirection: 'row',
-        gap: 15,
+        gap: 12,
     },
     halfWidth: {
         flex: 1,
     },
+
+    // Category Selection
     categoryContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
+        gap: 8,
     },
     categoryButton: {
-        backgroundColor: '#fff',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 25,
+        backgroundColor: '#F8F9FA',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
         borderWidth: 2,
-        borderColor: '#ddd',
+        borderColor: '#E0E0E0',
     },
     selectedCategory: {
-        backgroundColor: '#FF9800',
-        borderColor: '#FF9800',
+        backgroundColor: '#cb202d',
+        borderColor: '#cb202d',
     },
     categoryText: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
         color: '#666',
     },
     selectedCategoryText: {
         color: '#fff',
     },
-    imageSection: {
-        marginBottom: 20,
-    },
-    currentImage: {
+
+    // Image Upload
+    currentImageContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 15,
+        gap: 16,
     },
     imagePlaceholder: {
-        width: 80,
-        height: 80,
-        backgroundColor: '#fff',
+        width: 100,
+        height: 100,
+        backgroundColor: '#F8F9FA',
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#ddd',
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        borderStyle: 'dashed',
     },
     imageText: {
-        fontSize: 24,
-        color: '#ccc',
+        fontSize: 12,
+        color: '#999',
+        marginTop: 8,
     },
     changeImageButton: {
-        backgroundColor: '#FF9800',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 25,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#cb202d',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
     },
     changeImageText: {
         color: '#fff',
         fontWeight: '600',
+        fontSize: 14,
     },
-    optionsSection: {
-        marginBottom: 20,
-    },
+
+    // Options with Toggle Switch
     optionRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 12,
-        marginBottom: 10,
+        paddingVertical: 12,
+        gap: 12,
     },
     optionInfo: {
         flex: 1,
+        marginLeft: 4,
     },
     optionTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
+        color: '#2d2d2d',
+        marginBottom: 2,
     },
     optionSubtext: {
-        fontSize: 14,
-        color: '#666',
+        fontSize: 13,
+        color: '#8E8E93',
     },
-    checkbox: {
-        width: 24,
-        height: 24,
-        borderWidth: 2,
-        borderColor: '#ddd',
-        borderRadius: 6,
-        alignItems: 'center',
+    switch: {
+        width: 48,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#E0E0E0',
+        padding: 2,
         justifyContent: 'center',
     },
-    checkedBox: {
-        backgroundColor: '#FF9800',
-        borderColor: '#FF9800',
+    switchActive: {
+        backgroundColor: '#4CAF50',
     },
-    checkmark: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
+    switchThumb: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
     },
-    statsSection: {
-        marginBottom: 20,
+    switchThumbActive: {
+        alignSelf: 'flex-end',
     },
+
+    // Statistics
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
+        gap: 12,
     },
     statCard: {
         backgroundColor: '#fff',
-        padding: 15,
+        padding: 16,
         borderRadius: 12,
         alignItems: 'center',
         flex: 1,
         minWidth: '45%',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
     statNumber: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#FF9800',
-        marginBottom: 5,
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginVertical: 8,
     },
     statLabel: {
         fontSize: 12,
-        color: '#666',
+        color: '#8E8E93',
         textAlign: 'center',
     },
-    previewSection: {
-        marginBottom: 20,
-    },
+
+    // Preview Card (matching MenuScreen style)
     previewCard: {
         backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 15,
-        flexDirection: 'row',
-        gap: 15,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
     },
-    previewImage: {
-        width: 80,
-        height: 80,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 8,
+    previewImageSection: {
+        position: 'relative',
+        height: 200,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewImagePlaceholder: {
         alignItems: 'center',
         justifyContent: 'center',
     },
     previewImageText: {
-        fontSize: 24,
-        color: '#ccc',
+        fontSize: 12,
+        color: '#999',
+        marginTop: 8,
     },
-    previewContent: {
-        flex: 1,
+    previewBadgesContainer: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    previewVegIndicator: {
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        borderWidth: 1.5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    previewVegDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    previewAddButton: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        backgroundColor: '#cb202d',
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
+    },
+    previewAddButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#fff',
+        letterSpacing: 0.5,
+    },
+    previewContentSection: {
+        padding: 16,
     },
     previewName: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 5,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 6,
+        lineHeight: 22,
+    },
+    previewRatingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    previewRatingBadge: {
+        backgroundColor: '#0F8A65',
+        borderRadius: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+        marginRight: 6,
+    },
+    previewRatingText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    previewReviews: {
+        fontSize: 12,
+        color: '#666',
+        marginRight: 4,
+    },
+    previewPrepTime: {
+        fontSize: 12,
+        color: '#666',
     },
     previewDescription: {
         fontSize: 14,
         color: '#666',
-        marginBottom: 10,
+        lineHeight: 20,
+        marginBottom: 12,
     },
-    previewTags: {
+    previewTagsRow: {
         flexDirection: 'row',
-        gap: 5,
-        marginBottom: 10,
+        gap: 8,
+        marginBottom: 12,
     },
     previewTag: {
-        backgroundColor: '#f0f0f0',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
         paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 15,
+        borderRadius: 12,
+        gap: 4,
     },
     previewTagText: {
-        fontSize: 12,
+        fontSize: 11,
+        fontWeight: '600',
         color: '#666',
+    },
+    previewPriceContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
     },
     previewPrice: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FF9800',
+        fontWeight: '600',
+        color: '#2d2d2d',
     },
+
+    // Footer
     footer: {
-        flexDirection: 'row',
-        padding: 20,
         backgroundColor: '#fff',
+        padding: 16,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
-        gap: 15,
-    },
-    deleteButton: {
-        backgroundColor: '#f44336',
-        padding: 18,
-        borderRadius: 12,
-        alignItems: 'center',
-        flex: 1,
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
+        borderTopColor: '#E0E0E0',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     saveButton: {
-        backgroundColor: '#FF9800',
-        padding: 18,
+        backgroundColor: '#cb202d',
+        paddingVertical: 16,
         borderRadius: 12,
+        flexDirection: 'row',
         alignItems: 'center',
-        flex: 2,
+        justifyContent: 'center',
+        gap: 8,
     },
     saveButtonText: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });

@@ -8,10 +8,10 @@ import { AdminTabParamList, AdminStackParamList } from '../types/navigation';
 import AdminDashboardScreen from '../screens/admin/main/DashboardScreen';
 import OrderManagementScreen from '../screens/admin/main/OrderManagementScreen';
 import MenuManagementScreen from '../screens/admin/main/MenuManagementScreen';
-import AnalyticsScreen from '../screens/admin/main/AnalyticsScreen';
-import NotificationsScreen from '../screens/admin/main/NotificationsScreen';
+import ProfileScreen from '../screens/admin/main/ProfileScreen';
 
 // Sub-screens
+import NotificationsScreen from '../screens/admin/notifications/NotificationsScreen';
 import AdminOrderDetailsScreen from '../screens/admin/orders/OrderDetailsScreen';
 import AssignDeliveryScreen from '../screens/admin/orders/AssignDeliveryScreen';
 import AssignDeliveryAgentScreen from '../screens/admin/orders/AssignDeliveryAgentScreen';
@@ -21,7 +21,11 @@ import CategoryManagementScreen from '../screens/admin/menu/CategoryManagementSc
 import SalesReportsScreen from '../screens/admin/analytics/SalesReportsScreen';
 import DeliveryAnalyticsScreen from '../screens/admin/analytics/DeliveryAnalyticsScreen';
 import StaffManagementScreen from '../screens/admin/management/StaffManagementScreen';
-import RestaurantSettingsScreen from '../screens/admin/management/RestaurantSettingsScreen';
+import RestaurantSettingsScreen from '../screens/admin/settings/RestaurantSettingsScreen';
+import AccountSettingsScreen from '../screens/admin/settings/AccountSettingsScreen';
+import UserManagementScreen from '../screens/admin/users/UserManagementScreen';
+import AddOfferScreen from '../screens/admin/offers/AddOfferScreen';
+import OfferManagementScreen from '../screens/admin/offers/OfferManagementScreen';
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -74,7 +78,7 @@ function AdminTabs() {
             <Tab.Screen name="MenuManagement" component={MenuManagementScreen} />
             <Tab.Screen
                 name="Profile"
-                component={AnalyticsScreen}
+                component={ProfileScreen}
                 options={{
                     tabBarLabel: 'Profile'
                 }}
@@ -113,6 +117,10 @@ export default function AdminNavigator() {
             {/* Management Sub-screens */}
             <Stack.Screen name="StaffManagement" component={StaffManagementScreen} />
             <Stack.Screen name="RestaurantSettings" component={RestaurantSettingsScreen} />
+            <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+            <Stack.Screen name="UserManagement" component={UserManagementScreen} />
+            <Stack.Screen name="OfferManagement" component={OfferManagementScreen} />
+            <Stack.Screen name="AddOffer" component={AddOfferScreen} />
         </Stack.Navigator>
     );
 }

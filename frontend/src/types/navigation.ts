@@ -97,4 +97,8 @@ export type AdminStackParamList = {
     StaffManagement: undefined;
     DeliveryPartners: undefined;
     RestaurantSettings: undefined;
+    AccountSettings: undefined;
+    UserManagement: undefined;
+    OfferManagement: undefined;
+    AddOffer: { offer?: any } | undefined;
 };
