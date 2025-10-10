@@ -78,10 +78,66 @@ export const protect = async (req, res, next) => {
             });
         }
 
-        res.status(401).json({
+        return res.status(401).json({
             success: false,
-            message: 'Not authorized, authentication failed.',
+            message: 'Authentication failed.',
         });
+    }
+};
+
+/**
+ * Soft protect - For logout endpoint
+ * Allows expired tokens but still extracts user info if possible
+ * @middleware
+ */
+export const softProtect = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        // If no token, just proceed (logout will still work)
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return next();
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        if (!token) {
+            return next();
+        }
+
+        try {
+            // Try to verify token (may be expired)
+            const decoded = verifyToken(token);
+            const user = await User.findById(decoded.id).select('-password');
+
+            if (user) {
+                req.user = user;
+            }
+        } catch (err) {
+            // Token might be expired - that's okay for logout
+            // Try to decode without verification to get user ID
+            if (err.name === 'TokenExpiredError') {
+                try {
+                    const jwt = require('jsonwebtoken');
+                    const decoded = jwt.decode(token);
+                    if (decoded && decoded.id) {
+                        const user = await User.findById(decoded.id).select('-password');
+                        if (user) {
+                            req.user = user;
+                        }
+                    }
+                } catch (decodeErr) {
+                    console.warn('Could not decode expired token:', decodeErr.message);
+                }
+            }
+        }
+
+        // Always proceed to next - logout should work even without valid token
+        next();
+    } catch (err) {
+        console.error('Soft protect error:', err);
+        // Don't fail - let logout proceed
+        next();
     }
 };
 
@@ -159,6 +215,7 @@ export const optionalAuth = async (req, res, next) => {
 
 export default {
     protect,
+    softProtect,
     adminOnly,
     deliveryOnly,
     optionalAuth,

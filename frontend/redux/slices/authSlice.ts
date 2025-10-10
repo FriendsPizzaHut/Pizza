@@ -152,6 +152,17 @@ const authSlice = createSlice({
             state.error = null;
         });
         builder.addCase(signupThunk.fulfilled, (state, action) => {
+            // Check if this is a delivery boy requiring approval
+            if (action.payload.requiresApproval) {
+                // Don't set authentication state for delivery boys awaiting approval
+                state.isLoading = false;
+                state.error = null;
+                state.isAuthenticated = false;
+                // User info is available but not authenticated
+                return;
+            }
+
+            // For customers and admins, set authentication
             state.token = action.payload.token;
             state.role = action.payload.user.role;
             state.name = action.payload.user.name;

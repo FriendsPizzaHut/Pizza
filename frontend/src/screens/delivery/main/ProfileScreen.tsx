@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DeliveryStackParamList } from '../../../types/navigation';
-import { RootState, clearAuthState } from '../../../../redux/store';
-import { logout } from '../../../../redux/slices/authSlice';
+import { RootState } from '../../../../redux/store';
+import { logoutThunk } from '../../../../redux/thunks/authThunks';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 type NavigationProp = NativeStackNavigationProp<DeliveryStackParamList>;
@@ -15,11 +15,31 @@ const { width } = Dimensions.get('window');
 export default function ProfileScreen() {
     const dispatch = useDispatch();
     const navigation = useNavigation<NavigationProp>();
-    const { name, email } = useSelector((state: RootState) => state.auth);
+    const { name, email, isLoading } = useSelector((state: RootState) => state.auth);
 
     const handleLogout = async () => {
-        await clearAuthState();
-        dispatch(logout());
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout? You will be marked as offline.',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await dispatch(logoutThunk() as any);
+                            console.log('✅ Delivery boy logged out and marked offline');
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     return (

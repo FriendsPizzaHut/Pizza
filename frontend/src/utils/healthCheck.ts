@@ -56,7 +56,9 @@ export const checkBackendHealth = async (): Promise<HealthCheckResult> => {
         }
 
         // Step 2: Ping backend health endpoint
-        const response = await axios.get(`${ENV.API_URL.replace('/api', '')}/health`, {
+        // Remove /api/v1 or /api from URL to get base URL, then add /health
+        const baseUrl = ENV.API_URL.replace(/\/api(\/v1)?$/, '');
+        const response = await axios.get(`${baseUrl}/health`, {
             timeout: 10000, // 10 second timeout
             headers: {
                 'Content-Type': 'application/json',

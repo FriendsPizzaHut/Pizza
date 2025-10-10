@@ -33,7 +33,8 @@ export const register = async (req, res, next) => {
  */
 export const login = async (req, res, next) => {
     try {
-        const result = await authService.loginUser(req.body);
+        const { email, password } = req.body;
+        const result = await authService.loginUser(email, password);
         sendResponse(res, 200, 'Login successful', result);
     } catch (error) {
         next(error);
@@ -47,10 +48,13 @@ export const login = async (req, res, next) => {
  */
 export const logout = async (req, res, next) => {
     try {
-        // Note: In JWT-based auth, logout is typically handled client-side
-        // by removing the token. However, we can invalidate refresh tokens here
-        // or add token to a blacklist (future enhancement with Redis)
-        sendResponse(res, 200, 'Logout successful');
+        // Get userId from authenticated request (set by auth middleware)
+        const userId = req.user?.id || req.user?.userId;
+
+        // Call logout service (updates online status for delivery boys)
+        const result = await authService.logoutUser(userId);
+
+        sendResponse(res, 200, 'Logout successful', result);
     } catch (error) {
         next(error);
     }

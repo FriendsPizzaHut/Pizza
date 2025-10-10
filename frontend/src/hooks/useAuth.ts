@@ -7,14 +7,15 @@ import {
     loginFailure,
     logout as logoutAction,
 } from '../../redux/slices/authSlice';
-import * as authService from '../api/authService';
-import { LoginCredentials, RegisterCredentials, User } from '../types/auth';
+import * as authService from '../services/authService';
+import { Alert } from 'react-native';
 
 /**
  * useAuth Hook
  * 
  * Provides authentication functionality and state.
  * Handles login, logout, registration, and session management.
+ * Updated to work with real backend API.
  */
 
 export const useAuth = () => {
@@ -25,20 +26,17 @@ export const useAuth = () => {
     /**
      * Login
      */
-    const login = async (credentials: LoginCredentials): Promise<void> => {
+    const login = async (credentials: { email: string; password: string }): Promise<void> => {
         try {
             dispatch(loginStart());
 
-            // Call auth service
+            // Call real auth service
             const response = await authService.login(credentials);
 
             if (response.success) {
-                const { user, token } = response.data;
+                const { user, token } = response;
 
-                // Save to AsyncStorage
-                await authService.saveAuthData(user, token);
-
-                // Update Redux state
+                // Update Redux state (AsyncStorage is handled by authService)
                 dispatch(loginSuccess({
                     token,
                     role: user.role,
@@ -62,20 +60,34 @@ export const useAuth = () => {
     /**
      * Register
      */
-    const register = async (credentials: RegisterCredentials): Promise<void> => {
+    const register = async (credentials: authService.SignupData): Promise<void> => {
         try {
             dispatch(loginStart());
 
-            // Call auth service
-            const response = await authService.register(credentials);
+            // Call real auth service (signup function)
+            const response = await authService.signup(credentials);
 
             if (response.success) {
-                const { user, token } = response.data;
+                // Check if delivery boy requiring approval
+                if (response.requiresApproval) {
+                    dispatch(loginFailure());
+                    Alert.alert(
+                        'Registration Successful!',
+                        response.message || 'Your account is awaiting admin approval. You will be able to login once approved.',
+                        [
+                            {
+                                text: 'OK',
+                                onPress: () => navigation.navigate('Login' as never),
+                            },
+                        ]
+                    );
+                    return;
+                }
 
-                // Save to AsyncStorage
-                await authService.saveAuthData(user, token);
+                // Auto-login for customers and admins
+                const { user, token } = response;
 
-                // Update Redux state
+                // Update Redux state (AsyncStorage is handled by authService)
                 dispatch(loginSuccess({
                     token,
                     role: user.role,
@@ -101,10 +113,10 @@ export const useAuth = () => {
      */
     const logout = async (): Promise<void> => {
         try {
-            // Call auth service to clear storage
-            await authService.clearAuthData();
+            // Call real auth service (handles AsyncStorage and backend)
+            await authService.logout();
 
-            // Update Redux state
+            // Clear Redux state
             dispatch(logoutAction());
 
             // Navigate to login
@@ -114,6 +126,12 @@ export const useAuth = () => {
             });
         } catch (error) {
             console.error('Logout error:', error);
+            // Clear local state even if backend call fails
+            dispatch(logoutAction());
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+            });
         }
     };
 
@@ -131,13 +149,13 @@ export const useAuth = () => {
             case 'delivery':
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: 'DeliveryDashboard' }],
+                    routes: [{ name: 'DeliveryTabs' }],
                 });
                 break;
             case 'admin':
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: 'AdminDashboard' }],
+                    routes: [{ name: 'AdminTabs' }],
                 });
                 break;
             default:
@@ -148,11 +166,6 @@ export const useAuth = () => {
         }
     };
 
-    /**
-     * Get demo accounts
-     */
-    const getDemoAccounts = () => authService.DEMO_ACCOUNTS;
-
     return {
         // State
         ...authState,
@@ -161,10 +174,8 @@ export const useAuth = () => {
         login,
         register,
         logout,
-
-        // Helpers
-        getDemoAccounts,
     };
 };
 
+// Export both named and default
 export default useAuth;

@@ -11,7 +11,7 @@ import express from 'express';
 import { register, login, logout } from '../controllers/authController.js';
 import { validate } from '../middlewares/validateMiddleware.js';
 import { registerValidator, loginValidator } from '../utils/validators/authValidator.js';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, softProtect } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -21,7 +21,7 @@ router.post('/register', validate(registerValidator), register);
 // Login - with validation
 router.post('/login', validate(loginValidator), login);
 
-// Logout - requires authentication
-router.post('/logout', protect, logout);
+// Logout - accepts expired tokens (users should always be able to logout)
+router.post('/logout', softProtect, logout);
 
 export default router;

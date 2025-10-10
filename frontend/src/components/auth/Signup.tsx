@@ -402,6 +402,22 @@ export default function Signup() {
                             <Text style={styles.loginLink}>Login</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* Delivery Partner Link */}
+                    <View style={styles.deliveryLinkContainer}>
+                        <View style={styles.divider} />
+                        <TouchableOpacity
+                            style={styles.deliveryButton}
+                            onPress={() => navigation.navigate('DeliverySignup')}
+                            disabled={isLoading}
+                        >
+                            <Ionicons name="bicycle" size={20} color="#4CAF50" />
+                            <Text style={styles.deliveryButtonText}>
+                                Want to become a delivery partner? Register here
+                            </Text>
+                            <Ionicons name="arrow-forward" size={18} color="#4CAF50" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -547,5 +563,34 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#FF6347',
+    },
+    deliveryLinkContainer: {
+        marginTop: 32,
+        alignItems: 'center',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        width: '100%',
+        marginBottom: 24,
+    },
+    deliveryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        backgroundColor: '#F0FDF4',
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#4CAF50',
+        gap: 8,
+    },
+    deliveryButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4CAF50',
+        flex: 1,
+        textAlign: 'center',
     },
 });

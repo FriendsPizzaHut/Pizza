@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
-import { RootState, clearAuthState } from '../../../../redux/store';
-import { logout } from '../../../../redux/slices/authSlice';
+import { RootState } from '../../../../redux/store';
+import { logoutThunk } from '../../../../redux/thunks/authThunks';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../../types/navigation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -16,12 +16,34 @@ const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
     const navigation = useNavigation<NavigationProp>();
-    const { name, email, role } = useSelector((state: RootState) => state.auth);
+    const { name, email, role, isLoading } = useSelector((state: RootState) => state.auth);
     const dispatch = useDispatch();
 
     const handleLogout = async () => {
-        await clearAuthState();
-        dispatch(logout());
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await dispatch(logoutThunk() as any);
+                            // Navigation will be handled automatically by RootNavigator
+                            console.log('✅ Logged out successfully');
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                            // Even if there's an error, state is cleared
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const profileOptions = [

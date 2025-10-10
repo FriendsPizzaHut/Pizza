@@ -74,6 +74,59 @@ export const registerValidator = [
         .trim()
         .notEmpty()
         .withMessage('Zip code is required in address'),
+
+    // Delivery boy specific fields
+    body('vehicleInfo')
+        .optional()
+        .isObject()
+        .withMessage('Vehicle info must be an object'),
+
+    body('vehicleInfo.type')
+        .optional()
+        .isIn(['bike', 'scooter', 'bicycle', 'car'])
+        .withMessage('Vehicle type must be bike, scooter, bicycle, or car'),
+
+    body('vehicleInfo.number')
+        .optional()
+        .trim()
+        .matches(/^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$/)
+        .withMessage('Invalid vehicle number format'),
+
+    body('vehicleInfo.model')
+        .optional()
+        .trim(),
+
+    body('documents')
+        .optional()
+        .isObject()
+        .withMessage('Documents must be an object'),
+
+    body('documents.drivingLicense')
+        .optional()
+        .isObject()
+        .withMessage('Driving license must be an object'),
+
+    body('documents.drivingLicense.imageUrl')
+        .optional()
+        .trim(),
+
+    body('documents.aadharCard')
+        .optional()
+        .isObject()
+        .withMessage('Aadhar card must be an object'),
+
+    body('documents.aadharCard.imageUrl')
+        .optional()
+        .trim(),
+
+    body('documents.vehicleRC')
+        .optional()
+        .isObject()
+        .withMessage('Vehicle RC must be an object'),
+
+    body('documents.vehicleRC.imageUrl')
+        .optional()
+        .trim(),
 ];
 
 /**

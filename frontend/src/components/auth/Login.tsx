@@ -14,7 +14,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
-import { DEMO_ACCOUNTS } from '../../api/authService';
 import { Loader } from '../common/Loader';
 import { useToast } from '../common/Toast';
 
@@ -55,13 +54,6 @@ export default function Login() {
         } finally {
             setIsLoading(false);
         }
-    };
-
-    const fillDemoCredentials = (role: 'customer' | 'delivery' | 'admin') => {
-        const account = DEMO_ACCOUNTS[role];
-        setEmail(account.email);
-        setPassword(account.password);
-        setError('');
     };
 
     return (
@@ -140,58 +132,6 @@ export default function Login() {
                                 ) : (
                                     <Text style={styles.loginButtonText}>Sign In</Text>
                                 )}
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Demo Accounts Section */}
-                        <View style={styles.demoSection}>
-                            <View style={styles.divider}>
-                                <View style={styles.dividerLine} />
-                                <Text style={styles.dividerText}>Demo Accounts</Text>
-                                <View style={styles.dividerLine} />
-                            </View>
-
-                            <Text style={styles.demoDescription}>
-                                Try different user roles with these demo accounts:
-                            </Text>
-
-                            <TouchableOpacity
-                                style={[styles.demoButton, styles.customerButton]}
-                                onPress={() => fillDemoCredentials('customer')}
-                                disabled={isLoading}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.demoButtonEmoji}>👤</Text>
-                                <View style={styles.demoButtonContent}>
-                                    <Text style={styles.demoButtonTitle}>Customer Account</Text>
-                                    <Text style={styles.demoButtonEmail}>{DEMO_ACCOUNTS.customer.email}</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.demoButton, styles.deliveryButton]}
-                                onPress={() => fillDemoCredentials('delivery')}
-                                disabled={isLoading}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.demoButtonEmoji}>🚚</Text>
-                                <View style={styles.demoButtonContent}>
-                                    <Text style={styles.demoButtonTitle}>Delivery Partner</Text>
-                                    <Text style={styles.demoButtonEmail}>{DEMO_ACCOUNTS.delivery.email}</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.demoButton, styles.adminButton]}
-                                onPress={() => fillDemoCredentials('admin')}
-                                disabled={isLoading}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.demoButtonEmoji}>👨‍💼</Text>
-                                <View style={styles.demoButtonContent}>
-                                    <Text style={styles.demoButtonTitle}>Restaurant Admin</Text>
-                                    <Text style={styles.demoButtonEmail}>{DEMO_ACCOUNTS.admin.email}</Text>
-                                </View>
                             </TouchableOpacity>
                         </View>
 

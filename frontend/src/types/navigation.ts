@@ -10,6 +10,7 @@ export type RootStackParamList = {
 export type AuthStackParamList = {
     Login: undefined;
     Register: undefined;
+    DeliverySignup: undefined;
     ForgotPassword: undefined;
 };
 

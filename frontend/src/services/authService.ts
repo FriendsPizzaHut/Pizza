@@ -39,6 +39,8 @@ export interface AuthResponse {
     refreshToken?: string;
     user: User;
     expiresIn?: number; // Token expiry in seconds
+    requiresApproval?: boolean; // For delivery boys awaiting approval
+    message?: string; // Optional message from server
 }
 
 export interface SignupData {
@@ -47,6 +49,23 @@ export interface SignupData {
     phone: string;
     password: string;
     role?: 'customer' | 'admin' | 'delivery';
+    // Delivery boy specific fields
+    vehicleInfo?: {
+        type: 'bike' | 'scooter' | 'bicycle' | 'car';
+        number?: string; // Optional
+        model?: string;
+    };
+    documents?: {
+        drivingLicense?: {
+            imageUrl?: string; // Image URI/URL
+        };
+        aadharCard?: {
+            imageUrl?: string; // Image URI/URL
+        };
+        vehicleRC?: {
+            imageUrl?: string; // Image URI/URL (optional)
+        };
+    };
 }
 
 export interface LoginData {
@@ -86,12 +105,39 @@ export const signup = async (data: SignupData): Promise<AuthResponse> => {
         });
 
         // Check response format
-        // Backend returns: { success, data: { accessToken, refreshToken, user }, statusCode }
+        // Backend returns: { success, data: { accessToken, refreshToken, user, requiresApproval?, message? }, statusCode }
         const responseData = response.data?.data || response.data;
-        const token = responseData.accessToken || responseData.token;
         const user = responseData.user;
 
-        if (!token || !user) {
+        if (!user) {
+            throw {
+                message: 'Invalid response from server',
+                code: 'INVALID_RESPONSE',
+                statusCode: response.status,
+            } as AuthError;
+        }
+
+        // Check if this is a delivery boy requiring approval
+        if (responseData.requiresApproval || data.role === 'delivery') {
+            // Delivery boy registered but needs admin approval
+            // Don't store tokens, don't auto-login
+            console.log('Delivery boy registered, awaiting approval:', data.email);
+
+            return {
+                success: true,
+                token: '', // No token for unapproved delivery boys
+                refreshToken: '',
+                user: user,
+                expiresIn: 0,
+                requiresApproval: true,
+                message: responseData.message || 'Registration successful! Please wait for admin approval.',
+            };
+        }
+
+        // For customers and admins, proceed with auto-login
+        const token = responseData.accessToken || responseData.token;
+
+        if (!token) {
             throw {
                 message: 'Invalid response from server',
                 code: 'INVALID_RESPONSE',

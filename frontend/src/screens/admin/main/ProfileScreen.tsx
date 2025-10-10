@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, clearAuthState } from '../../../../redux/store';
-import { logout } from '../../../../redux/slices/authSlice';
+import { RootState } from '../../../../redux/store';
+import { logoutThunk } from '../../../../redux/thunks/authThunks';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -11,13 +11,33 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-    const { name, email, role } = useSelector((state: RootState) => state.auth);
+    const { name, email, role, isLoading } = useSelector((state: RootState) => state.auth);
     const dispatch = useDispatch();
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
     const handleLogout = async () => {
-        await clearAuthState();
-        dispatch(logout());
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout from admin panel?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await dispatch(logoutThunk() as any);
+                            console.log('✅ Admin logged out successfully');
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const profileOptions = [
