@@ -13,7 +13,6 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
-import mongoSanitize from 'express-mongo-sanitize';
 import { logSecurity } from '../utils/logger.js';
 
 /**
@@ -137,27 +136,127 @@ export const hppProtection = hpp({
 
 /**
  * NoSQL Injection Protection
- * Sanitizes user input to prevent MongoDB injection
+ * Custom middleware to sanitize MongoDB operators from user input
+ * 
+ * NOTE: Not using express-mongo-sanitize due to Node.js v18+ compatibility issues
+ * This custom implementation sanitizes $ and . characters from keys in-place
  */
-export const noSQLInjectionProtection = mongoSanitize({
-    replaceWith: '_', // Replace prohibited characters with underscore
-    onSanitize: ({ req, key }) => {
-        logSecurity('NoSQL Injection Attempt Blocked', {
-            ip: req.ip,
-            key,
-            path: req.path,
-            method: req.method,
-        });
-    },
-});
+export const noSQLInjectionProtection = (req, res, next) => {
+    // Sanitize function to remove $ and . from object keys (in-place modification)
+    const sanitize = (obj) => {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+            const keysToDelete = [];
+
+            Object.keys(obj).forEach(key => {
+                // Mark keys that start with $ or contain . for deletion
+                if (key.startsWith('$') || key.includes('.')) {
+                    keysToDelete.push(key);
+                    logSecurity('NoSQL Injection Attempt Blocked', {
+                        ip: req.ip,
+                        key,
+                        path: req.path,
+                        method: req.method,
+                    });
+                }
+                // Recursively sanitize nested objects
+                else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    sanitize(obj[key]);
+                }
+            });
+
+            // Delete dangerous keys
+            keysToDelete.forEach(key => delete obj[key]);
+        }
+        return obj;
+    };
+
+    // Sanitize request body (safe to modify)
+    if (req.body && typeof req.body === 'object') {
+        sanitize(req.body);
+    }
+
+    // For query and params, we can't reassign but we CAN delete properties
+    if (req.query && typeof req.query === 'object') {
+        sanitize(req.query);
+    }
+
+    if (req.params && typeof req.params === 'object') {
+        sanitize(req.params);
+    }
+
+    next();
+};
 
 /**
  * XSS Protection Middleware
- * Note: xss-clean is deprecated but still functional
- * Consider migrating to DOMPurify for production
+ * Custom implementation to sanitize XSS attacks from user input
+ * 
+ * NOTE: Not using xss-clean due to Node.js v18+ compatibility issues
+ * This custom implementation escapes HTML special characters
  */
-import xss from 'xss-clean';
-export const xssProtection = xss();
+export const xssProtection = (req, res, next) => {
+    // Function to escape HTML special characters
+    const escapeHtml = (text) => {
+        if (typeof text !== 'string') return text;
+
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '/': '&#x2F;',
+        };
+
+        return text.replace(/[&<>"'/]/g, (char) => map[char]);
+    };
+
+    // Recursively sanitize object
+    const sanitizeObject = (obj) => {
+        if (!obj || typeof obj !== 'object') {
+            return typeof obj === 'string' ? escapeHtml(obj) : obj;
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map(item => sanitizeObject(item));
+        }
+
+        const sanitized = {};
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                sanitized[key] = sanitizeObject(obj[key]);
+            }
+        }
+        return sanitized;
+    };
+
+    // Sanitize request body (safe - we can reassign body)
+    if (req.body && typeof req.body === 'object') {
+        req.body = sanitizeObject(req.body);
+    }
+
+    // Sanitize query params (in-place modification)
+    if (req.query && typeof req.query === 'object') {
+        Object.keys(req.query).forEach(key => {
+            const sanitizedValue = sanitizeObject(req.query[key]);
+            if (typeof sanitizedValue === 'string') {
+                req.query[key] = sanitizedValue;
+            }
+        });
+    }
+
+    // Sanitize URL params (in-place modification)
+    if (req.params && typeof req.params === 'object') {
+        Object.keys(req.params).forEach(key => {
+            const sanitizedValue = sanitizeObject(req.params[key]);
+            if (typeof sanitizedValue === 'string') {
+                req.params[key] = sanitizedValue;
+            }
+        });
+    }
+
+    next();
+};
 
 /**
  * Security Headers Middleware

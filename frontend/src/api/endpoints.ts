@@ -3,10 +3,12 @@
  * 
  * This file contains all API endpoint definitions.
  * Endpoints are organized by feature/module.
+ * 
+ * NOTE: Do NOT include /api prefix here - it's already in the baseURL
  */
 
-// Base API path
-const API_BASE = '/api';
+// Base API path (empty since baseURL already includes /api)
+const API_BASE = '';
 
 // Authentication Endpoints
 export const AUTH_ENDPOINTS = {

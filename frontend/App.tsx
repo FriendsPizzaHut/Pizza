@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Provider } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 
 import store from './redux/store';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -12,6 +12,8 @@ import { NetworkProvider } from './src/context/NetworkContext';
 import { NetworkBanner } from './src/components/common/NetworkBanner';
 import { errorLogger } from './src/services/errorLogger';
 import { initializeApiClient } from './src/api/apiClient';
+import { checkAuthStatusThunk } from './redux/thunks/authThunks';
+import { logConnectionDiagnostics } from './src/utils/healthCheck';
 
 // ⚡ Performance imports
 import { PerformanceProvider, performanceSystem } from './src/utils/performanceInit';
@@ -28,34 +30,42 @@ if (__DEV__ && !process.env.EAS_BUILD) {
 }
 
 function AppContent() {
+  const dispatch = useDispatch();
+
   useEffect(() => {
-    // Initialize error logger
-    errorLogger.initialize({
-      environment: __DEV__ ? 'development' : 'production',
-      // sentryDsn: 'YOUR_SENTRY_DSN',
-    });
-
-    // Initialize API client (handles offline queue and cache)
-    initializeApiClient();
-
-    // Initialize performance systems
-    performanceSystem.initialize()
-      .then(() => {
-        console.log('🚀 Performance systems initialized successfully');
-      })
-      .catch((error: Error) => {
-        console.error('❌ Performance initialization failed:', error);
+    const initializeApp = async () => {
+      // Initialize error logger
+      errorLogger.initialize({
+        environment: __DEV__ ? 'development' : 'production',
+        // sentryDsn: 'YOUR_SENTRY_DSN',
       });
 
-    if (__DEV__) {
-      console.log('🚀 App initialized with error handling, offline support, and performance optimization');
+      // Initialize API client (handles offline queue and cache)
+      initializeApiClient();
 
-      // Performance tools are available via dynamic import
-      console.log('📊 Dev performance tools available:');
-      console.log('- Access via: import("./src/utils/performanceTesting").then(m => m.PerformanceDevTools.runTestSuite())');
-      console.log('- Or via browser console after dynamic import');
-    }
-  }, []);
+      // Check backend connectivity and log diagnostics (development only)
+      if (__DEV__) {
+        await logConnectionDiagnostics();
+      }
+
+      // Check auth status (auto-login if token exists)
+      dispatch(checkAuthStatusThunk() as any);
+
+      // Note: Performance system is initialized by PerformanceProvider wrapper
+      // No need to call performanceSystem.initialize() here to avoid duplicate initialization
+
+      if (__DEV__) {
+        console.log('🚀 App initialized with error handling, offline support, and performance optimization');
+
+        // Performance tools are available via dynamic import
+        console.log('📊 Dev performance tools available:');
+        console.log('- Access via: import("./src/utils/performanceTesting").then(m => m.PerformanceDevTools.runTestSuite())');
+        console.log('- Or via browser console after dynamic import');
+      }
+    };
+
+    initializeApp();
+  }, [dispatch]);
 
   return (
     <>

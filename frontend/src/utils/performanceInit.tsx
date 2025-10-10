@@ -156,12 +156,12 @@ export class PerformanceInitializer {
         const defaultConfig: PerformanceConfig = {
             enableMonitoring: __DEV__,
             enableImageCache: true,
-            enableBackgroundTasks: true,
-            enableSocketOptimization: true,
+            enableBackgroundTasks: false, // Disabled for Phase 1 - will enable later
+            enableSocketOptimization: false, // Disabled for Phase 1 - will enable when needed
             enableLazyLoading: true,
             performanceMode: 'normal',
             debugMode: __DEV__,
-            preloadCriticalAssets: true,
+            preloadCriticalAssets: false, // Disabled for Phase 1
             enableMemoryOptimizations: true,
         };
 

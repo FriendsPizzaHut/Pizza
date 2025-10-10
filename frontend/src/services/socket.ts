@@ -22,8 +22,8 @@ class SocketService {
     private getSocketUrl(): string {
         const isDevelopment = __DEV__;
         return isDevelopment
-            ? process.env.EXPO_PUBLIC_API_URL_DEVELOPMENT || 'http://localhost:5000'
-            : process.env.EXPO_PUBLIC_API_URL_PRODUCTION || 'https://pizzabackend-u9ui.onrender.com';
+            ? process.env.EXPO_PUBLIC_SOCKET_URL_DEVELOPMENT || 'http://localhost:5000'
+            : process.env.EXPO_PUBLIC_SOCKET_URL_PRODUCTION || 'https://pizzabackend-u9ui.onrender.com';
     }
 
     /**
@@ -90,10 +90,14 @@ class SocketService {
 
         this.socket.on('connect_error', (error: Error) => {
             this.reconnectAttempts++;
-            console.error('Socket connection error:', error.message);
 
-            if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                console.error('Max reconnection attempts reached');
+            // Only log error if we haven't exceeded max attempts (reduce noise)
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                if (__DEV__ && this.reconnectAttempts === 1) {
+                    console.warn('🔌 Socket connection failed (will retry in background)');
+                }
+            } else {
+                console.warn('⚠️ Socket connection unavailable after multiple attempts');
                 this.disconnect();
             }
         });
