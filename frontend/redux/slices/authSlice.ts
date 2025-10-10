@@ -83,6 +83,28 @@ const authSlice = createSlice({
             state.isLoading = false;
             state.isAuthenticated = false;
         },
+        registerStart: (state) => {
+            state.isLoading = true;
+        },
+        registerSuccess: (state, action: PayloadAction<{
+            token: string;
+            role: 'customer' | 'delivery' | 'admin';
+            name: string;
+            email: string;
+            userId: string;
+        }>) => {
+            state.token = action.payload.token;
+            state.role = action.payload.role;
+            state.name = action.payload.name;
+            state.email = action.payload.email;
+            state.userId = action.payload.userId;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+        },
+        registerFailure: (state) => {
+            state.isLoading = false;
+            state.isAuthenticated = false;
+        },
         logout: (state) => {
             state.token = null;
             state.role = null;
@@ -117,6 +139,9 @@ export const {
     loginStart,
     loginSuccess,
     loginFailure,
+    registerStart,
+    registerSuccess,
+    registerFailure,
     logout,
     restoreAuthState,
     setLoading,

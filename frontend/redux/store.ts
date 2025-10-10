@@ -2,19 +2,31 @@ import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authSlice from './slices/authSlice';
 import onboardingSlice from './slices/onboardingSlice';
+import { baseApi } from './slices/api/baseApi';
 
-// Store configuration
+// Store configuration with RTK Query
 const store = configureStore({
     reducer: {
+        // Feature slices
         auth: authSlice,
         onboarding: onboardingSlice,
+
+        // RTK Query API slice
+        [baseApi.reducerPath]: baseApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
+            // Performance optimizations
+            immutableCheck: {
+                warnAfter: 128,
+            },
             serializableCheck: {
+                warnAfter: 128,
                 ignoredActions: ['persist/PERSIST'],
             },
-        }),
+        })
+            // Add RTK Query middleware for caching, invalidation, polling, etc.
+            .concat(baseApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
