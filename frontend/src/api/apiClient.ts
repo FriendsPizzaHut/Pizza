@@ -100,13 +100,10 @@ apiClient.interceptors.request.use(
             // Check network connectivity
             await checkNetworkConnectivity();
 
-            // Get token from AsyncStorage
-            const authState = await AsyncStorage.getItem('authState');
-            if (authState) {
-                const { token } = JSON.parse(authState);
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
-                }
+            // Get token from AsyncStorage - using the correct key from authService
+            const token = await AsyncStorage.getItem('@auth_token');
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
             }
 
             // Add platform info

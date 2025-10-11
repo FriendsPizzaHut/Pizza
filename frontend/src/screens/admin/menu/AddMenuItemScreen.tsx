@@ -1,44 +1,252 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, StatusBar, Platform, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, StatusBar, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../../redux/store';
+import { createProductThunk } from '../../../../redux/thunks/productThunks';
+import { clearMessages } from '../../../../redux/slices/productSlice';
 
 export default function AddMenuItemScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
+    const dispatch = useDispatch<AppDispatch>();
+    const { isCreating, error, successMessage } = useSelector((state: RootState) => state.product);
+
     const [itemData, setItemData] = useState({
         name: '',
         description: '',
-        category: 'Pizza',
+        category: 'pizza' as 'pizza' | 'sides' | 'beverages' | 'desserts',
+        // For pizza: multi-size pricing
+        priceSmall: '',
+        priceMedium: '',
+        priceLarge: '',
+        // For other items: single price
         price: '',
-        preparationTime: '',
-        ingredients: '',
+        imageUrl: '', // Temporary - will be replaced with actual image picker
         isVegetarian: false,
-        isSpicy: false,
         isAvailable: true,
     });
 
-    const categories = ['Pizzas', 'Sides', 'Beverages', 'Desserts'];
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-    const handleSaveItem = () => {
-        // Validate required fields
-        if (!itemData.name || !itemData.price || !itemData.preparationTime) {
-            Alert.alert('Missing Information', 'Please fill in all required fields (Name, Price, Prep Time)');
+    // Toppings state (only for pizza)
+    const [toppings, setToppings] = useState<Array<{ name: string; category: 'vegetables' | 'meat' | 'cheese' | 'sauce' }>>([]);
+
+    // Topping modal state
+    const [showToppingModal, setShowToppingModal] = useState(false);
+    const [selectedToppingCategory, setSelectedToppingCategory] = useState<'vegetables' | 'meat' | 'cheese' | 'sauce' | null>(null);
+
+    const categories: Array<{ value: 'pizza' | 'sides' | 'beverages' | 'desserts', label: string }> = [
+        { value: 'pizza', label: 'Pizzas' },
+        { value: 'sides', label: 'Sides' },
+        { value: 'beverages', label: 'Beverages' },
+        { value: 'desserts', label: 'Desserts' },
+    ];
+
+    // Topping options by category
+    const toppingOptions = {
+        vegetables: [
+            { name: 'Mushrooms', icon: '🍄' },
+            { name: 'Onions', icon: '🧅' },
+            { name: 'Bell Peppers', icon: '🫑' },
+            { name: 'Olives', icon: '🫒' },
+            { name: 'Tomatoes', icon: '🍅' },
+            { name: 'Spinach', icon: '🥬' },
+            { name: 'Jalapenos', icon: '🌶️' },
+            { name: 'Pineapple', icon: '🍍' },
+        ],
+        meat: [
+            { name: 'Pepperoni', icon: '🍖' },
+            { name: 'Sausage', icon: '🌭' },
+            { name: 'Bacon', icon: '🥓' },
+            { name: 'Ham', icon: '🍖' },
+            { name: 'Chicken', icon: '🍗' },
+            { name: 'Beef', icon: '🥩' },
+        ],
+        cheese: [
+            { name: 'Mozzarella', icon: '🧀' },
+            { name: 'Parmesan', icon: '🧀' },
+            { name: 'Cheddar', icon: '🧀' },
+            { name: 'Feta', icon: '🧀' },
+            { name: 'Ricotta', icon: '🧀' },
+            { name: 'Goat Cheese', icon: '🧀' },
+        ],
+        sauce: [
+            { name: 'Marinara', icon: '🍅' },
+            { name: 'BBQ Sauce', icon: '🍖' },
+            { name: 'Pesto', icon: '🌿' },
+            { name: 'Alfredo', icon: '🥛' },
+            { name: 'Ranch', icon: '🥗' },
+            { name: 'Buffalo', icon: '🌶️' },
+        ],
+    };
+
+    const handleAddTopping = (toppingName: string, category: 'vegetables' | 'meat' | 'cheese' | 'sauce') => {
+        // Check if topping already exists
+        const exists = toppings.some(t => t.name === toppingName && t.category === category);
+        if (!exists) {
+            setToppings([...toppings, { name: toppingName, category }]);
+        }
+        setShowToppingModal(false);
+        setSelectedToppingCategory(null);
+    };
+
+    // Request image picker permissions
+    useEffect(() => {
+        (async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission Required',
+                    'We need camera roll permissions to upload product images.',
+                    [{ text: 'OK' }]
+                );
+            }
+        })();
+    }, []);
+
+    // Clear messages when component unmounts
+    useEffect(() => {
+        return () => {
+            dispatch(clearMessages());
+        };
+    }, [dispatch]);
+
+    const handleImagePick = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setSelectedImage(result.assets[0].uri);
+                // Also update imageUrl in itemData for preview
+                setItemData({ ...itemData, imageUrl: result.assets[0].uri });
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
+        }
+    };
+
+    const removeImage = () => {
+        setSelectedImage(null);
+        setItemData({ ...itemData, imageUrl: '' });
+    };
+
+    const validateForm = (): boolean => {
+        if (!itemData.name.trim()) {
+            Alert.alert('Missing Information', 'Please enter item name');
+            return false;
+        }
+        if (!itemData.description.trim()) {
+            Alert.alert('Missing Information', 'Please enter item description');
+            return false;
+        }
+
+        // Validate image
+        if (!selectedImage) {
+            Alert.alert('Missing Information', 'Please select a product image');
+            return false;
+        }
+
+        // Validate pricing based on category
+        if (itemData.category === 'pizza') {
+            // For pizza, at least one size must have a price
+            const hasSmall = itemData.priceSmall && parseFloat(itemData.priceSmall) > 0;
+            const hasMedium = itemData.priceMedium && parseFloat(itemData.priceMedium) > 0;
+            const hasLarge = itemData.priceLarge && parseFloat(itemData.priceLarge) > 0;
+
+            if (!hasSmall && !hasMedium && !hasLarge) {
+                Alert.alert('Missing Pricing', 'Please enter at least one pizza size price');
+                return false;
+            }
+        } else {
+            // For other items, validate single price
+            if (!itemData.price || parseFloat(itemData.price) <= 0) {
+                Alert.alert('Invalid Price', 'Please enter a valid price greater than 0');
+                return false;
+            }
+        }
+
+        // Image is optional for now (will use default or selected image)
+        // Prep time will be auto-assigned by backend
+        return true;
+    };
+
+    const handleSaveItem = async () => {
+        // Clear previous messages
+        dispatch(clearMessages());
+
+        // Validate form
+        if (!validateForm()) {
             return;
         }
 
-        // Handle save item
-        Alert.alert(
-            'Success',
-            'Menu item has been added successfully!',
-            [
-                {
-                    text: 'OK',
-                    onPress: () => navigation.goBack(),
-                },
-            ]
-        );
+        // Prepare pricing based on category
+        let pricing: number | { small?: number; medium?: number; large?: number };
+
+        if (itemData.category === 'pizza') {
+            // For pizza: create object with available sizes
+            pricing = {};
+            if (itemData.priceSmall && parseFloat(itemData.priceSmall) > 0) {
+                pricing.small = parseFloat(itemData.priceSmall);
+            }
+            if (itemData.priceMedium && parseFloat(itemData.priceMedium) > 0) {
+                pricing.medium = parseFloat(itemData.priceMedium);
+            }
+            if (itemData.priceLarge && parseFloat(itemData.priceLarge) > 0) {
+                pricing.large = parseFloat(itemData.priceLarge);
+            }
+        } else {
+            // For other items: single price
+            pricing = parseFloat(itemData.price);
+        }
+
+        // Prepare product data
+        const productData: any = {
+            name: itemData.name.trim(),
+            description: itemData.description.trim(),
+            category: itemData.category,
+            pricing,
+            // Use selected image or default placeholder
+            imageUrl: selectedImage || itemData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Menu+Item',
+            isVegetarian: itemData.isVegetarian,
+            isAvailable: itemData.isAvailable,
+            // preparationTime will be auto-assigned by backend based on category
+        };
+
+        // Add toppings if pizza category and toppings exist
+        if (itemData.category === 'pizza' && toppings.length > 0) {
+            productData.toppings = toppings;
+        }
+
+        try {
+            const result: any = await dispatch(createProductThunk(productData));
+
+            if (result.success) {
+                Alert.alert(
+                    'Success',
+                    'Menu item has been added successfully!',
+                    [
+                        {
+                            text: 'OK',
+                            onPress: () => navigation.goBack(),
+                        },
+                    ]
+                );
+            } else {
+                Alert.alert('Error', result.error || 'Failed to create product');
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to create product');
+        }
     };
 
     return (
@@ -83,7 +291,7 @@ export default function AddMenuItemScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Description</Text>
+                            <Text style={styles.label}>Description <Text style={styles.required}>*</Text></Text>
                             <TextInput
                                 style={[styles.input, styles.textArea]}
                                 value={itemData.description}
@@ -105,33 +313,87 @@ export default function AddMenuItemScreen() {
                         <View style={styles.categoryContainer}>
                             {categories.map((category) => (
                                 <TouchableOpacity
-                                    key={category}
+                                    key={category.value}
                                     style={[
                                         styles.categoryButton,
-                                        itemData.category === category && styles.selectedCategory
+                                        itemData.category === category.value && styles.selectedCategory
                                     ]}
-                                    onPress={() => setItemData({ ...itemData, category })}
+                                    onPress={() => setItemData({ ...itemData, category: category.value })}
                                 >
                                     <Text style={[
                                         styles.categoryText,
-                                        itemData.category === category && styles.selectedCategoryText
+                                        itemData.category === category.value && styles.selectedCategoryText
                                     ]}>
-                                        {category}
+                                        {category.label}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
                     </View>
 
-                    {/* Pricing & Time */}
+                    {/* Pricing */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <MaterialIcons name="attach-money" size={20} color="#cb202d" />
-                            <Text style={styles.sectionTitle}>Pricing & Time</Text>
+                            <Text style={styles.sectionTitle}>Pricing</Text>
                         </View>
 
-                        <View style={styles.row}>
-                            <View style={[styles.inputGroup, styles.halfWidth]}>
+                        {itemData.category === 'pizza' ? (
+                            // Multi-size pricing for pizza
+                            <>
+                                <Text style={styles.label}>Pizza Sizes <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.helperText}>Enter price for at least one size</Text>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.sizeLabel}>Small (10")</Text>
+                                    <View style={styles.inputWithIcon}>
+                                        <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={[styles.input, styles.inputWithPadding]}
+                                            value={itemData.priceSmall}
+                                            onChangeText={(text) => setItemData({ ...itemData, priceSmall: text })}
+                                            placeholder="9.99"
+                                            placeholderTextColor="#999"
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.sizeLabel}>Medium (12")</Text>
+                                    <View style={styles.inputWithIcon}>
+                                        <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={[styles.input, styles.inputWithPadding]}
+                                            value={itemData.priceMedium}
+                                            onChangeText={(text) => setItemData({ ...itemData, priceMedium: text })}
+                                            placeholder="14.99"
+                                            placeholderTextColor="#999"
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.sizeLabel}>Large (16")</Text>
+                                    <View style={styles.inputWithIcon}>
+                                        <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={[styles.input, styles.inputWithPadding]}
+                                            value={itemData.priceLarge}
+                                            onChangeText={(text) => setItemData({ ...itemData, priceLarge: text })}
+                                            placeholder="18.99"
+                                            placeholderTextColor="#999"
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                </View>
+
+                                <Text style={styles.helperText}>Preparation time: ~20 minutes</Text>
+                            </>
+                        ) : (
+                            // Single price for other items
+                            <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Price ($) <Text style={styles.required}>*</Text></Text>
                                 <View style={styles.inputWithIcon}>
                                     <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
@@ -144,55 +406,97 @@ export default function AddMenuItemScreen() {
                                         keyboardType="decimal-pad"
                                     />
                                 </View>
+                                <Text style={styles.helperText}>
+                                    Preparation time: ~{
+                                        itemData.category === 'sides' ? '10' :
+                                            itemData.category === 'beverages' ? '2' : '5'
+                                    } minutes
+                                </Text>
                             </View>
+                        )}
+                    </View>
 
-                            <View style={[styles.inputGroup, styles.halfWidth]}>
-                                <Text style={styles.label}>Prep Time <Text style={styles.required}>*</Text></Text>
-                                <View style={styles.inputWithIcon}>
-                                    <MaterialIcons name="schedule" size={20} color="#8E8E93" style={styles.inputIcon} />
-                                    <TextInput
-                                        style={[styles.input, styles.inputWithPadding]}
-                                        value={itemData.preparationTime}
-                                        onChangeText={(text) => setItemData({ ...itemData, preparationTime: text })}
-                                        placeholder="15 mins"
-                                        placeholderTextColor="#999"
-                                        keyboardType="number-pad"
-                                    />
+                    {/* Toppings (Pizza Only) */}
+                    {itemData.category === 'pizza' && (
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <MaterialIcons name="restaurant" size={20} color="#cb202d" />
+                                <Text style={styles.sectionTitle}>Pizza Toppings (Optional)</Text>
+                            </View>
+                            <Text style={[styles.helperText, { marginBottom: 12 }]}>Add toppings to customize your pizza</Text>
+
+                            {/* Toppings List */}
+                            {toppings.map((topping, index) => (
+                                <View key={index} style={styles.toppingItem}>
+                                    <View style={styles.toppingInfo}>
+                                        <Text style={styles.toppingName}>{topping.name}</Text>
+                                        <Text style={styles.toppingCategory}>
+                                            {topping.category.charAt(0).toUpperCase() + topping.category.slice(1)}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            const newToppings = toppings.filter((_, i) => i !== index);
+                                            setToppings(newToppings);
+                                        }}
+                                        style={styles.removeToppingButton}
+                                    >
+                                        <MaterialIcons name="close" size={18} color="#cb202d" />
+                                    </TouchableOpacity>
                                 </View>
-                            </View>
-                        </View>
-                    </View>
+                            ))}
 
-                    {/* Ingredients */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <MaterialIcons name="restaurant" size={20} color="#cb202d" />
-                            <Text style={styles.sectionTitle}>Ingredients</Text>
+                            {/* Add Topping Button */}
+                            <TouchableOpacity
+                                style={styles.addToppingButton}
+                                onPress={() => setShowToppingModal(true)}
+                            >
+                                <MaterialIcons name="add" size={20} color="#cb202d" />
+                                <Text style={styles.addToppingText}>Add Topping</Text>
+                            </TouchableOpacity>
                         </View>
-                        <View style={styles.inputGroup}>
-                            <TextInput
-                                style={[styles.input, styles.textArea]}
-                                value={itemData.ingredients}
-                                onChangeText={(text) => setItemData({ ...itemData, ingredients: text })}
-                                placeholder="e.g., Tomato sauce, Mozzarella, Basil..."
-                                placeholderTextColor="#999"
-                                multiline
-                                numberOfLines={2}
-                            />
-                        </View>
-                    </View>
+                    )}
 
                     {/* Image Upload */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <MaterialIcons name="image" size={20} color="#cb202d" />
-                            <Text style={styles.sectionTitle}>Item Image</Text>
+                            <Text style={styles.sectionTitle}>Item Image <Text style={styles.required}>*</Text></Text>
                         </View>
-                        <TouchableOpacity style={styles.imageUpload}>
-                            <MaterialIcons name="add-photo-alternate" size={48} color="#8E8E93" />
-                            <Text style={styles.imageUploadText}>Upload Image</Text>
-                            <Text style={styles.imageUploadSubtext}>Tap to select from gallery</Text>
-                        </TouchableOpacity>
+
+                        {selectedImage ? (
+                            <View style={styles.imagePreviewContainer}>
+                                <Image
+                                    source={{ uri: selectedImage }}
+                                    style={styles.imagePreview}
+                                    resizeMode="cover"
+                                />
+                                <TouchableOpacity
+                                    onPress={removeImage}
+                                    style={styles.removeImageButton}
+                                >
+                                    <MaterialIcons name="close" size={20} color="#cb202d" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleImagePick}
+                                    style={styles.changeImageButtonOverlay}
+                                >
+                                    <MaterialIcons name="edit" size={16} color="#fff" />
+                                    <Text style={styles.changeImageTextOverlay}>Change Image</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.uploadButton}
+                                onPress={handleImagePick}
+                                disabled={isCreating}
+                            >
+                                <MaterialIcons name="add-photo-alternate" size={48} color="#94A3B8" />
+                                <Text style={styles.uploadButtonText}>Upload Product Image</Text>
+                                <Text style={styles.uploadButtonSubtext}>Tap to select from gallery</Text>
+                            </TouchableOpacity>
+                        )}
+                        <Text style={styles.helperText}>Upload a clear photo of the menu item. Recommended size: 800x600px</Text>
                     </View>
 
                     {/* Item Options */}
@@ -218,26 +522,6 @@ export default function AddMenuItemScreen() {
                                 <View style={[
                                     styles.switchThumb,
                                     itemData.isVegetarian && styles.switchThumbActive
-                                ]} />
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.optionRow}
-                            onPress={() => setItemData({ ...itemData, isSpicy: !itemData.isSpicy })}
-                        >
-                            <MaterialIcons name="local-fire-department" size={20} color="#FF5722" />
-                            <View style={styles.optionInfo}>
-                                <Text style={styles.optionTitle}>Spicy</Text>
-                                <Text style={styles.optionSubtext}>Mark as spicy item</Text>
-                            </View>
-                            <View style={[
-                                styles.switch,
-                                itemData.isSpicy && styles.switchActive
-                            ]}>
-                                <View style={[
-                                    styles.switchThumb,
-                                    itemData.isSpicy && styles.switchThumbActive
                                 ]} />
                             </View>
                         </TouchableOpacity>
@@ -272,10 +556,18 @@ export default function AddMenuItemScreen() {
                         <View style={styles.previewCard}>
                             {/* Image Section at Top */}
                             <View style={styles.previewImageSection}>
-                                <View style={styles.previewImagePlaceholder}>
-                                    <MaterialIcons name="image" size={48} color="#ccc" />
-                                    <Text style={styles.previewImageText}>Preview Image</Text>
-                                </View>
+                                {selectedImage || itemData.imageUrl ? (
+                                    <Image
+                                        source={{ uri: selectedImage || itemData.imageUrl || 'https://via.placeholder.com/400x300?text=Menu+Item' }}
+                                        style={styles.previewImage}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <View style={styles.previewImagePlaceholder}>
+                                        <MaterialIcons name="image" size={48} color="#ccc" />
+                                        <Text style={styles.previewImageText}>Preview Image</Text>
+                                    </View>
+                                )}
 
                                 {/* Badges over image */}
                                 <View style={styles.previewBadgesContainer}>
@@ -292,20 +584,17 @@ export default function AddMenuItemScreen() {
 
                             {/* Content Section Below Image */}
                             <View style={styles.previewContentSection}>
-                                {/* Pizza Name */}
+                                {/* Item Name */}
                                 <Text style={styles.previewName}>
                                     {itemData.name || 'Item Name'}
                                 </Text>
 
-                                {/* Rating and Time */}
+                                {/* Rating (prep time will be auto-assigned) */}
                                 <View style={styles.previewRatingContainer}>
                                     <View style={styles.previewRatingBadge}>
-                                        <Text style={styles.previewRatingText}>★ 4.5</Text>
+                                        <Text style={styles.previewRatingText}>★ 4.0</Text>
                                     </View>
-                                    <Text style={styles.previewReviews}>(0)</Text>
-                                    {itemData.preparationTime && (
-                                        <Text style={styles.previewPrepTime}>• {itemData.preparationTime} min</Text>
-                                    )}
+                                    <Text style={styles.previewReviews}>(New Item)</Text>
                                 </View>
 
                                 {/* Description */}
@@ -314,28 +603,41 @@ export default function AddMenuItemScreen() {
                                 </Text>
 
                                 {/* Tags */}
-                                {(itemData.isSpicy || itemData.isVegetarian) && (
+                                {itemData.isVegetarian && (
                                     <View style={styles.previewTagsRow}>
-                                        {itemData.isVegetarian && (
-                                            <View style={styles.previewTag}>
-                                                <MaterialIcons name="eco" size={12} color="#4CAF50" />
-                                                <Text style={styles.previewTagText}>Vegetarian</Text>
-                                            </View>
-                                        )}
-                                        {itemData.isSpicy && (
-                                            <View style={styles.previewTag}>
-                                                <MaterialIcons name="local-fire-department" size={12} color="#FF5722" />
-                                                <Text style={styles.previewTagText}>Spicy</Text>
-                                            </View>
-                                        )}
+                                        <View style={styles.previewTag}>
+                                            <MaterialIcons name="eco" size={12} color="#4CAF50" />
+                                            <Text style={styles.previewTagText}>Vegetarian</Text>
+                                        </View>
                                     </View>
                                 )}
 
                                 {/* Price Section */}
                                 <View style={styles.previewPriceContainer}>
-                                    <Text style={styles.previewPrice}>
-                                        ${itemData.price || '0.00'}
-                                    </Text>
+                                    {itemData.category === 'pizza' ? (
+                                        // Show price range for pizza
+                                        <Text style={styles.previewPrice}>
+                                            {(() => {
+                                                const prices = [
+                                                    itemData.priceSmall ? parseFloat(itemData.priceSmall) : null,
+                                                    itemData.priceMedium ? parseFloat(itemData.priceMedium) : null,
+                                                    itemData.priceLarge ? parseFloat(itemData.priceLarge) : null,
+                                                ].filter((p): p is number => p !== null && !isNaN(p));
+
+                                                if (prices.length === 0) return '$0.00';
+                                                if (prices.length === 1) return `$${prices[0].toFixed(2)}`;
+
+                                                const minPrice = Math.min(...prices);
+                                                const maxPrice = Math.max(...prices);
+                                                return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+                                            })()}
+                                        </Text>
+                                    ) : (
+                                        // Show single price for other items
+                                        <Text style={styles.previewPrice}>
+                                            ${itemData.price || '0.00'}
+                                        </Text>
+                                    )}
                                 </View>
                             </View>
                         </View>
@@ -347,11 +649,139 @@ export default function AddMenuItemScreen() {
 
             {/* Floating Save Button */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
-                    <MaterialIcons name="check" size={20} color="#fff" />
-                    <Text style={styles.saveButtonText}>Save Menu Item</Text>
+                <TouchableOpacity
+                    style={[styles.saveButton, isCreating && styles.saveButtonDisabled]}
+                    onPress={handleSaveItem}
+                    disabled={isCreating}
+                >
+                    {isCreating ? (
+                        <>
+                            <MaterialIcons name="hourglass-empty" size={20} color="#fff" />
+                            <Text style={styles.saveButtonText}>Creating...</Text>
+                        </>
+                    ) : (
+                        <>
+                            <MaterialIcons name="check" size={20} color="#fff" />
+                            <Text style={styles.saveButtonText}>Save Menu Item</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
             </View>
+
+            {/* Topping Selection Modal */}
+            <Modal
+                visible={showToppingModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setShowToppingModal(false);
+                    setSelectedToppingCategory(null);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        {!selectedToppingCategory ? (
+                            // Category Selection View
+                            <>
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>Select Topping Category</Text>
+                                    <TouchableOpacity
+                                        onPress={() => setShowToppingModal(false)}
+                                        style={styles.modalCloseButton}
+                                    >
+                                        <MaterialIcons name="close" size={24} color="#2d2d2d" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.categoryList}>
+                                    <TouchableOpacity
+                                        style={styles.categoryCard}
+                                        onPress={() => setSelectedToppingCategory('vegetables')}
+                                    >
+                                        <Text style={styles.categoryCardIcon}>🥬</Text>
+                                        <Text style={styles.categoryCardTitle}>Vegetables</Text>
+                                        <MaterialIcons name="chevron-right" size={24} color="#8E8E93" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.categoryCard}
+                                        onPress={() => setSelectedToppingCategory('meat')}
+                                    >
+                                        <Text style={styles.categoryCardIcon}>🍖</Text>
+                                        <Text style={styles.categoryCardTitle}>Meat</Text>
+                                        <MaterialIcons name="chevron-right" size={24} color="#8E8E93" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.categoryCard}
+                                        onPress={() => setSelectedToppingCategory('cheese')}
+                                    >
+                                        <Text style={styles.categoryCardIcon}>🧀</Text>
+                                        <Text style={styles.categoryCardTitle}>Cheese</Text>
+                                        <MaterialIcons name="chevron-right" size={24} color="#8E8E93" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.categoryCard}
+                                        onPress={() => setSelectedToppingCategory('sauce')}
+                                    >
+                                        <Text style={styles.categoryCardIcon}>🍅</Text>
+                                        <Text style={styles.categoryCardTitle}>Sauce</Text>
+                                        <MaterialIcons name="chevron-right" size={24} color="#8E8E93" />
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </>
+                        ) : (
+                            // Topping Selection View
+                            <>
+                                <View style={styles.modalHeader}>
+                                    <TouchableOpacity
+                                        onPress={() => setSelectedToppingCategory(null)}
+                                        style={styles.modalBackButton}
+                                    >
+                                        <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.modalTitle}>
+                                        {selectedToppingCategory.charAt(0).toUpperCase() + selectedToppingCategory.slice(1)}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setShowToppingModal(false);
+                                            setSelectedToppingCategory(null);
+                                        }}
+                                        style={styles.modalCloseButton}
+                                    >
+                                        <MaterialIcons name="close" size={24} color="#2d2d2d" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.toppingGrid}>
+                                    <View style={styles.toppingGridContainer}>
+                                        {toppingOptions[selectedToppingCategory].map((topping, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.toppingChip,
+                                                    toppings.some(t => t.name === topping.name) && styles.toppingChipSelected
+                                                ]}
+                                                onPress={() => handleAddTopping(topping.name, selectedToppingCategory)}
+                                            >
+                                                <Text style={styles.toppingChipIcon}>{topping.icon}</Text>
+                                                <Text style={[
+                                                    styles.toppingChipText,
+                                                    toppings.some(t => t.name === topping.name) && styles.toppingChipTextSelected
+                                                ]}>
+                                                    {topping.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </ScrollView>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -452,6 +882,11 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
         paddingTop: 12,
     },
+    helperText: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginTop: 4,
+    },
     inputWithIcon: {
         position: 'relative',
     },
@@ -500,26 +935,91 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
 
-    // Image Upload
-    imageUpload: {
-        backgroundColor: '#F8F9FA',
+    // Image Upload styles (matching DeliveryBoySignup)
+    uploadButton: {
+        backgroundColor: '#F8FAFC',
         borderWidth: 2,
-        borderColor: '#E0E0E0',
+        borderColor: '#E2E8F0',
         borderStyle: 'dashed',
         borderRadius: 12,
-        padding: 32,
+        padding: 24,
         alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 200,
     },
-    imageUploadText: {
+    uploadButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#2d2d2d',
-        marginTop: 8,
+        color: '#64748B',
+        marginTop: 12,
     },
-    imageUploadSubtext: {
+    uploadButtonSubtext: {
         fontSize: 13,
-        color: '#8E8E93',
+        color: '#94A3B8',
         marginTop: 4,
+    },
+    imagePreviewContainer: {
+        position: 'relative',
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    imagePreview: {
+        width: '100%',
+        height: 250,
+        resizeMode: 'cover',
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        backgroundColor: '#FFFFFF',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
+    },
+    changeImageButtonOverlay: {
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#cb202d',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        gap: 6,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#cb202d',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 3,
+            },
+        }),
+    },
+    changeImageTextOverlay: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
 
     // Options with Toggle Switch
@@ -600,6 +1100,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
     },
     previewImagePlaceholder: {
         alignItems: 'center',
@@ -756,9 +1260,191 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
     },
+    saveButtonDisabled: {
+        opacity: 0.6,
+    },
     saveButtonText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
+    },
+
+    // Size labels for pizza pricing
+    sizeLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 6,
+    },
+
+    // Toppings styles
+    toppingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F8F9FA',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    toppingInfo: {
+        flex: 1,
+    },
+    toppingName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    toppingCategory: {
+        fontSize: 12,
+        color: '#8E8E93',
+        textTransform: 'capitalize',
+    },
+    removeToppingButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FFE5E7',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addToppingButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F8F9FA',
+        borderWidth: 2,
+        borderColor: '#cb202d',
+        borderStyle: 'dashed',
+        padding: 12,
+        borderRadius: 8,
+        gap: 6,
+    },
+    addToppingText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#cb202d',
+    },
+
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '80%',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+            },
+            android: {
+                elevation: 16,
+            },
+        }),
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        flex: 1,
+        textAlign: 'center',
+    },
+    modalCloseButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F8F9FA',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalBackButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F8F9FA',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    categoryList: {
+        padding: 16,
+    },
+    categoryCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FA',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.06,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
+    },
+    categoryCardIcon: {
+        fontSize: 32,
+        marginRight: 12,
+    },
+    categoryCardTitle: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2d2d2d',
+    },
+    toppingGrid: {
+        padding: 16,
+    },
+    toppingGridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    toppingChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FA',
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        gap: 6,
+    },
+    toppingChipSelected: {
+        backgroundColor: '#FFE5E7',
+        borderColor: '#cb202d',
+    },
+    toppingChipIcon: {
+        fontSize: 18,
+    },
+    toppingChipText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2d2d2d',
+    },
+    toppingChipTextSelected: {
+        color: '#cb202d',
     },
 });

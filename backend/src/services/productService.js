@@ -10,15 +10,16 @@ import Product from '../models/Product.js';
 import { getCache, setCache, deleteCache, deleteCachePattern, CACHE_KEYS, CACHE_TTL } from '../utils/cache.js';
 
 /**
- * Get all products with optional category filter (with caching)
- * @param {String} category - Category filter (optional)
+ * Get all products with optional filters (with caching)
+ * @param {Object} filters - Query filters { category, isVegetarian, isAvailable, sortBy }
  * @returns {Array} - List of products
  */
-export const getAllProducts = async (category = null) => {
-    // Create cache key based on filter
-    const cacheKey = category
-        ? CACHE_KEYS.PRODUCTS_BY_CATEGORY(category)
-        : CACHE_KEYS.PRODUCTS_ALL;
+export const getAllProducts = async (filters = {}) => {
+    const { category, isVegetarian, isAvailable, sortBy = 'createdAt' } = filters;
+
+    // Create cache key based on filters
+    const filterKey = JSON.stringify(filters);
+    const cacheKey = `${CACHE_KEYS.PRODUCTS_ALL}:${filterKey}`;
 
     // Try cache first
     const cached = await getCache(cacheKey);
@@ -27,13 +28,31 @@ export const getAllProducts = async (category = null) => {
         return cached;
     }
 
-    // Query database
+    // Build query
     const query = {};
     if (category) {
         query.category = category;
     }
+    if (isVegetarian !== undefined) {
+        query.isVegetarian = isVegetarian === 'true' || isVegetarian === true;
+    }
+    if (isAvailable !== undefined) {
+        query.isAvailable = isAvailable === 'true' || isAvailable === true;
+    }
 
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    // Build sort options
+    const sortOptions = {};
+    if (sortBy === 'price') {
+        sortOptions.basePrice = 1;
+    } else if (sortBy === 'rating') {
+        sortOptions.rating = -1;
+    } else if (sortBy === 'popular') {
+        sortOptions.salesCount = -1;
+    } else {
+        sortOptions.createdAt = -1;
+    }
+
+    const products = await Product.find(query).sort(sortOptions);
 
     // Cache for 1 hour (menu doesn't change often)
     await setCache(cacheKey, products, CACHE_TTL.ONE_HOUR);
@@ -76,6 +95,28 @@ export const getProductById = async (productId) => {
  * @returns {Object} - Created product
  */
 export const createProduct = async (productData) => {
+    // Validate pricing structure
+    if (productData.category === 'pizza') {
+        if (typeof productData.pricing !== 'object' || !productData.pricing) {
+            const error = new Error('Pizza products must have pricing as an object with size keys');
+            error.statusCode = 400;
+            throw error;
+        }
+    } else {
+        if (typeof productData.pricing !== 'number') {
+            const error = new Error('Non-pizza products must have pricing as a single number');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    // Validate toppings only for pizza
+    if (productData.category !== 'pizza' && productData.toppings && productData.toppings.length > 0) {
+        const error = new Error('Only pizza products can have toppings');
+        error.statusCode = 400;
+        throw error;
+    }
+
     const product = await Product.create(productData);
 
     // Invalidate all product list caches

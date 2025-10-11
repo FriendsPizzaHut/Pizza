@@ -45,8 +45,8 @@ export const useAuth = () => {
                     userId: user.id,
                 }));
 
-                // Navigate based on role
-                redirectToRoleDashboard(user.role);
+                // Navigation will happen automatically via RootNavigator
+                // based on isAuthenticated and role from Redux state
             } else {
                 dispatch(loginFailure());
                 throw new Error(response.message || 'Login failed');
@@ -96,8 +96,7 @@ export const useAuth = () => {
                     userId: user.id,
                 }));
 
-                // Navigate based on role
-                redirectToRoleDashboard(user.role);
+                // Navigation will happen automatically via RootNavigator
             } else {
                 dispatch(loginFailure());
                 throw new Error(response.message || 'Registration failed');
@@ -116,53 +115,12 @@ export const useAuth = () => {
             // Call real auth service (handles AsyncStorage and backend)
             await authService.logout();
 
-            // Clear Redux state
+            // Clear Redux state - RootNavigator will automatically show Auth screen
             dispatch(logoutAction());
-
-            // Navigate to login
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-            });
         } catch (error) {
             console.error('Logout error:', error);
             // Clear local state even if backend call fails
             dispatch(logoutAction());
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-            });
-        }
-    };
-
-    /**
-     * Redirect to role-specific dashboard
-     */
-    const redirectToRoleDashboard = (role: string) => {
-        switch (role) {
-            case 'customer':
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'CustomerTabs' }],
-                });
-                break;
-            case 'delivery':
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'DeliveryTabs' }],
-                });
-                break;
-            case 'admin':
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'AdminTabs' }],
-                });
-                break;
-            default:
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                });
         }
     };
 

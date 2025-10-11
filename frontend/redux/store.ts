@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authSlice from './slices/authSlice';
 import onboardingSlice from './slices/onboardingSlice';
+import productSlice from './slices/productSlice';
 import { baseApi } from './slices/api/baseApi';
 
 // Store configuration with RTK Query
@@ -10,6 +11,7 @@ const store = configureStore({
         // Feature slices
         auth: authSlice,
         onboarding: onboardingSlice,
+        product: productSlice,
 
         // RTK Query API slice
         [baseApi.reducerPath]: baseApi.reducer,
