@@ -14,7 +14,7 @@
 
 import * as orderService from '../services/orderService.js';
 import { sendResponse } from '../utils/response.js';
-import { emitNewOrder, emitOrderStatusUpdate, emitOrderCancelled } from '../socket/events.js';
+import { emitNewOrder, emitOrderStatusUpdate, emitOrderCancelled, emitDeliveryAssignment } from '../socket/events.js';
 
 /**
  * Create new order
@@ -29,6 +29,27 @@ export const createOrder = async (req, res, next) => {
         emitNewOrder(order);
 
         sendResponse(res, 201, 'Order created successfully', order);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Create order from cart
+ * POST /api/v1/orders/from-cart
+ * @access Private
+ */
+export const createOrderFromCart = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const orderData = req.body;
+
+        const order = await orderService.createOrderFromCart(userId, orderData);
+
+        // Emit real-time notification to admin and delivery agents
+        emitNewOrder(order);
+
+        sendResponse(res, 201, 'Order placed successfully', order);
     } catch (error) {
         next(error);
     }
@@ -63,6 +84,28 @@ export const getOrdersByUser = async (req, res, next) => {
 };
 
 /**
+ * Get my orders (optimized for mobile OrdersScreen)
+ * GET /api/v1/orders/my-orders
+ * @access Private
+ */
+export const getMyOrders = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const { limit, skip, status } = req.query;
+
+        const orders = await orderService.getMyOrders(userId, {
+            limit: parseInt(limit) || 20,
+            skip: parseInt(skip) || 0,
+            status,
+        });
+
+        sendResponse(res, 200, 'Orders retrieved successfully', orders);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
  * Update order status
  * PATCH /api/v1/orders/:id/status
  * @access Private/Admin
@@ -75,6 +118,33 @@ export const updateOrderStatus = async (req, res, next) => {
         emitOrderStatusUpdate(order);
 
         sendResponse(res, 200, 'Order status updated successfully', order);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Assign delivery agent to order
+ * PATCH /api/v1/orders/:id/assign-delivery
+ * @access Private/Admin
+ */
+export const assignDeliveryAgent = async (req, res, next) => {
+    try {
+        const { deliveryAgentId } = req.body;
+
+        if (!deliveryAgentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Delivery agent ID is required'
+            });
+        }
+
+        const order = await orderService.assignDeliveryAgent(req.params.id, deliveryAgentId);
+
+        // Emit real-time notification to delivery agent, admin, and customer
+        emitDeliveryAssignment(order);
+
+        sendResponse(res, 200, 'Delivery agent assigned successfully', order);
     } catch (error) {
         next(error);
     }
@@ -102,8 +172,11 @@ export const deleteOrder = async (req, res, next) => {
 
 export default {
     createOrder,
+    createOrderFromCart,
     getAllOrders,
     getOrdersByUser,
+    getMyOrders,
     updateOrderStatus,
+    assignDeliveryAgent,
     deleteOrder,
 };

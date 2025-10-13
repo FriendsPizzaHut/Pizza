@@ -1,12 +1,50 @@
 // JWT token helpers for axiosInstance
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+const API_URL = __DEV__
+    ? process.env.EXPO_PUBLIC_API_URL_DEVELOPMENT || 'http://localhost:5000'
+    : process.env.EXPO_PUBLIC_API_URL_PRODUCTION || 'https://pizzabackend-u9ui.onrender.com';
+
 export async function getToken(): Promise<string | null> {
-    return AsyncStorage.getItem('JWT_TOKEN');
+    try {
+        return await AsyncStorage.getItem('@auth_token');
+    } catch {
+        return null;
+    }
 }
 
 export async function refreshToken(): Promise<string | null> {
-    // Implement your refresh logic here (API call, etc.)
-    // For now, just return null to simulate failure
-    return null;
+    try {
+        const refreshTokenValue = await AsyncStorage.getItem('@refresh_token');
+
+        if (!refreshTokenValue) {
+            return null;
+        }
+
+        // Call refresh token API
+        const response = await axios.post(`${API_URL}/api/v1/auth/refresh`, {
+            refreshToken: refreshTokenValue,
+        });
+
+        if (response.data?.data?.accessToken) {
+            const newToken = response.data.data.accessToken;
+            await AsyncStorage.setItem('@auth_token', newToken);
+
+            // Update expiry if provided
+            if (response.data.data.expiresIn) {
+                const expiryTime = Date.now() + response.data.data.expiresIn * 1000;
+                await AsyncStorage.setItem('@token_expiry', expiryTime.toString());
+            }
+
+            return newToken;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+        return null;
+    }
 }
 /**
  * Cache Utility
@@ -14,8 +52,6 @@ export async function refreshToken(): Promise<string | null> {
  * Provides timestamp-based caching using AsyncStorage for offline data access.
  * Allows storing and retrieving API responses with expiration support.
  */
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CacheEntry<T = any> {
     data: T;

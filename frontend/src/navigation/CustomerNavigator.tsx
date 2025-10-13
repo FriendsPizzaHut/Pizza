@@ -19,6 +19,8 @@ import HelpSupportScreen from '../screens/customer/profile/HelpSupportScreen';
 import CartScreen from '../screens/customer/menu/CartScreen';
 import PizzaDetailsScreen from '../screens/customer/menu/PizzaDetailsScreen';
 import CheckoutScreen from '../screens/customer/menu/CheckoutScreen';
+import AddAddressScreen from '../screens/customer/menu/AddAddressScreen';
+import EditAddressScreen from '../screens/customer/menu/EditAddressScreen';
 import TrackOrderScreen from '../screens/customer/orders/TrackOrderScreen';
 import OrderDetailsScreen from '../screens/customer/orders/OrderDetailsScreen';
 
@@ -97,6 +99,10 @@ export default function CustomerNavigator() {
             <Stack.Screen name="PizzaDetails" component={PizzaDetailsScreen} />
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
+
+            {/* Address Management Sub-screens */}
+            <Stack.Screen name="AddAddress" component={AddAddressScreen} />
+            <Stack.Screen name="EditAddress" component={EditAddressScreen} />
 
             {/* Order Sub-screens */}
             <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />

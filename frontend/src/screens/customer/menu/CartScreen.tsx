@@ -1,96 +1,94 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-
-interface CartItem {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-    size?: string;
-    customizations?: string[];
-    image?: string;
-    isVeg?: boolean;
-}
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../../redux/store';
+import {
+    fetchCartThunk,
+    updateCartItemThunk,
+    removeCartItemThunk,
+    applyCouponThunk,
+    removeCouponThunk
+} from '../../../../redux/thunks/cartThunks';
+import { selectCartItems, selectCartTotals, selectCartLoading, selectAppliedCoupon } from '../../../../redux/slices/cartSlice';
 
 export default function CartScreen() {
     const navigation = useNavigation();
-    const [cartItems, setCartItems] = useState<CartItem[]>([
-        {
-            id: '1',
-            name: 'Margherita Pizza',
-            price: 12.99,
-            quantity: 2,
-            size: 'Large',
-            customizations: ['Extra Cheese'],
-            image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400',
-            isVeg: true,
-        },
-        {
-            id: '2',
-            name: 'Pepperoni Pizza',
-            price: 14.99,
-            quantity: 1,
-            size: 'Medium',
-            customizations: ['Extra Pepperoni'],
-            image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400',
-            isVeg: false,
-        },
-        {
-            id: '3',
-            name: 'Veggie Supreme',
-            price: 11.99,
-            quantity: 1,
-            size: 'Large',
-            customizations: ['Fresh Basil'],
-            image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=400',
-            isVeg: true,
-        },
-    ]);
+    const dispatch = useDispatch<AppDispatch>();
+
+    // Redux state
+    const cartItems = useSelector(selectCartItems);
+    const totals = useSelector(selectCartTotals);
+    const isLoading = useSelector(selectCartLoading);
+    const appliedCoupon = useSelector(selectAppliedCoupon);
 
     const [promoCode, setPromoCode] = useState('');
-    const [appliedPromo, setAppliedPromo] = useState<{ code: string, discount: number } | null>(null);
 
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const tax = subtotal * 0.085; // 8.5% tax
-    const deliveryFee = 2.99;
-    const discount = appliedPromo ? appliedPromo.discount : 0;
-    const total = subtotal + tax + deliveryFee - discount;
+    // Fetch cart on mount and when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            dispatch(fetchCartThunk());
+        }, [dispatch])
+    );
 
-    const updateQuantity = (id: string, newQuantity: number) => {
+    const updateQuantity = (itemId: string, newQuantity: number) => {
         if (newQuantity === 0) {
-            setCartItems(cartItems.filter(item => item.id !== id));
+            Alert.alert(
+                'Remove Item',
+                'Are you sure you want to remove this item?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Remove',
+                        style: 'destructive',
+                        onPress: () => dispatch(removeCartItemThunk(itemId))
+                    }
+                ]
+            );
         } else {
-            setCartItems(cartItems.map(item =>
-                item.id === id ? { ...item, quantity: newQuantity } : item
-            ));
+            dispatch(updateCartItemThunk({ itemId, quantity: newQuantity }));
         }
     };
 
-    const applyPromoCode = () => {
-        const validCodes = {
-            'WELCOME10': 5.00,
-            'STUDENT15': 7.50,
-            'PIZZA20': 10.00,
-        };
+    const handleRemoveItem = (itemId: string) => {
+        Alert.alert(
+            'Remove Item',
+            'Are you sure you want to remove this item?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: () => dispatch(removeCartItemThunk(itemId))
+                }
+            ]
+        );
+    };
 
-        if (validCodes[promoCode as keyof typeof validCodes]) {
-            setAppliedPromo({
-                code: promoCode,
-                discount: validCodes[promoCode as keyof typeof validCodes]
-            });
+    const applyPromoCode = async () => {
+        if (!promoCode.trim()) {
+            Alert.alert('Error', 'Please enter a promo code');
+            return;
+        }
+
+        try {
+            await dispatch(applyCouponThunk(promoCode)).unwrap();
             setPromoCode('');
-            Alert.alert('Success!', `Promo code ${promoCode} applied successfully!`);
-        } else {
-            Alert.alert('Invalid Code', 'The promo code you entered is not valid.');
+            Alert.alert('Success', 'Promo code applied successfully!');
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'Invalid promo code');
         }
     };
 
-    const removePromo = () => {
-        setAppliedPromo(null);
+    const removePromo = async () => {
+        try {
+            await dispatch(removeCouponThunk()).unwrap();
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'Failed to remove coupon');
+        }
     };
 
     const proceedToCheckout = () => {
@@ -98,9 +96,20 @@ export default function CartScreen() {
             Alert.alert('Empty Cart', 'Please add items to your cart before proceeding.');
             return;
         }
-        // Navigate to checkout screen
-        console.log('Proceeding to checkout...');
+        // Navigate to checkout screen with cart total
+        (navigation as any).navigate('Checkout', {
+            cartTotal: totals.total
+        });
     };
+
+    if (isLoading && cartItems.length === 0) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#0C7C59" />
+                <Text style={{ marginTop: 16, fontSize: 14, color: '#666' }}>Loading cart...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -134,55 +143,49 @@ export default function CartScreen() {
                     <View>
                         <View style={styles.cartItemsContainer}>
                             {cartItems.map((item) => (
-                                <View key={item.id} style={styles.cartItem}>
+                                <View key={item._id} style={styles.cartItem}>
                                     {/* Item Image */}
                                     <View style={styles.itemImageContainer}>
                                         <Image
-                                            source={{ uri: item.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400' }}
+                                            source={{ uri: item.productSnapshot.imageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400' }}
                                             style={styles.itemImage}
                                         />
-                                        {/* Veg/Non-veg Badge */}
-                                        {item.isVeg !== undefined && (
-                                            <View style={styles.vegBadgeSmall}>
-                                                <View style={[styles.vegIndicatorSmall, !item.isVeg && styles.nonVegIndicatorSmall]} />
-                                            </View>
-                                        )}
                                     </View>
 
                                     <View style={styles.itemDetails}>
                                         <View style={styles.itemHeader}>
-                                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                            <Text style={styles.itemName} numberOfLines={1}>{item.productSnapshot.name}</Text>
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
-                                                onPress={() => updateQuantity(item.id, 0)}
+                                                onPress={() => handleRemoveItem(item._id)}
                                             >
                                                 <MaterialIcons name="delete-outline" size={18} color="#999" />
                                             </TouchableOpacity>
                                         </View>
 
                                         {item.size && (
-                                            <Text style={styles.itemSize}>{item.size}</Text>
+                                            <Text style={styles.itemSize}>{item.size.charAt(0).toUpperCase() + item.size.slice(1)}</Text>
                                         )}
 
-                                        {item.customizations && item.customizations.length > 0 && (
+                                        {item.customToppings && item.customToppings.length > 0 && (
                                             <Text style={styles.itemCustomizations} numberOfLines={1}>
-                                                {item.customizations.join(', ')}
+                                                {item.customToppings.map(t => t.name).join(', ')}
                                             </Text>
                                         )}
 
                                         <View style={styles.itemFooter}>
-                                            <Text style={styles.itemPrice}>₹{(item.price * item.quantity * 83).toFixed(0)}</Text>
+                                            <Text style={styles.itemPrice}>₹{item.subtotal.toFixed(0)}</Text>
                                             <View style={styles.quantityControls}>
                                                 <TouchableOpacity
                                                     style={styles.quantityButton}
-                                                    onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                                                    onPress={() => updateQuantity(item._id, item.quantity - 1)}
                                                 >
                                                     <MaterialIcons name="remove" size={18} color="#0C7C59" />
                                                 </TouchableOpacity>
                                                 <Text style={styles.quantity}>{item.quantity}</Text>
                                                 <TouchableOpacity
                                                     style={styles.quantityButton}
-                                                    onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                                                    onPress={() => updateQuantity(item._id, item.quantity + 1)}
                                                 >
                                                     <MaterialIcons name="add" size={18} color="#0C7C59" />
                                                 </TouchableOpacity>
@@ -198,15 +201,15 @@ export default function CartScreen() {
                                 <MaterialIcons name="local-offer" size={20} color="#cb202d" />
                                 <Text style={styles.sectionTitle}>Apply Coupon</Text>
                             </View>
-                            {appliedPromo ? (
+                            {appliedCoupon ? (
                                 <View style={styles.appliedPromo}>
                                     <View style={styles.appliedPromoContent}>
                                         <MaterialIcons name="check-circle" size={16} color="#0C7C59" />
                                         <Text style={styles.appliedPromoText}>
-                                            {appliedPromo.code} applied
+                                            {appliedCoupon} applied
                                         </Text>
                                         <Text style={styles.appliedPromoSavings}>
-                                            You saved ₹{(appliedPromo.discount * 83).toFixed(0)}
+                                            You saved ₹{totals.discount.toFixed(0)}
                                         </Text>
                                     </View>
                                     <TouchableOpacity onPress={removePromo} style={styles.removeButton}>
@@ -245,7 +248,7 @@ export default function CartScreen() {
                             <View style={styles.summaryContent}>
                                 <View style={styles.summaryRow}>
                                     <Text style={styles.summaryLabel}>Item total</Text>
-                                    <Text style={styles.summaryValue}>₹{(subtotal * 83).toFixed(0)}</Text>
+                                    <Text style={styles.summaryValue}>₹{totals.subtotal.toFixed(0)}</Text>
                                 </View>
 
                                 <View style={styles.summaryRow}>
@@ -253,21 +256,21 @@ export default function CartScreen() {
                                         <Text style={styles.summaryLabel}>Delivery fee</Text>
                                         <MaterialIcons name="info-outline" size={14} color="#999" />
                                     </View>
-                                    <Text style={styles.summaryValue}>₹{(deliveryFee * 83).toFixed(0)}</Text>
+                                    <Text style={styles.summaryValue}>₹{totals.deliveryFee.toFixed(0)}</Text>
                                 </View>
 
                                 <View style={styles.summaryRow}>
                                     <Text style={styles.summaryLabel}>Taxes and charges</Text>
-                                    <Text style={styles.summaryValue}>₹{(tax * 83).toFixed(0)}</Text>
+                                    <Text style={styles.summaryValue}>₹{totals.tax.toFixed(0)}</Text>
                                 </View>
 
-                                {appliedPromo && (
+                                {appliedCoupon && (
                                     <View style={styles.summaryRow}>
                                         <Text style={[styles.summaryLabel, styles.discountLabel]}>
-                                            Coupon discount ({appliedPromo.code})
+                                            Coupon discount ({appliedCoupon})
                                         </Text>
                                         <Text style={[styles.summaryValue, styles.discountValue]}>
-                                            -₹{(appliedPromo.discount * 83).toFixed(0)}
+                                            -₹{totals.discount.toFixed(0)}
                                         </Text>
                                     </View>
                                 )}
@@ -282,7 +285,7 @@ export default function CartScreen() {
                                 >
                                     <View style={styles.totalRowContent}>
                                         <Text style={styles.totalLabel}>Grand Total</Text>
-                                        <Text style={styles.totalValue}>₹{(total * 83).toFixed(0)}</Text>
+                                        <Text style={styles.totalValue}>₹{totals.total.toFixed(0)}</Text>
                                     </View>
                                 </LinearGradient>
                             </View>
@@ -295,10 +298,10 @@ export default function CartScreen() {
                             </View>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedScrollContainer}>
                                 {[
-                                    { name: 'Garlic Bread', price: 5.99, image: 'https://images.unsplash.com/photo-1619326463172-59c1fb84d4a2?w=400', isVeg: true },
-                                    { name: 'Chicken Wings', price: 8.99, image: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400', isVeg: false },
-                                    { name: 'Caesar Salad', price: 6.99, image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400', isVeg: true },
-                                    { name: 'Chocolate Cake', price: 4.99, image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400', isVeg: true },
+                                    { name: 'Garlic Bread', price: 499, image: 'https://images.unsplash.com/photo-1619326463172-59c1fb84d4a2?w=400', isVeg: true },
+                                    { name: 'Chicken Wings', price: 749, image: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400', isVeg: false },
+                                    { name: 'Caesar Salad', price: 579, image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400', isVeg: true },
+                                    { name: 'Chocolate Cake', price: 415, image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400', isVeg: true },
                                 ].map((item, index) => (
                                     <TouchableOpacity key={index} style={styles.suggestedItem}>
                                         <Image
@@ -312,7 +315,7 @@ export default function CartScreen() {
                                         )}
                                         <Text style={styles.suggestedItemName}>{item.name}</Text>
                                         <View style={styles.suggestedItemFooter}>
-                                            <Text style={styles.suggestedItemPrice}>₹{(item.price * 83).toFixed(0)}</Text>
+                                            <Text style={styles.suggestedItemPrice}>₹{item.price.toFixed(0)}</Text>
                                             <View style={styles.addSuggestedButton}>
                                                 <Text style={styles.addSuggestedText}>ADD</Text>
                                             </View>
@@ -331,7 +334,7 @@ export default function CartScreen() {
                         <View style={styles.checkoutLeft}>
                             <View style={styles.totalInfo}>
                                 <Text style={styles.footerTotalLabel}>Total Amount</Text>
-                                <Text style={styles.footerTotalValue}>₹{(total * 83).toFixed(0)}</Text>
+                                <Text style={styles.footerTotalValue}>₹{totals.total.toFixed(0)}</Text>
                             </View>
                         </View>
                         <View style={styles.checkoutRight}>

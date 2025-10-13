@@ -214,7 +214,7 @@ export default function OrderDetailsScreen() {
                             <View style={styles.contentSection}>
                                 <Text style={styles.itemName}>{item.name}</Text>
                                 <Text style={styles.itemSize}>{item.size}</Text>
-                                <Text style={styles.itemBasePrice}>${item.price.toFixed(2)} each</Text>
+                                <Text style={styles.itemBasePrice}>₹{item.price.toFixed(0)} each</Text>
 
                                 {item.addOns.length > 0 && (
                                     <View style={styles.addOnsSection}>
@@ -223,7 +223,7 @@ export default function OrderDetailsScreen() {
                                             <View key={addOnIndex} style={styles.addOnRow}>
                                                 <View style={styles.addOnDot} />
                                                 <Text style={styles.addOnName}>{addOn.name}</Text>
-                                                <Text style={styles.addOnPrice}>+${addOn.price.toFixed(2)}</Text>
+                                                <Text style={styles.addOnPrice}>+₹{addOn.price.toFixed(0)}</Text>
                                             </View>
                                         ))}
                                     </View>
@@ -239,7 +239,7 @@ export default function OrderDetailsScreen() {
                                 <View style={styles.itemTotal}>
                                     <Text style={styles.itemTotalLabel}>Item Total</Text>
                                     <Text style={styles.itemTotalPrice}>
-                                        ${((item.price + item.addOns.reduce((sum, addOn) => sum + addOn.price, 0)) * item.quantity).toFixed(2)}
+                                        ₹{((item.price + item.addOns.reduce((sum, addOn) => sum + addOn.price, 0)) * item.quantity).toFixed(0)}
                                     </Text>
                                 </View>
                             </View>
@@ -254,26 +254,26 @@ export default function OrderDetailsScreen() {
                     <View style={styles.paymentCard}>
                         <View style={styles.paymentRow}>
                             <Text style={styles.paymentLabel}>Subtotal</Text>
-                            <Text style={styles.paymentValue}>${orderDetails.subtotal.toFixed(2)}</Text>
+                            <Text style={styles.paymentValue}>₹{orderDetails.subtotal.toFixed(0)}</Text>
                         </View>
                         <View style={styles.paymentRow}>
                             <Text style={styles.paymentLabel}>Delivery Fee</Text>
-                            <Text style={styles.paymentValue}>${orderDetails.deliveryFee.toFixed(2)}</Text>
+                            <Text style={styles.paymentValue}>₹{orderDetails.deliveryFee.toFixed(0)}</Text>
                         </View>
                         <View style={styles.paymentRow}>
                             <Text style={styles.paymentLabel}>Tax</Text>
-                            <Text style={styles.paymentValue}>${orderDetails.tax.toFixed(2)}</Text>
+                            <Text style={styles.paymentValue}>₹{orderDetails.tax.toFixed(0)}</Text>
                         </View>
                         {orderDetails.discount > 0 && (
                             <View style={styles.paymentRow}>
                                 <Text style={[styles.paymentLabel, { color: '#4CAF50' }]}>Discount</Text>
-                                <Text style={[styles.paymentValue, { color: '#4CAF50' }]}>-${orderDetails.discount.toFixed(2)}</Text>
+                                <Text style={[styles.paymentValue, { color: '#4CAF50' }]}>-₹{orderDetails.discount.toFixed(0)}</Text>
                             </View>
                         )}
                         <View style={styles.paymentDivider} />
                         <View style={styles.paymentRow}>
                             <Text style={styles.totalLabel}>Total Amount</Text>
-                            <Text style={styles.totalValue}>${orderDetails.total.toFixed(2)}</Text>
+                            <Text style={styles.totalValue}>₹{orderDetails.total.toFixed(0)}</Text>
                         </View>
                         <View style={styles.paymentMethodRow}>
                             <MaterialIcons name="credit-card" size={16} color="#2196F3" />

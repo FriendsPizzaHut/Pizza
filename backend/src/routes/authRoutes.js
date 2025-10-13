@@ -5,10 +5,11 @@
  * - POST /api/auth/register - Register new user
  * - POST /api/auth/login - Login
  * - POST /api/auth/logout - Logout
+ * - POST /api/auth/refresh - Refresh access token
  */
 
 import express from 'express';
-import { register, login, logout } from '../controllers/authController.js';
+import { register, login, logout, refresh } from '../controllers/authController.js';
 import { validate } from '../middlewares/validateMiddleware.js';
 import { registerValidator, loginValidator } from '../utils/validators/authValidator.js';
 import { protect, softProtect } from '../middlewares/authMiddleware.js';
@@ -23,5 +24,8 @@ router.post('/login', validate(loginValidator), login);
 
 // Logout - accepts expired tokens (users should always be able to logout)
 router.post('/logout', softProtect, logout);
+
+// Refresh access token - public endpoint
+router.post('/refresh', refresh);
 
 export default router;

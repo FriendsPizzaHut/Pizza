@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Image } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../../types/navigation';
 import { Typography, Colors, Spacing, BorderRadius, Shadows } from '../../../constants/designSystem';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { getMyOrders, MyOrder, MyOrdersResponse } from '../../../services/orderService';
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList>;
 
@@ -13,85 +14,45 @@ const { width } = Dimensions.get('window');
 export default function OrdersScreen() {
     const navigation = useNavigation<NavigationProp>();
 
-    const orders = [
-        {
-            id: '1234',
-            status: 'Out for Delivery',
-            statusType: 'active',
-            items: ['2x Margherita Pizza', '1x Pepperoni Pizza'],
-            firstItemImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 42.97,
-            date: new Date(), // Today
-            time: '2:30 PM',
-            estimatedTime: '15-20 min'
-        },
-        {
-            id: '1235',
-            status: 'Preparing',
-            statusType: 'active',
-            items: ['1x Supreme Pizza', '1x Garlic Bread'],
-            firstItemImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 28.50,
-            date: new Date(), // Today
-            time: '1:15 PM',
-            estimatedTime: '25-30 min'
-        },
-        {
-            id: '1233',
-            status: 'Delivered',
-            statusType: 'completed',
-            items: ['1x Vegetarian Supreme'],
-            firstItemImage: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 16.99,
-            date: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-            time: '7:15 PM',
-            estimatedTime: null
-        },
-        {
-            id: '1232',
-            status: 'Delivered',
-            statusType: 'completed',
-            items: ['1x Meat Lovers', '1x Margherita'],
-            firstItemImage: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 31.98,
-            date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-            time: '6:45 PM',
-            estimatedTime: null
-        },
-        {
-            id: '1231',
-            status: 'Delivered',
-            statusType: 'completed',
-            items: ['1x BBQ Chicken Pizza'],
-            firstItemImage: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 19.99,
-            date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-            time: '8:30 PM',
-            estimatedTime: null
-        },
-        {
-            id: '1230',
-            status: 'Delivered',
-            statusType: 'completed',
-            items: ['1x Hawaiian Pizza', '2x Coca Cola'],
-            firstItemImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 24.50,
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
-            time: '7:20 PM',
-            estimatedTime: null
-        },
-        {
-            id: '1229',
-            status: 'Delivered',
-            statusType: 'completed',
-            items: ['1x Four Cheese Pizza'],
-            firstItemImage: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            total: 22.99,
-            date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 2 weeks ago
-            time: '6:45 PM',
-            estimatedTime: null
-        },
-    ];
+    // State management
+    const [orders, setOrders] = useState<MyOrder[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [totalOrders, setTotalOrders] = useState(0);
+
+    // Fetch orders from backend
+    const fetchOrders = useCallback(async () => {
+        try {
+            setError(null);
+            const data = await getMyOrders({ limit: 10 }); // Fetch only 10 orders for main screen
+            setOrders(data.orders);
+            setTotalOrders(data.pagination.total);
+        } catch (err: any) {
+            console.error('Error fetching orders:', err);
+            setError(err.response?.data?.message || 'Failed to load orders. Please try again.');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    // Initial load
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
+
+    // Pull to refresh handler
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchOrders();
+    }, [fetchOrders]);
+
+    // Convert date string to Date object for grouping
+    const ordersWithDates = orders.map(order => ({
+        ...order,
+        dateObj: new Date(order.date)
+    }));
 
     // Helper function to get date label
     const getDateLabel = (date: Date) => {
@@ -113,9 +74,11 @@ export default function OrdersScreen() {
                 year: orderDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
             });
         }
-    };    // Group orders by date
-    const groupedOrders = orders.reduce((groups: { [key: string]: typeof orders }, order) => {
-        const dateLabel = getDateLabel(order.date);
+    };
+
+    // Group orders by date
+    const groupedOrders = ordersWithDates.reduce((groups: { [key: string]: typeof ordersWithDates }, order) => {
+        const dateLabel = getDateLabel(order.dateObj);
         if (!groups[dateLabel]) {
             groups[dateLabel] = [];
         }
@@ -131,8 +94,8 @@ export default function OrdersScreen() {
         if (b === 'Yesterday') return 1;
 
         // For other dates, sort by the actual date of the first order in each group
-        const dateA = groupedOrders[a][0].date;
-        const dateB = groupedOrders[b][0].date;
+        const dateA = groupedOrders[a][0].dateObj;
+        const dateB = groupedOrders[b][0].dateObj;
         return dateB.getTime() - dateA.getTime(); // Most recent first
     });
 
@@ -174,106 +137,185 @@ export default function OrdersScreen() {
                 </View>
             </View>
 
-            <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-                <View style={styles.ordersSection}>
-                    {/* Empty State */}
-                    {sortedDateGroups.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <MaterialIcons name="receipt-long" size={48} color="#E0E0E0" />
-                            <Text style={styles.emptyStateTitle}>No Orders Found</Text>
-                            <Text style={styles.emptyStateText}>
-                                You haven't placed any orders yet.
-                            </Text>
-                        </View>
-                    ) : (
-                        /* Date-wise Orders Section */
-                        sortedDateGroups.map((dateLabel) => (
-                            <View key={dateLabel} style={styles.sectionContainer}>
-                                {/* Date Section Header */}
-                                <View style={styles.dateHeader}>
-                                    <Text style={styles.sectionTitle}>{dateLabel}</Text>
-                                    <View style={styles.dottedLine}>
-                                        {Array.from({ length: 40 }).map((_, index) => (
-                                            <View key={index} style={styles.dot} />
-                                        ))}
-                                    </View>
-                                </View>
-
-                                {/* Orders for this date */}
-                                {groupedOrders[dateLabel].map((order) => (
-                                    <TouchableOpacity
-                                        key={order.id}
-                                        style={styles.orderCard}
-                                        onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}
-                                        activeOpacity={0.8}
-                                    >
-                                        {/* Top Section with Image and First Item Details */}
-                                        <View style={styles.topSection}>
-                                            <Image
-                                                source={{ uri: order.firstItemImage }}
-                                                style={styles.itemImage}
-                                                resizeMode="cover"
-                                            />
-                                            <View style={styles.firstItemDetails}>
-                                                <Text style={styles.firstItemName}>
-                                                    {order.items[0]}
-                                                </Text>
-                                                <Text style={styles.orderNumber}>Order #{order.id}</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Additional Items (if more than 1) */}
-                                        {order.items.length > 1 && (
-                                            <View style={styles.additionalItemsSection}>
-                                                <View style={styles.divider} />
-                                                {order.items.slice(1).map((item, index) => (
-                                                    <Text key={index} style={styles.additionalItem}>
-                                                        {item}
-                                                    </Text>
-                                                ))}
-                                            </View>
-                                        )}
-
-                                        {/* Bottom Section with Date, Status and Total */}
-                                        <View style={styles.bottomSection}>
-                                            <View style={styles.divider} />
-                                            <View style={styles.orderMetaRow}>
-                                                <Text style={styles.orderDateTime}>
-                                                    Order placed on {order.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, {order.time}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.statusTotalRow}>
-                                                <View style={styles.statusBadge}>
-                                                    <Text style={styles.statusText}>{order.status}</Text>
-                                                </View>
-                                                <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        ))
-                    )}
-
-                    {/* View All History Button */}
-                    {sortedDateGroups.length > 0 && (
-                        <TouchableOpacity
-                            style={styles.historyButton}
-                            onPress={() => navigation.navigate('OrderHistory')}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.historyButtonLeft}>
-                                <MaterialIcons name="history" size={20} color="#cb202d" />
-                                <Text style={styles.historyButtonText}>View All Order History</Text>
-                            </View>
-                            <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
-                        </TouchableOpacity>
-                    )}
-
-                    {/* Bottom Spacing */}
-                    <View style={styles.bottomSpacing} />
+            {/* Loading State */}
+            {loading ? (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color="#cb202d" />
+                    <Text style={styles.loadingText}>Loading your orders...</Text>
                 </View>
-            </ScrollView>
+            ) : error ? (
+                /* Error State */
+                <View style={styles.centerContainer}>
+                    <MaterialIcons name="error-outline" size={48} color="#E0E0E0" />
+                    <Text style={styles.errorTitle}>Oops!</Text>
+                    <Text style={styles.errorText}>{error}</Text>
+                    <TouchableOpacity
+                        style={styles.retryButton}
+                        onPress={() => {
+                            setLoading(true);
+                            fetchOrders();
+                        }}
+                    >
+                        <Text style={styles.retryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                /* Orders List */
+                <ScrollView
+                    style={styles.ordersList}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#cb202d']}
+                            tintColor="#cb202d"
+                        />
+                    }
+                >
+                    <View style={styles.ordersSection}>
+                        {/* Empty State */}
+                        {sortedDateGroups.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <MaterialIcons name="receipt-long" size={48} color="#E0E0E0" />
+                                <Text style={styles.emptyStateTitle}>No Orders Found</Text>
+                                <Text style={styles.emptyStateText}>
+                                    You haven't placed any orders yet.
+                                </Text>
+                            </View>
+                        ) : (
+                            /* Date-wise Orders Section */
+                            sortedDateGroups.map((dateLabel) => (
+                                <View key={dateLabel} style={styles.sectionContainer}>
+                                    {/* Date Section Header */}
+                                    <View style={styles.dateHeader}>
+                                        <Text style={styles.sectionTitle}>{dateLabel}</Text>
+                                        <View style={styles.dottedLine}>
+                                            {Array.from({ length: 40 }).map((_, index) => (
+                                                <View key={index} style={styles.dot} />
+                                            ))}
+                                        </View>
+                                    </View>
+
+                                    {/* Orders for this date */}
+                                    {groupedOrders[dateLabel].map((order) => (
+                                        <TouchableOpacity
+                                            key={order.id}
+                                            style={styles.orderCard}
+                                            onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}
+                                            activeOpacity={0.8}
+                                        >
+                                            {/* Top Section with Image and First Item Details */}
+                                            <View style={styles.topSection}>
+                                                {order.firstItemImage && (
+                                                    <Image
+                                                        source={{ uri: order.firstItemImage }}
+                                                        style={styles.itemImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                )}
+                                                <View style={styles.firstItemDetails}>
+                                                    <Text style={styles.firstItemName}>
+                                                        {order.items[0]}
+                                                    </Text>
+                                                    <Text style={styles.orderNumber}>{order.id}</Text>
+                                                    <Text style={styles.itemsCount}>
+                                                        {order.itemsCount} {order.itemsCount === 1 ? 'item' : 'items'}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Additional Items (if more than 1) */}
+                                            {order.items.length > 1 && (
+                                                <View style={styles.additionalItemsSection}>
+                                                    <View style={styles.divider} />
+                                                    {order.items.slice(1).map((item, index) => (
+                                                        <Text key={index} style={styles.additionalItem}>
+                                                            {item}
+                                                        </Text>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Order Details Section */}
+                                            <View style={styles.orderDetailsSection}>
+                                                <View style={styles.divider} />
+
+                                                {/* Delivery Address */}
+                                                {order.deliveryAddress && (
+                                                    <View style={styles.detailRow}>
+                                                        <MaterialIcons name="location-on" size={16} color="#8E8E93" />
+                                                        <Text style={styles.detailText} numberOfLines={1}>
+                                                            {order.deliveryAddress}
+                                                        </Text>
+                                                    </View>
+                                                )}
+
+                                                {/* Payment Method */}
+                                                <View style={styles.detailRow}>
+                                                    <MaterialIcons name="payment" size={16} color="#8E8E93" />
+                                                    <Text style={styles.detailText}>
+                                                        {order.paymentMethod.toUpperCase()}
+                                                    </Text>
+                                                </View>
+
+                                                {/* Estimated Time for Active Orders */}
+                                                {order.estimatedTime && (
+                                                    <View style={styles.detailRow}>
+                                                        <MaterialIcons name="schedule" size={16} color="#cb202d" />
+                                                        <Text style={[styles.detailText, { color: '#cb202d', fontWeight: '600' }]}>
+                                                            Arrives in {order.estimatedTime}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Bottom Section with Date, Status and Total */}
+                                            <View style={styles.bottomSection}>
+                                                <View style={styles.divider} />
+                                                <View style={styles.orderMetaRow}>
+                                                    <Text style={styles.orderDateTime}>
+                                                        Order placed on {order.dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, {order.time}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.statusTotalRow}>
+                                                    <View style={styles.statusBadge}>
+                                                        <Text style={styles.statusText}>{order.status}</Text>
+                                                    </View>
+                                                    <View style={styles.totalContainer}>
+                                                        <Text style={styles.totalLabel}>Total</Text>
+                                                        <Text style={styles.orderTotal}>₹{order.total.toFixed(0)}</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ))
+                        )}
+
+                        {/* View All History Button */}
+                        {totalOrders > 10 && (
+                            <TouchableOpacity
+                                style={styles.historyButton}
+                                onPress={() => navigation.navigate('OrderHistory')}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.historyButtonLeft}>
+                                    <MaterialIcons name="history" size={20} color="#cb202d" />
+                                    <Text style={styles.historyButtonText}>
+                                        View All Order History ({totalOrders} orders)
+                                    </Text>
+                                </View>
+                                <MaterialIcons name="chevron-right" size={20} color="#8E8E93" />
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Bottom Spacing */}
+                        <View style={styles.bottomSpacing} />
+                    </View>
+                </ScrollView>
+            )}
         </View>
     );
 }
@@ -436,6 +478,11 @@ const styles = StyleSheet.create({
         ...Typography.regular.text300,
         color: Colors.text.secondary,
     },
+    itemsCount: {
+        ...Typography.regular.text200,
+        color: Colors.text.tertiary,
+        marginTop: 2,
+    },
     additionalItemsSection: {
         marginBottom: 8,
     },
@@ -449,6 +496,20 @@ const styles = StyleSheet.create({
         color: Colors.text.secondary,
         marginBottom: 4,
         lineHeight: 18,
+    },
+    orderDetailsSection: {
+        marginTop: 4,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+        gap: 8,
+    },
+    detailText: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
+        flex: 1,
     },
     bottomSection: {
         marginTop: 4,
@@ -481,6 +542,14 @@ const styles = StyleSheet.create({
         ...Typography.medium.text200,
         color: Colors.text.primary,
     },
+    totalContainer: {
+        alignItems: 'flex-end',
+    },
+    totalLabel: {
+        ...Typography.regular.text200,
+        color: Colors.text.tertiary,
+        marginBottom: 2,
+    },
     orderTotal: {
         ...Typography.semibold.text500,
         color: Colors.text.primary,
@@ -512,5 +581,40 @@ const styles = StyleSheet.create({
     },
     bottomSpacing: {
         height: 24,
+    },
+
+    // Loading and Error States
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: Spacing.xxl,
+    },
+    loadingText: {
+        ...Typography.medium.text400,
+        color: Colors.text.secondary,
+        marginTop: Spacing.md,
+    },
+    errorTitle: {
+        ...Typography.semibold.text500,
+        color: Colors.text.primary,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.xs,
+    },
+    errorText: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
+        textAlign: 'center',
+        marginBottom: Spacing.lg,
+    },
+    retryButton: {
+        backgroundColor: '#cb202d',
+        paddingHorizontal: Spacing.xl,
+        paddingVertical: Spacing.md,
+        borderRadius: BorderRadius.lg,
+    },
+    retryButtonText: {
+        ...Typography.semibold.text400,
+        color: Colors.surface,
     },
 });

@@ -11,6 +11,7 @@ import {
     TextInput,
     RefreshControl,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Feather from '@expo/vector-icons/Feather';
@@ -29,6 +30,18 @@ import {
 } from '../../../../redux/thunks/productThunks';
 import { Product } from '../../../services/productService';
 import MenuItemSkeleton from '../../../components/admin/MenuItemSkeleton';
+
+/**
+ * Decode HTML entities in image URL
+ * Fixes issue where URLs are stored with &#x2F; instead of /
+ */
+const decodeImageUrl = (url: string): string => {
+    if (!url) return '';
+    return url
+        .replace(/&#x2F;/g, '/')
+        .replace(/&#x3A;/g, ':')
+        .replace(/&amp;/g, '&');
+};
 
 /**
  * MenuManagementScreen - Professional optimized version
@@ -171,6 +184,33 @@ export default function MenuManagementScreen() {
     }, [selectedCategory]);
 
     /**
+     * Handle delete item with confirmation
+     */
+    const handleDeleteItem = useCallback((itemId: string, itemName: string) => {
+        Alert.alert(
+            'Delete Item',
+            `Are you sure you want to delete "${itemName}"?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        // TODO: Implement delete functionality
+                        console.log('Deleting item:', itemId);
+                        // You can add the delete thunk here later
+                        // dispatch(deleteProductThunk(itemId));
+                    },
+                },
+            ],
+            { cancelable: true }
+        );
+    }, []);
+
+    /**
      * Get status configuration
      */
     const getStatusConfig = (status: string) => {
@@ -196,10 +236,10 @@ export default function MenuManagementScreen() {
 
         // Get display price
         const displayPrice = typeof item.pricing === 'number'
-            ? `$${item.pricing.toFixed(2)}`
+            ? `₹${item.pricing.toFixed(0)}`
             : item.pricing.small
-                ? `$${item.pricing.small.toFixed(2)} - $${item.pricing.large?.toFixed(2) || item.pricing.medium?.toFixed(2) || item.pricing.small.toFixed(2)}`
-                : `$${item.basePrice.toFixed(2)}`;
+                ? `₹${item.pricing.small.toFixed(0)} - ₹${item.pricing.large?.toFixed(0) || item.pricing.medium?.toFixed(0) || item.pricing.small.toFixed(0)}`
+                : `₹${item.basePrice.toFixed(0)}`;
 
         return (
             <View style={styles.itemCard}>
@@ -207,7 +247,7 @@ export default function MenuManagementScreen() {
                 <View style={styles.topSection}>
                     <View style={styles.itemImageContainer}>
                         <Image
-                            source={{ uri: item.imageUrl }}
+                            source={{ uri: decodeImageUrl(item.imageUrl) }}
                             style={styles.itemImage}
                             resizeMode="cover"
                         />
@@ -279,14 +319,14 @@ export default function MenuManagementScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.deleteButton}
-                        onPress={() => console.log('Delete item:', item._id)}
+                        onPress={() => handleDeleteItem(item._id, item.name)}
                     >
                         <MaterialIcons name="delete" size={16} color="#F44336" />
                     </TouchableOpacity>
                 </View>
             </View>
         );
-    }, []);
+    }, [navigation, handleDeleteItem]);
 
     /**
      * Render loading skeleton
@@ -344,32 +384,50 @@ export default function MenuManagementScreen() {
 
     /**
      * Render list header (banner + section title)
+     * Only shows banner and header when NOT searching
      */
-    const renderListHeader = () => (
-        <>
-            {/* Advertisement Banner */}
-            <View style={styles.advertisementBanner}>
-                <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop' }}
-                    style={styles.advertisementImage}
-                    resizeMode="cover"
-                />
-            </View>
+    const renderListHeader = () => {
+        // If actively searching, don't show banner and header
+        const isSearching = reduxSearchQuery && reduxSearchQuery.trim().length > 0;
 
-            {/* Section Header */}
-            <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleWithIcon}>
-                    <MaterialIcons name="restaurant-menu" size={24} color="#cb202d" />
-                    <Text style={styles.sectionTitle}>
-                        {selectedCategory === 'all'
-                            ? 'All Menu Items'
-                            : categories.find((c) => c.id === selectedCategory)?.label}
+        if (isSearching) {
+            return (
+                <View style={styles.searchResultsHeader}>
+                    <Text style={styles.searchResultsText}>
+                        Search results for "{reduxSearchQuery}"
                     </Text>
+                    <Text style={styles.searchResultsCount}>{total} items found</Text>
                 </View>
-                <Text style={styles.itemCount}>{total} items</Text>
-            </View>
-        </>
-    );
+            );
+        }
+
+        // Normal view: show banner and section header
+        return (
+            <>
+                {/* Advertisement Banner */}
+                <View style={styles.advertisementBanner}>
+                    <Image
+                        source={{ uri: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop' }}
+                        style={styles.advertisementImage}
+                        resizeMode="cover"
+                    />
+                </View>
+
+                {/* Section Header */}
+                <View style={styles.sectionHeader}>
+                    <View style={styles.sectionTitleWithIcon}>
+                        <MaterialIcons name="restaurant-menu" size={24} color="#cb202d" />
+                        <Text style={styles.sectionTitle}>
+                            {selectedCategory === 'all'
+                                ? 'All Menu Items'
+                                : categories.find((c) => c.id === selectedCategory)?.label}
+                        </Text>
+                    </View>
+                    <Text style={styles.itemCount}>{total} items</Text>
+                </View>
+            </>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -848,5 +906,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         color: '#fff',
+    },
+    searchResultsHeader: {
+        paddingVertical: 12,
+        paddingHorizontal: 4,
+        marginBottom: 8,
+    },
+    searchResultsText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 4,
+    },
+    searchResultsCount: {
+        fontSize: 12,
+        color: '#8E8E93',
+        fontWeight: '500',
     },
 });

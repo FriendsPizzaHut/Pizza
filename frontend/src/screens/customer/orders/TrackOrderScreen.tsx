@@ -198,13 +198,13 @@ export default function TrackOrderScreen() {
                                     {item.quantity}x {item.name}
                                 </Text>
                             </View>
-                            <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+                            <Text style={styles.itemPrice}>₹{item.price.toFixed(0)}</Text>
                         </View>
                     ))}
 
                     <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalValue}>${order.total.toFixed(2)}</Text>
+                        <Text style={styles.totalValue}>₹{order.total.toFixed(0)}</Text>
                     </View>
                 </View>
 

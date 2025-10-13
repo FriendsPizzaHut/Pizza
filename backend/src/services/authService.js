@@ -171,8 +171,57 @@ export const logoutUser = async (userId) => {
     }
 };
 
+/**
+ * Refresh access token using refresh token
+ * @param {String} refreshToken - Refresh token
+ * @returns {Object} - New access token
+ */
+export const refreshAccessToken = async (refreshToken) => {
+    try {
+        // Verify refresh token
+        const { verifyToken } = await import('../utils/token.js');
+        const decoded = verifyToken(refreshToken);
+
+        // Find user
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            const error = new Error('User not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // Check if user is active (for delivery boys)
+        if (user.role === 'delivery' && !user.isActive) {
+            const error = new Error('Account is not active');
+            error.statusCode = 403;
+            throw error;
+        }
+
+        // Generate new access token
+        const newAccessToken = generateAccessToken({
+            id: user._id,
+            email: user.email,
+            role: user.role,
+        });
+
+        return {
+            accessToken: newAccessToken,
+            expiresIn: 604800, // 7 days in seconds (7 * 24 * 60 * 60)
+        };
+    } catch (error) {
+        // If token verification fails, throw proper error
+        if (error.message === 'Invalid or expired token') {
+            const err = new Error('Invalid or expired refresh token');
+            err.statusCode = 401;
+            throw err;
+        }
+        throw error;
+    }
+};
+
 export default {
     registerUser,
     loginUser,
     logoutUser,
+    refreshAccessToken,
 };

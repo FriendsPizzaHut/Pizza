@@ -38,7 +38,7 @@ export const verifyToken = (token) => {
  * @returns {string} Access token
  */
 export const generateAccessToken = (payload) => {
-    return generateToken(payload, '15m'); // 15 minutes
+    return generateToken(payload, '7d'); // 7 days - suitable for mobile apps
 };
 
 /**

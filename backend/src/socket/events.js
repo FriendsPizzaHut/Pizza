@@ -228,6 +228,69 @@ export const emitDeliveryLocationUpdate = (locationData) => {
 };
 
 /**
+ * Emit delivery agent assignment notification
+ * Event: order:assigned
+ * 
+ * @param {Object} orderData - Order with assigned delivery agent
+ */
+export const emitDeliveryAssignment = (orderData) => {
+    try {
+        if (!global.socketEmit) {
+            console.log('⚠️  Socket not initialized');
+            return;
+        }
+
+        const payload = {
+            orderId: orderData._id || orderData.id,
+            orderNumber: orderData.orderNumber,
+            deliveryAgent: {
+                _id: orderData.deliveryAgent._id,
+                name: orderData.deliveryAgent.name,
+                phone: orderData.deliveryAgent.phone,
+            },
+            customer: {
+                name: orderData.user?.name || 'Customer',
+                phone: orderData.user?.phone,
+            },
+            deliveryAddress: orderData.deliveryAddress,
+            items: orderData.items,
+            totalAmount: orderData.totalAmount,
+            status: orderData.status,
+            assignedAt: new Date(),
+            message: `🚴 New delivery assigned!`,
+        };
+
+        // Notify specific delivery agent
+        const deliveryAgentId = orderData.deliveryAgent._id || orderData.deliveryAgent;
+        global.socketEmit.emitToUser(deliveryAgentId, 'order:assigned', payload);
+
+        // Notify admin role
+        global.socketEmit.emitToRole('admin', 'order:assigned', {
+            orderId: payload.orderId,
+            orderNumber: payload.orderNumber,
+            deliveryAgent: payload.deliveryAgent,
+            assignedAt: payload.assignedAt,
+            message: `Order ${payload.orderNumber} assigned to ${payload.deliveryAgent.name}`,
+        });
+
+        // Notify customer
+        const customerId = orderData.user?._id || orderData.user;
+        global.socketEmit.emitToUser(customerId, 'order:delivery:assigned', {
+            orderId: payload.orderId,
+            orderNumber: payload.orderNumber,
+            deliveryAgent: {
+                name: payload.deliveryAgent.name,
+            },
+            message: `Your order is now out for delivery`,
+        });
+
+        console.log(`🚴 Delivery assignment sent - Order: ${payload.orderNumber} → Agent: ${payload.deliveryAgent.name}`);
+    } catch (error) {
+        console.error('❌ Error emitting delivery assignment:', error.message);
+    }
+};
+
+/**
  * Emit payment received notification
  * Event: payment:received
  * 
@@ -374,6 +437,7 @@ export default {
     emitOrderStatusUpdate,
     emitDeliveryStatusUpdate,
     emitDeliveryLocationUpdate,
+    emitDeliveryAssignment,
     emitPaymentReceived,
     emitNewNotification,
     emitOrderCancelled,

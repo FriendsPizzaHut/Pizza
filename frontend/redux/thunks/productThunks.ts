@@ -39,6 +39,7 @@ export const fetchProductsThunk = (params?: {
     limit?: number;
     category?: string;
     search?: string;
+    isAvailable?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }) => async (dispatch: AppDispatch) => {
@@ -68,6 +69,7 @@ export const loadMoreProductsThunk = (params?: {
     limit?: number;
     category?: string;
     search?: string;
+    isAvailable?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }) => async (dispatch: AppDispatch) => {
@@ -95,6 +97,7 @@ export const refreshProductsThunk = (params?: {
     limit?: number;
     category?: string;
     search?: string;
+    isAvailable?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }) => async (dispatch: AppDispatch) => {

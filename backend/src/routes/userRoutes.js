@@ -15,6 +15,12 @@ import {
     updateUser,
     deleteUser,
 } from '../controllers/userController.js';
+import {
+    addAddress,
+    updateAddress,
+    deleteAddress,
+    setDefaultAddress,
+} from '../controllers/addressController.js';
 import { protect, adminOnly } from '../middlewares/authMiddleware.js';
 import { validate } from '../middlewares/validateMiddleware.js';
 import { updateProfileValidator } from '../utils/validators/authValidator.js';
@@ -32,5 +38,18 @@ router.patch('/:id', protect, validate(updateProfileValidator), updateUser);
 
 // Delete user (admin only)
 router.delete('/:id', protect, adminOnly, deleteUser);
+
+// Address Management Routes
+// Add new address
+router.post('/:id/address', protect, addAddress);
+
+// Update address
+router.put('/:id/address/:addressId', protect, updateAddress);
+
+// Delete address
+router.delete('/:id/address/:addressId', protect, deleteAddress);
+
+// Set address as default
+router.patch('/:id/address/:addressId/default', protect, setDefaultAddress);
 
 export default router;

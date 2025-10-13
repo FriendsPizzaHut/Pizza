@@ -1,157 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar, Animated, Image, ActivityIndicator } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { CustomerStackParamList } from '../../../types/navigation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-
-interface PizzaDetails {
-    id: string;
-    name: string;
-    description: string;
-    basePrice: number;
-    image?: string;
-    category: string;
-    preparationTime: string;
-    isVegetarian: boolean;
-    isSpicy: boolean;
-    ingredients: string[];
-    nutritionalInfo: {
-        calories: number;
-        protein: string;
-        carbs: string;
-        fat: string;
-    };
-    sizes: {
-        name: string;
-        price: number;
-        servings: string;
-    }[];
-    crusts: {
-        name: string;
-        price: number;
-    }[];
-    toppings: {
-        name: string;
-        price: number;
-        category: string;
-    }[];
-}
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../../redux/store';
+import { fetchProductByIdThunk } from '../../../../redux/thunks/productThunks';
+import { addToCartThunk } from '../../../../redux/thunks/cartThunks';
+import { Product } from '../../../services/productService';
 
 type PizzaDetailsRouteProp = RouteProp<CustomerStackParamList, 'PizzaDetails'>;
 
 export default function PizzaDetailsScreen() {
     const route = useRoute<PizzaDetailsRouteProp>();
     const navigation = useNavigation();
+    const dispatch = useDispatch<AppDispatch>();
     const { pizzaId } = route.params;
 
     const [selectedSize, setSelectedSize] = useState(0);
-    const [selectedCrust, setSelectedCrust] = useState(0);
     const [selectedToppings, setSelectedToppings] = useState<number[]>([]);
     const [quantity, setQuantity] = useState(1);
-    const [pizza, setPizza] = useState<PizzaDetails | null>(null);
     const [scrollY] = useState(new Animated.Value(0));
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-    // Mock pizza data - in real app, this would be fetched based on pizzaId
-    const getPizzaDetails = (id: string): PizzaDetails => {
-        const pizzaData: Record<string, PizzaDetails> = {
-            'margherita': {
-                id: 'margherita',
-                name: 'Margherita Pizza',
-                description: 'A classic Italian pizza with fresh tomato sauce, mozzarella cheese, fresh basil leaves, and a drizzle of olive oil on our signature pizza dough.',
-                basePrice: 9.99,
-                image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80',
-                category: 'Classic Pizzas',
-                preparationTime: '15-20 mins',
-                isVegetarian: true,
-                isSpicy: false,
-                ingredients: [
-                    'Pizza Dough',
-                    'Tomato Sauce',
-                    'Fresh Mozzarella',
-                    'Fresh Basil',
-                    'Olive Oil',
-                    'Sea Salt'
-                ],
-                nutritionalInfo: {
-                    calories: 285,
-                    protein: '12g',
-                    carbs: '36g',
-                    fat: '10g',
-                },
-                sizes: [
-                    { name: 'Small', price: 0, servings: '1-2 people' },
-                    { name: 'Medium', price: 3, servings: '2-3 people' },
-                    { name: 'Large', price: 6, servings: '3-4 people' },
-                ],
-                crusts: [
-                    { name: 'Original', price: 0 },
-                    { name: 'Thin & Crispy', price: 0 },
-                    { name: 'Thick & Fluffy', price: 1.5 },
-                    { name: 'Stuffed Crust', price: 2.99 },
-                ],
-                toppings: [
-                    { name: 'Extra Cheese', price: 1.99, category: 'Cheese' },
-                    { name: 'Pepperoni', price: 2.49, category: 'Meat' },
-                    { name: 'Italian Sausage', price: 2.49, category: 'Meat' },
-                    { name: 'Mushrooms', price: 1.49, category: 'Vegetables' },
-                    { name: 'Bell Peppers', price: 1.49, category: 'Vegetables' },
-                    { name: 'Red Onions', price: 1.29, category: 'Vegetables' },
-                    { name: 'Black Olives', price: 1.49, category: 'Vegetables' },
-                    { name: 'Fresh Tomatoes', price: 1.29, category: 'Vegetables' },
-                ],
-            },
-            'pepperoni': {
-                id: 'pepperoni',
-                name: 'Pepperoni Pizza',
-                description: 'Classic pepperoni pizza with premium pepperoni slices and mozzarella cheese.',
-                basePrice: 11.99,
-                image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=800&q=80',
-                category: 'Classic Pizzas',
-                preparationTime: '15-20 mins',
-                isVegetarian: false,
-                isSpicy: false,
-                ingredients: [
-                    'Pizza Dough',
-                    'Tomato Sauce',
-                    'Mozzarella Cheese',
-                    'Premium Pepperoni'
-                ],
-                nutritionalInfo: {
-                    calories: 320,
-                    protein: '14g',
-                    carbs: '35g',
-                    fat: '14g',
-                },
-                sizes: [
-                    { name: 'Small', price: 0, servings: '1-2 people' },
-                    { name: 'Medium', price: 3, servings: '2-3 people' },
-                    { name: 'Large', price: 6, servings: '3-4 people' },
-                ],
-                crusts: [
-                    { name: 'Original', price: 0 },
-                    { name: 'Thin & Crispy', price: 0 },
-                    { name: 'Thick & Fluffy', price: 1.5 },
-                    { name: 'Stuffed Crust', price: 2.99 },
-                ],
-                toppings: [
-                    { name: 'Extra Cheese', price: 1.99, category: 'Cheese' },
-                    { name: 'Extra Pepperoni', price: 2.49, category: 'Meat' },
-                    { name: 'Italian Sausage', price: 2.49, category: 'Meat' },
-                    { name: 'Mushrooms', price: 1.49, category: 'Vegetables' },
-                    { name: 'Bell Peppers', price: 1.49, category: 'Vegetables' },
-                    { name: 'Red Onions', price: 1.29, category: 'Vegetables' },
-                    { name: 'Black Olives', price: 1.49, category: 'Vegetables' },
-                    { name: 'Jalapeños', price: 1.29, category: 'Vegetables' },
-                ],
+    // Get product from Redux store
+    const product = useSelector((state: RootState) =>
+        state.product.products.find(p => p._id === pizzaId)
+    );
+
+    // Fetch product data
+    useEffect(() => {
+        const fetchProduct = async () => {
+            setIsLoading(true);
+            try {
+                await dispatch(fetchProductByIdThunk(pizzaId));
+            } catch (error) {
+                console.error('Error fetching product:', error);
+                Alert.alert('Error', 'Failed to load product details');
+            } finally {
+                setIsLoading(false);
             }
         };
 
-        return pizzaData[id] || pizzaData['margherita']; // Default to margherita if ID not found
-    };
-
-    useEffect(() => {
-        const pizzaDetails = getPizzaDetails(pizzaId);
-        setPizza(pizzaDetails);
+        if (!product) {
+            fetchProduct();
+        } else {
+            setIsLoading(false);
+        }
     }, [pizzaId]);
 
     const toggleTopping = (index: number) => {
@@ -162,56 +58,128 @@ export default function PizzaDetailsScreen() {
         );
     };
 
+    // Parse sizes from product.pricing
+    const getSizes = () => {
+        if (!product || typeof product.pricing === 'number') {
+            return [{ name: 'Regular', price: 0, servings: '1-2 people' }];
+        }
+
+        const sizes = [];
+        if (product.pricing.small !== undefined) {
+            sizes.push({ name: 'Small', price: product.pricing.small, servings: '1-2 people' });
+        }
+        if (product.pricing.medium !== undefined) {
+            sizes.push({ name: 'Medium', price: product.pricing.medium, servings: '2-3 people' });
+        }
+        if (product.pricing.large !== undefined) {
+            sizes.push({ name: 'Large', price: product.pricing.large, servings: '3-4 people' });
+        }
+
+        return sizes.length > 0 ? sizes : [{ name: 'Regular', price: product.basePrice, servings: '1-2 people' }];
+    };
+
+    // Get toppings with prices
+    const getToppings = () => {
+        if (!product || !product.toppings) return [];
+
+        return product.toppings.map((topping, index) => ({
+            name: topping.name,
+            price: 1.99, // Default topping price (static)
+            category: topping.category || 'Other',
+            index
+        }));
+    };
+
+    const sizes = getSizes();
+    const toppings = getToppings();
+
     const calculateTotalPrice = () => {
-        if (!pizza) return 0;
-        const sizePrice = pizza.sizes[selectedSize].price;
-        const crustPrice = pizza.crusts[selectedCrust].price;
-        const toppingsPrice = selectedToppings.reduce((sum, index) =>
-            sum + pizza.toppings[index].price, 0
-        );
+        if (!product) return 0;
 
-        return (pizza.basePrice + sizePrice + crustPrice + toppingsPrice) * quantity;
+        const sizePrice = sizes[selectedSize]?.price || 0;
+        const toppingsPrice = selectedToppings.reduce((sum, index) => {
+            const topping = toppings[index];
+            return sum + (topping?.price || 0);
+        }, 0);
+
+        return (sizePrice + toppingsPrice) * quantity;
     };
 
-    const addToCart = () => {
-        if (!pizza) return;
+    const addToCart = async () => {
+        if (!product || isAddingToCart) return;
 
-        const cartItem = {
-            id: pizza.id,
-            name: pizza.name,
-            size: pizza.sizes[selectedSize].name,
-            crust: pizza.crusts[selectedCrust].name,
-            toppings: selectedToppings.map(index => pizza.toppings[index].name),
-            quantity,
-            price: calculateTotalPrice() / quantity,
-            totalPrice: calculateTotalPrice(),
-        };
+        setIsAddingToCart(true);
 
-        Alert.alert(
-            'Added to Cart!',
-            `${quantity}x ${pizza.name} (${cartItem.size}) has been added to your cart.`,
-            [
-                { text: 'Continue Shopping', style: 'cancel' },
-                { text: 'View Cart', onPress: () => console.log('Navigate to cart') },
-            ]
-        );
+        try {
+            // Prepare cart item data
+            const sizeName = sizes[selectedSize]?.name;
+            const customToppings = selectedToppings.map(index => ({
+                name: toppings[index].name,
+                category: toppings[index].category,
+                price: toppings[index].price
+            }));
+
+            await dispatch(addToCartThunk({
+                productId: product._id,
+                quantity,
+                size: sizeName?.toLowerCase() as 'small' | 'medium' | 'large' | undefined,
+                customToppings: customToppings.length > 0 ? customToppings : undefined,
+            })).unwrap();
+
+            Alert.alert(
+                'Added to Cart!',
+                `${quantity}x ${product.name}${sizeName ? ` (${sizeName})` : ''} has been added to your cart.`,
+                [
+                    { text: 'Continue Shopping', onPress: () => navigation.goBack(), style: 'cancel' },
+                    { text: 'View Cart', onPress: () => (navigation as any).navigate('Cart') },
+                ]
+            );
+        } catch (error: any) {
+            const errorMessage = error?.message || 'Failed to add item to cart';
+
+            // Handle token expiration
+            if (errorMessage.includes('Token expired') || errorMessage.includes('Session expired')) {
+                Alert.alert(
+                    'Session Expired',
+                    'Your session has expired. Please login again.',
+                    [
+                        {
+                            text: 'Login',
+                            onPress: () => {
+                                // Navigate to login screen
+                                (navigation as any).reset({
+                                    index: 0,
+                                    routes: [{ name: 'Auth' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Error', errorMessage);
+            }
+        } finally {
+            setIsAddingToCart(false);
+        }
     };
 
-    if (!pizza) {
+    if (isLoading || !product) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#cb202d" />
                 <Text style={styles.loadingText}>Loading pizza details...</Text>
             </View>
         );
     }
 
-    const toppingsByCategory = pizza.toppings.reduce((acc, topping, index) => {
-        if (!acc[topping.category]) {
-            acc[topping.category] = [];
+    const toppingsByCategory = toppings.reduce((acc, topping) => {
+        const category = topping.category;
+        if (!acc[category]) {
+            acc[category] = [];
         }
-        acc[topping.category].push({ ...topping, index });
+        acc[category].push(topping);
         return acc;
-    }, {} as Record<string, (typeof pizza.toppings[0] & { index: number })[]>);
+    }, {} as Record<string, typeof toppings>);
 
     // Animated header opacity
     const headerOpacity = scrollY.interpolate({
@@ -238,7 +206,7 @@ export default function PizzaDetailsScreen() {
                 >
                     <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{pizza.name}</Text>
+                <Text style={styles.headerTitle} numberOfLines={1}>{product.name}</Text>
                 <View style={styles.headerPlaceholder} />
             </Animated.View>
 
@@ -255,7 +223,7 @@ export default function PizzaDetailsScreen() {
                 <Animated.View style={[styles.heroSection, { transform: [{ scale: imageScale }] }]}>
                     <View style={styles.pizzaImageContainer}>
                         <Image
-                            source={{ uri: pizza.image || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80' }}
+                            source={{ uri: product.imageUrl || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80' }}
                             style={styles.pizzaImage}
                             resizeMode="cover"
                         />
@@ -271,17 +239,12 @@ export default function PizzaDetailsScreen() {
 
                     {/* Badges on Image */}
                     <View style={styles.imageBadges}>
-                        {pizza.isVegetarian && (
+                        {product.isVegetarian && (
                             <View style={[styles.imageBadge, { backgroundColor: '#0C7C59' }]}>
                                 <View style={styles.vegIcon}>
                                     <View style={styles.vegDot} />
                                 </View>
                                 <Text style={styles.imageBadgeText}>Pure Veg</Text>
-                            </View>
-                        )}
-                        {pizza.isSpicy && (
-                            <View style={[styles.imageBadge, { backgroundColor: '#cb202d' }]}>
-                                <Text style={styles.imageBadgeText}>🌶️ Spicy</Text>
                             </View>
                         )}
                     </View>
@@ -293,23 +256,23 @@ export default function PizzaDetailsScreen() {
                     <View style={styles.titleSection}>
                         <View style={styles.titleRow}>
                             <View style={styles.titleLeft}>
-                                <Text style={styles.pizzaName}>{pizza.name}</Text>
+                                <Text style={styles.pizzaName}>{product.name}</Text>
                                 <View style={styles.ratingRow}>
                                     <View style={styles.ratingBadge}>
                                         <MaterialIcons name="star" size={14} color="#fff" />
-                                        <Text style={styles.ratingText}>4.5</Text>
+                                        <Text style={styles.ratingText}>{product.rating.toFixed(1)}</Text>
                                     </View>
-                                    <Text style={styles.reviewsText}>(245 ratings)</Text>
+                                    <Text style={styles.reviewsText}>({product.salesCount || 0} orders)</Text>
                                 </View>
                             </View>
                         </View>
-                        <Text style={styles.description}>{pizza.description}</Text>
+                        <Text style={styles.description}>{product.description}</Text>
 
                         {/* Quick Info */}
                         <View style={styles.quickInfoRow}>
                             <View style={styles.quickInfoItem}>
                                 <MaterialIcons name="access-time" size={16} color="#cb202d" />
-                                <Text style={styles.quickInfoText}>{pizza.preparationTime}</Text>
+                                <Text style={styles.quickInfoText}>{product.preparationTime || 20} mins</Text>
                             </View>
                         </View>
                     </View>
@@ -319,7 +282,7 @@ export default function PizzaDetailsScreen() {
                         <Text style={styles.cardTitle}>Choose Size</Text>
                         <Text style={styles.cardSubtitle}>Select 1 option</Text>
                         <View style={styles.optionsList}>
-                            {pizza.sizes.map((size, index) => (
+                            {sizes.map((size, index) => (
                                 <TouchableOpacity
                                     key={index}
                                     style={[
@@ -342,7 +305,7 @@ export default function PizzaDetailsScreen() {
                                         </View>
                                     </View>
                                     <Text style={styles.radioPrice}>
-                                        {size.price > 0 ? `+₹${(size.price * 83).toFixed(0)}` : 'Free'}
+                                        ₹{size.price.toFixed(0)}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -350,41 +313,43 @@ export default function PizzaDetailsScreen() {
                     </View>
 
                     {/* Extra Toppings */}
-                    <View style={styles.sectionCard}>
-                        <Text style={styles.cardTitle}>Extra Toppings (Optional)</Text>
-                        <Text style={styles.cardSubtitle}>You can select multiple</Text>
-                        <View style={styles.optionsList}>
-                            {Object.entries(toppingsByCategory).map(([category, toppings]) => (
-                                <View key={category}>
-                                    <Text style={styles.toppingCategoryTitle}>{category}</Text>
-                                    {toppings.map((topping) => (
-                                        <TouchableOpacity
-                                            key={topping.index}
-                                            style={[
-                                                styles.checkboxOption,
-                                                selectedToppings.includes(topping.index) && styles.checkboxOptionSelected
-                                            ]}
-                                            onPress={() => toggleTopping(topping.index)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={styles.radioLeft}>
-                                                <View style={[
-                                                    styles.checkbox,
-                                                    selectedToppings.includes(topping.index) && styles.checkboxSelected
-                                                ]}>
-                                                    {selectedToppings.includes(topping.index) && (
-                                                        <MaterialIcons name="check" size={14} color="#fff" />
-                                                    )}
+                    {toppings.length > 0 && (
+                        <View style={styles.sectionCard}>
+                            <Text style={styles.cardTitle}>Extra Toppings (Optional)</Text>
+                            <Text style={styles.cardSubtitle}>You can select multiple</Text>
+                            <View style={styles.optionsList}>
+                                {Object.entries(toppingsByCategory).map(([category, toppings]) => (
+                                    <View key={category}>
+                                        <Text style={styles.toppingCategoryTitle}>{category}</Text>
+                                        {toppings.map((topping) => (
+                                            <TouchableOpacity
+                                                key={topping.index}
+                                                style={[
+                                                    styles.checkboxOption,
+                                                    selectedToppings.includes(topping.index) && styles.checkboxOptionSelected
+                                                ]}
+                                                onPress={() => toggleTopping(topping.index)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.radioLeft}>
+                                                    <View style={[
+                                                        styles.checkbox,
+                                                        selectedToppings.includes(topping.index) && styles.checkboxSelected
+                                                    ]}>
+                                                        {selectedToppings.includes(topping.index) && (
+                                                            <MaterialIcons name="check" size={14} color="#fff" />
+                                                        )}
+                                                    </View>
+                                                    <Text style={styles.radioTitle}>{topping.name}</Text>
                                                 </View>
-                                                <Text style={styles.radioTitle}>{topping.name}</Text>
-                                            </View>
-                                            <Text style={styles.radioPrice}>+₹{(topping.price * 83).toFixed(0)}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            ))}
+                                                <Text style={styles.radioPrice}>₹{topping.price.toFixed(0)}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                ))}
+                            </View>
                         </View>
-                    </View>
+                    )}
 
                     {/* Bottom Spacing */}
                     <View style={styles.bottomSpacing} />
@@ -414,8 +379,8 @@ export default function PizzaDetailsScreen() {
                         </View>
                     </View>
                     <View style={styles.addButtonRight}>
-                        <Text style={styles.addButtonText}>Add item</Text>
-                        <Text style={styles.addButtonPrice}>₹{(calculateTotalPrice() * 83).toFixed(0)}</Text>
+                        <Text style={styles.addButtonText}>{isAddingToCart ? 'Adding...' : 'Add item'}</Text>
+                        <Text style={styles.addButtonPrice}>₹{calculateTotalPrice().toFixed(0)}</Text>
                     </View>
                 </TouchableOpacity>
             </View>

@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../../../redux/store';
 import { createProductThunk } from '../../../../redux/thunks/productThunks';
 import { clearMessages } from '../../../../redux/slices/productSlice';
+import { uploadImage, isLocalFileUri } from '../../../utils/imageUpload';
 
 export default function AddMenuItemScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -31,6 +32,9 @@ export default function AddMenuItemScreen() {
     });
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+    // Image upload state
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     // Toppings state (only for pizza)
     const [toppings, setToppings] = useState<Array<{ name: string; category: 'vegetables' | 'meat' | 'cheese' | 'sauce' }>>([]);
@@ -189,6 +193,57 @@ export default function AddMenuItemScreen() {
             return;
         }
 
+        try {
+            // Upload image to Cloudinary if it's a local file
+            let cloudinaryImageUrl = '';
+
+            if (selectedImage && isLocalFileUri(selectedImage)) {
+                setIsUploadingImage(true);
+                console.log('📤 Uploading image to Cloudinary...');
+
+                try {
+                    cloudinaryImageUrl = await uploadImage(selectedImage, 'product');
+                    console.log('✅ Image uploaded successfully:', cloudinaryImageUrl);
+                } catch (uploadError: any) {
+                    setIsUploadingImage(false);
+                    Alert.alert(
+                        'Image Upload Failed',
+                        `Failed to upload image: ${uploadError.message}\n\nWould you like to continue without an image?`,
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                                text: 'Continue',
+                                onPress: () => {
+                                    // Continue with default placeholder
+                                    cloudinaryImageUrl = 'https://via.placeholder.com/400x300?text=Menu+Item';
+                                    proceedWithSave(cloudinaryImageUrl);
+                                }
+                            }
+                        ]
+                    );
+                    return;
+                }
+
+                setIsUploadingImage(false);
+            } else if (selectedImage) {
+                // Already a cloud URL (http/https)
+                cloudinaryImageUrl = selectedImage;
+            } else if (itemData.imageUrl.trim()) {
+                // Use provided URL
+                cloudinaryImageUrl = itemData.imageUrl.trim();
+            } else {
+                // Use placeholder
+                cloudinaryImageUrl = 'https://via.placeholder.com/400x300?text=Menu+Item';
+            }
+
+            await proceedWithSave(cloudinaryImageUrl);
+        } catch (err: any) {
+            setIsUploadingImage(false);
+            Alert.alert('Error', err.message || 'Failed to create product');
+        }
+    };
+
+    const proceedWithSave = async (imageUrl: string) => {
         // Prepare pricing based on category
         let pricing: number | { small?: number; medium?: number; large?: number };
 
@@ -215,8 +270,7 @@ export default function AddMenuItemScreen() {
             description: itemData.description.trim(),
             category: itemData.category,
             pricing,
-            // Use selected image or default placeholder
-            imageUrl: selectedImage || itemData.imageUrl.trim() || 'https://via.placeholder.com/400x300?text=Menu+Item',
+            imageUrl, // Use Cloudinary URL
             isVegetarian: itemData.isVegetarian,
             isAvailable: itemData.isAvailable,
             // preparationTime will be auto-assigned by backend based on category
@@ -624,12 +678,12 @@ export default function AddMenuItemScreen() {
                                                     itemData.priceLarge ? parseFloat(itemData.priceLarge) : null,
                                                 ].filter((p): p is number => p !== null && !isNaN(p));
 
-                                                if (prices.length === 0) return '$0.00';
-                                                if (prices.length === 1) return `$${prices[0].toFixed(2)}`;
+                                                if (prices.length === 0) return '₹0';
+                                                if (prices.length === 1) return `₹${prices[0].toFixed(0)}`;
 
                                                 const minPrice = Math.min(...prices);
                                                 const maxPrice = Math.max(...prices);
-                                                return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+                                                return `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
                                             })()}
                                         </Text>
                                     ) : (
@@ -650,11 +704,16 @@ export default function AddMenuItemScreen() {
             {/* Floating Save Button */}
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.saveButton, isCreating && styles.saveButtonDisabled]}
+                    style={[styles.saveButton, (isCreating || isUploadingImage) && styles.saveButtonDisabled]}
                     onPress={handleSaveItem}
-                    disabled={isCreating}
+                    disabled={isCreating || isUploadingImage}
                 >
-                    {isCreating ? (
+                    {isUploadingImage ? (
+                        <>
+                            <ActivityIndicator size="small" color="#fff" />
+                            <Text style={styles.saveButtonText}>Uploading Image...</Text>
+                        </>
+                    ) : isCreating ? (
                         <>
                             <MaterialIcons name="hourglass-empty" size={20} color="#fff" />
                             <Text style={styles.saveButtonText}>Creating...</Text>

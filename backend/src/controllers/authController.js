@@ -60,4 +60,26 @@ export const logout = async (req, res, next) => {
     }
 };
 
-export default { register, login, logout };
+/**
+ * Refresh access token
+ * POST /api/v1/auth/refresh
+ * @access Public
+ */
+export const refresh = async (req, res, next) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            const error = new Error('Refresh token is required');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const result = await authService.refreshAccessToken(refreshToken);
+        sendResponse(res, 200, 'Token refreshed successfully', result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default { register, login, logout, refresh };

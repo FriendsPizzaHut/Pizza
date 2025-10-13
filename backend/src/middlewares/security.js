@@ -193,8 +193,21 @@ export const noSQLInjectionProtection = (req, res, next) => {
  * 
  * NOTE: Not using xss-clean due to Node.js v18+ compatibility issues
  * This custom implementation escapes HTML special characters
+ * 
+ * URL fields are whitelisted to prevent breaking image/document URLs
  */
 export const xssProtection = (req, res, next) => {
+    // Whitelist of fields that should not be HTML-escaped (URLs, file paths, etc.)
+    const urlFieldWhitelist = [
+        'imageUrl',
+        'url',
+        'avatar',
+        'profilePicture',
+        'documentUrl',
+        'fileUrl',
+        'photoUrl',
+    ];
+
     // Function to escape HTML special characters
     const escapeHtml = (text) => {
         if (typeof text !== 'string') return text;
@@ -212,19 +225,24 @@ export const xssProtection = (req, res, next) => {
     };
 
     // Recursively sanitize object
-    const sanitizeObject = (obj) => {
+    const sanitizeObject = (obj, parentKey = '') => {
         if (!obj || typeof obj !== 'object') {
             return typeof obj === 'string' ? escapeHtml(obj) : obj;
         }
 
         if (Array.isArray(obj)) {
-            return obj.map(item => sanitizeObject(item));
+            return obj.map(item => sanitizeObject(item, parentKey));
         }
 
         const sanitized = {};
         for (const key in obj) {
             if (obj.hasOwnProperty(key)) {
-                sanitized[key] = sanitizeObject(obj[key]);
+                // Skip HTML escaping for whitelisted URL fields
+                if (urlFieldWhitelist.includes(key) && typeof obj[key] === 'string') {
+                    sanitized[key] = obj[key]; // Keep URL as-is
+                } else {
+                    sanitized[key] = sanitizeObject(obj[key], key);
+                }
             }
         }
         return sanitized;

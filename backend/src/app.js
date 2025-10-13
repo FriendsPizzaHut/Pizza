@@ -113,11 +113,13 @@ import userRoutes from './routes/userRoutes.js';
 import businessRoutes from './routes/businessRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import cartRoutes from './routes/cart.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 // Mount routes with /api/v1 prefix
 // Auth routes have stricter rate limiting
@@ -131,10 +133,12 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/business', businessRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/activity', activityRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 /**
  * ROOT ENDPOINT

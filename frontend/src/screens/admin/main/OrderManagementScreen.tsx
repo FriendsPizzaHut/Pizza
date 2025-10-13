@@ -1,113 +1,326 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Platform, Image, TextInput } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    StatusBar,
+    Platform,
+    Image,
+    TextInput,
+    ActivityIndicator,
+    RefreshControl,
+} from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Feather from '@expo/vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../../redux/store';
+import { io, Socket } from 'socket.io-client';
+import Constants from 'expo-constants';
+import axiosInstance from '../../../api/axiosInstance';
 
+// 🔥 PART 5.1: axiosInstance imported (not used yet)
+console.log('✅ PART 5.1 - axiosInstance imported successfully');
 
-// const { width } = Dimensions.get('window');
+// 🔥 PART 2: Socket URL Configuration
+// Get socket URL from environment (remove /api/v1 suffix if present)
+const SOCKET_URL = __DEV__
+    ? (Constants.expoConfig?.extra?.apiUrlDevelopment || 'http://localhost:5000').replace(/\/api\/v1$/, '')
+    : (Constants.expoConfig?.extra?.apiUrlProduction || 'https://pizzabackend-u9ui.onrender.com').replace(/\/api\/v1$/, '');
+
+console.log('🔌 PART 2 - Socket Configuration:');
+console.log('  - Environment:', __DEV__ ? 'development' : 'production');
+console.log('  - Socket URL:', SOCKET_URL);
+console.log('  - Raw apiUrlDevelopment:', Constants.expoConfig?.extra?.apiUrlDevelopment);
+
+// Static mock data for demonstration
+const MOCK_ORDERS = [
+    {
+        id: 'ORD001',
+        customer: 'John Doe',
+        status: 'pending',
+        time: '10 mins ago',
+        deliveryAddress: '123 Main St, Apt 4B',
+        estimatedReady: '25 mins',
+        itemsList: ['2x Margherita Pizza', '1x Pepperoni Pizza', '2x Coke'],
+        total: 32.97,
+        profileImage: null,
+        priority: 'high',
+    },
+    {
+        id: 'ORD002',
+        customer: 'Jane Smith',
+        status: 'preparing',
+        time: '15 mins ago',
+        deliveryAddress: '456 Oak Avenue',
+        estimatedReady: '15 mins',
+        itemsList: ['1x Veggie Supreme', '1x Garlic Bread'],
+        total: 18.98,
+        profileImage: null,
+    },
+    {
+        id: 'ORD003',
+        customer: 'Mike Johnson',
+        status: 'ready',
+        time: '5 mins ago',
+        deliveryAddress: '789 Pine Road',
+        estimatedReady: 'Ready now',
+        itemsList: ['3x Meat Lovers', '1x Caesar Salad'],
+        total: 45.97,
+        profileImage: null,
+    },
+];
 
 export default function OrderManagementScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
     const [selectedFilter, setSelectedFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const orders = [
-        {
-            id: '#ORD-001',
-            customer: 'John Doe',
-            items: 3,
-            total: 35.99,
-            status: 'preparing',
-            time: '14:30',
-            estimatedReady: '15:15',
-            priority: 'normal',
-            itemsList: ['2x Margherita Pizza', '1x Pepperoni Pizza', '1x Garlic Bread'],
-            paymentMethod: 'Card',
-            deliveryAddress: '123 Main St, Apt 4B',
-            profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-        },
-        {
-            id: '#ORD-002',
-            customer: 'Sarah Wilson',
-            items: 2,
-            total: 24.50,
-            status: 'ready',
-            time: '14:25',
-            estimatedReady: '15:10',
-            priority: 'high',
-            itemsList: ['1x Veggie Supreme', '2x Coke'],
-            paymentMethod: 'Cash',
-            deliveryAddress: '456 Oak Ave',
-            profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
-        },
-        {
-            id: '#ORD-003',
-            customer: 'Mike Johnson',
-            items: 5,
-            total: 47.75,
-            status: 'delivery',
-            time: '14:20',
-            estimatedReady: '15:05',
-            priority: 'normal',
-            itemsList: ['1x BBQ Chicken', '1x Meat Lovers', '1x Fries', '2x Pepsi'],
-            paymentMethod: 'Card',
-            deliveryAddress: '789 Pine Road',
-            profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
-        },
-        {
-            id: '#ORD-004',
-            customer: 'Emma Davis',
-            items: 1,
-            total: 15.99,
-            status: 'pending',
-            time: '14:35',
-            estimatedReady: '15:20',
-            priority: 'normal',
-            itemsList: ['1x Margherita Pizza'],
-            paymentMethod: 'Card',
-            deliveryAddress: '321 Elm Street',
-            profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
-        },
-    ];
+    // 🔥 PART 1: Get user info from Redux
+    const { userId, name, email, role } = useSelector((state: RootState) => state.auth);
+
+    console.log('📍 PART 1 - User Info from Redux:');
+    console.log('  - userId:', userId);
+    console.log('  - name:', name);
+    console.log('  - email:', email);
+    console.log('  - role:', role);
+
+    // 🔥 PART 3: Socket reference
+    const socketRef = useRef<Socket | null>(null);
+
+    // 🔥 PART 5.2: State variables for dynamic orders
+    const [orders, setOrders] = useState<any[]>(MOCK_ORDERS); // Start with mock data
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false); // 🔥 PART 9: Refresh state
+
+    console.log('✅ PART 5.2 - State variables initialized');
+    console.log('  - orders count:', orders.length);
+    console.log('  - loading:', loading);
+    console.log('✅ PART 9 - Refresh state initialized:', refreshing);
+
+    // Static orders - REMOVED, now using state above
+    // const orders = MOCK_ORDERS;
+
+    // 🔥 PART 5.3: Empty fetchOrders function (not called yet)
+    const fetchOrders = async () => {
+        console.log('📡 PART 5.4 - fetchOrders function called');
+
+        try {
+            setLoading(true);
+            console.log('  - Setting loading to true');
+            console.log('  - Making API call to /orders');
+
+            const response = await axiosInstance.get('/orders');
+            console.log('  - API response received');
+            console.log('  - Success:', response.data.success);
+
+            if (response.data.success) {
+                const ordersData = response.data.data.orders || response.data.data || [];
+                console.log('  - Total orders from API:', ordersData.length);
+                setOrders(ordersData);
+                console.log('  - Orders state updated');
+            }
+        } catch (error: any) {
+            console.error('❌ PART 5.4 - Error fetching orders:');
+            console.error('  - Error message:', error.message);
+            console.error('  - Error details:', error.response?.data || 'No details');
+        } finally {
+            setLoading(false);
+            console.log('  - Loading set to false');
+        }
+    };
+
+    console.log('✅ PART 5.4 - fetchOrders function with API logic created (not called yet)');
+
+    // 🔥 PART 9: Pull-to-refresh handler
+    const onRefresh = async () => {
+        console.log('🔄 PART 9 - Pull-to-refresh triggered');
+        setRefreshing(true);
+        await fetchOrders();
+        setRefreshing(false);
+        console.log('✅ PART 9 - Refresh completed');
+    };
+
+    // 🔥 PART 5.5: Call fetchOrders on mount (FIXED - data structure handled)
+    useEffect(() => {
+        console.log('🔄 PART 5.5 - Component mounted, calling fetchOrders...');
+        fetchOrders();
+    }, []);
+
+    // 🔥 PART 3: Socket connection useEffect
+    useEffect(() => {
+        if (!userId) {
+            console.log('⚠️ PART 3 - No userId found, skipping socket connection');
+            return;
+        }
+
+        console.log('🔌 PART 3 - Initiating socket connection...');
+        console.log('  - Connecting to:', SOCKET_URL);
+
+        // Create socket connection
+        socketRef.current = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+        });
+
+        const socket = socketRef.current;
+
+        // Connection event
+        socket.on('connect', () => {
+            console.log('✅ PART 3 - Socket connected successfully!');
+            console.log('  - Socket ID:', socket.id);
+            console.log('  - Transport:', socket.io.engine.transport.name);
+
+            // 🔥 PART 4: Register as admin
+            console.log('📍 PART 4 - Registering as admin...');
+            socket.emit('register', {
+                userId: userId,
+                role: role || 'admin'
+            });
+            console.log('  - Sent registration with userId:', userId);
+            console.log('  - Role:', role || 'admin');
+        });
+
+        // 🔥 PART 4: Listen for registration confirmation
+        socket.on('registered', (data) => {
+            console.log('✅ PART 4 - Registration confirmed by server!');
+            console.log('  - Response:', JSON.stringify(data, null, 2));
+        });
+
+        // Disconnect event
+        socket.on('disconnect', (reason) => {
+            console.log('❌ PART 3 - Socket disconnected');
+            console.log('  - Reason:', reason);
+        });
+
+        // Connection error event
+        socket.on('connect_error', (error) => {
+            console.error('❌ PART 3 - Socket connection error:');
+            console.error('  - Error:', error.message);
+        });
+
+        // 🔥 PART 6: Listen for new orders
+        socket.on('order:new', (data) => {
+            console.log('📦 PART 6 - NEW ORDER RECEIVED:', data);
+            const newOrder = data.order || data;
+            console.log('  - Order Number:', newOrder.orderNumber);
+            console.log('  - Customer:', newOrder.user?.name);
+
+            // Add new order to the top of the list
+            setOrders((prevOrders) => [newOrder, ...prevOrders]);
+            console.log('  - Order added to list');
+        });
+
+        // 🔥 PART 7: Listen for order status updates
+        socket.on('order:status:changed', (data) => {
+            console.log('🔄 PART 7 - ORDER STATUS UPDATED:', data);
+            console.log('  - Order ID:', data.orderId);
+            console.log('  - New Status:', data.status);
+
+            // Update the order in the list
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    (order._id === data.orderId || order.id === data.orderId)
+                        ? { ...order, status: data.status, updatedAt: data.timestamp }
+                        : order
+                )
+            );
+            console.log('  - Order status updated in list');
+        });
+
+        // 🔥 PART 8: Listen for delivery assignments
+        socket.on('order:assigned', (data) => {
+            console.log('🚴 PART 8 - ORDER ASSIGNED TO DELIVERY:', data);
+            console.log('  - Order ID:', data.orderId);
+            console.log('  - Delivery Agent:', data.deliveryAgent?.name);
+
+            // Update the order in the list
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    (order._id === data.orderId || order.id === data.orderId)
+                        ? {
+                            ...order,
+                            deliveryAgent: data.deliveryAgent,
+                            status: 'out_for_delivery',
+                            assignedAt: data.assignedAt
+                        }
+                        : order
+                )
+            );
+            console.log('  - Delivery assignment updated in list');
+        });
+
+        // Cleanup on unmount
+        return () => {
+            console.log('🧹 PART 3 - Cleaning up socket connection');
+            if (socket) {
+                socket.off('connect');
+                socket.off('disconnect');
+                socket.off('connect_error');
+                socket.off('registered'); // 🔥 PART 4: Clean up registered listener
+                socket.off('order:new'); // 🔥 PART 6: Clean up
+                socket.off('order:status:changed'); // 🔥 PART 7: Clean up
+                socket.off('order:assigned'); // 🔥 PART 8: Clean up
+                socket.disconnect();
+            }
+        };
+    }, [userId]);
 
     const filters = [
-        { id: 'all', label: 'All Orders', count: 20 },
-        { id: 'pending', label: 'Pending', count: 4 },
-        { id: 'preparing', label: 'Preparing', count: 8 },
-        { id: 'ready', label: 'Ready', count: 3 },
-        { id: 'delivery', label: 'Delivery', count: 5 },
+        { id: 'all', label: 'All Orders', count: orders.length },
+        { id: 'pending', label: 'Pending', count: orders.filter(o => o.status === 'pending').length },
+        { id: 'confirmed', label: 'Confirmed', count: orders.filter(o => o.status === 'confirmed').length },
+        { id: 'preparing', label: 'Preparing', count: orders.filter(o => o.status === 'preparing').length },
+        { id: 'out_for_delivery', label: 'Delivery', count: orders.filter(o => o.status === 'out_for_delivery').length },
+        { id: 'delivered', label: 'Delivered', count: orders.filter(o => o.status === 'delivered').length },
     ];
 
     const getStatusConfig = (status: string) => {
         switch (status) {
             case 'pending':
                 return { label: 'Pending', color: '#FF9800', bgColor: '#FFF3E0', icon: 'schedule' };
+            case 'confirmed':
+                return { label: 'Confirmed', color: '#2196F3', bgColor: '#E3F2FD', icon: 'check-circle' };
             case 'preparing':
                 return { label: 'Preparing', color: '#2196F3', bgColor: '#E3F2FD', icon: 'restaurant' };
             case 'ready':
                 return { label: 'Ready', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'check-circle' };
-            case 'delivery':
+            case 'out_for_delivery':
                 return { label: 'Out for Delivery', color: '#9C27B0', bgColor: '#F3E5F5', icon: 'delivery-dining' };
             case 'delivered':
-                return { label: 'Delivered', color: '#607D8B', bgColor: '#ECEFF1', icon: 'done-all' };
+                return { label: 'Delivered', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'done-all' };
+            case 'cancelled':
+                return { label: 'Cancelled', color: '#F44336', bgColor: '#FFEBEE', icon: 'cancel' };
             default:
                 return { label: status, color: '#666', bgColor: '#F5F5F5', icon: 'info' };
         }
     };
 
     const filteredOrders = selectedFilter === 'all'
-        ? orders.filter(order =>
-            order.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.id.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : orders.filter(order =>
-            order.status === selectedFilter &&
-            (order.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                order.id.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+        ? orders.filter(order => {
+            // Handle both API (order.user.name) and mock (order.customer) structures
+            const customerName = order.user?.name || order.customer || '';
+            const orderNumber = order.orderNumber || order.id || '';
+            const searchLower = searchQuery.toLowerCase();
+
+            return customerName.toLowerCase().includes(searchLower) ||
+                orderNumber.toLowerCase().includes(searchLower);
+        })
+        : orders.filter(order => {
+            // Handle both API (order.user.name) and mock (order.customer) structures
+            const customerName = order.user?.name || order.customer || '';
+            const orderNumber = order.orderNumber || order.id || '';
+            const searchLower = searchQuery.toLowerCase();
+
+            return order.status === selectedFilter &&
+                (customerName.toLowerCase().includes(searchLower) ||
+                    orderNumber.toLowerCase().includes(searchLower));
+        });
 
     return (
         <View style={styles.container}>
@@ -122,7 +335,10 @@ export default function OrderManagementScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.notificationButton}
-                        onPress={() => console.log('Notifications pressed')}
+                        onPress={() => {
+                            console.log('🧪 TEST: Manually calling fetchOrders...');
+                            fetchOrders();
+                        }}
                     >
                         <MaterialIcons name="notifications-none" size={24} color="#2d2d2d" />
                         <View style={styles.notificationBadge}>
@@ -170,6 +386,15 @@ export default function OrderManagementScreen() {
             <ScrollView
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#cb202d']} // Android
+                        tintColor="#cb202d" // iOS
+                        progressBackgroundColor="#FFFFFF" // Android
+                    />
+                }
             >
                 {/* Advertisement Banner */}
                 <View style={styles.advertisementBanner}>
@@ -179,6 +404,14 @@ export default function OrderManagementScreen() {
                         resizeMode="cover"
                     />
                 </View>
+
+                {/* 🔥 PART 9: Loading Overlay */}
+                {loading && !refreshing && (
+                    <View style={styles.loadingOverlay}>
+                        <ActivityIndicator size="large" color="#cb202d" />
+                        <Text style={styles.loadingText}>Loading orders...</Text>
+                    </View>
+                )}
 
                 {/* Orders List */}
                 <View style={styles.ordersSection}>
@@ -192,142 +425,187 @@ export default function OrderManagementScreen() {
                         <Text style={styles.orderCount}>{filteredOrders.length} orders</Text>
                     </View>
 
-                    {filteredOrders.map((order) => {
-                        const statusConfig = getStatusConfig(order.status);
-                        return (
-                            <View key={order.id} style={styles.orderCard}>
-                                {/* Top Section with Customer Info */}
-                                <View style={styles.topSection}>
-                                    <View style={styles.customerAvatarContainer}>
-                                        {order.profileImage ? (
-                                            <Image
-                                                source={{ uri: order.profileImage }}
-                                                style={styles.profileImage}
-                                                resizeMode="cover"
-                                            />
-                                        ) : (
-                                            <View style={styles.customerAvatar}>
-                                                <Text style={styles.customerInitial}>{order.customer.charAt(0)}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <View style={styles.customerDetails}>
-                                        <View style={styles.nameRow}>
-                                            <Text style={styles.customerName}>{order.customer}</Text>
-                                            {order.priority === 'high' && (
-                                                <View style={styles.priorityBadge}>
-                                                    <MaterialIcons name="local-fire-department" size={10} color="#fff" />
-                                                    <Text style={styles.priorityText}>HIGH</Text>
+                    {filteredOrders.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <MaterialIcons name="receipt-long" size={64} color="#E0E0E0" />
+                            <Text style={styles.emptyTitle}>No Orders Found</Text>
+                            <Text style={styles.emptyText}>
+                                {selectedFilter === 'all'
+                                    ? 'No orders yet. Orders will appear here.'
+                                    : `No ${filters.find(f => f.id === selectedFilter)?.label.toLowerCase()} orders found.`}
+                            </Text>
+                        </View>
+                    ) : (
+                        filteredOrders.map((order) => {
+                            const statusConfig = getStatusConfig(order.status);
+                            // 🔥 PART 5.6: Handle both API and mock data structures
+                            const customerName = order.user?.name || order.customer || 'Unknown';
+                            const orderNumber = order.orderNumber || order.id || 'N/A';
+                            // Handle delivery address (API: object, Mock: string)
+                            const deliveryAddress = typeof order.deliveryAddress === 'string'
+                                ? order.deliveryAddress
+                                : `${order.deliveryAddress?.street || ''}, ${order.deliveryAddress?.city || ''}`.trim();
+                            // Handle time (API: createdAt, Mock: time)
+                            const orderTime = order.time || (order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A');
+                            // Handle estimated time (API: estimatedDeliveryTime, Mock: estimatedReady)
+                            const estimatedReady = order.estimatedReady || `${order.estimatedDeliveryTime || 30} mins`;
+
+                            return (
+                                <View key={order._id || order.id} style={styles.orderCard}>
+                                    {/* Top Section with Customer Info */}
+                                    <View style={styles.topSection}>
+                                        <View style={styles.customerAvatarContainer}>
+                                            {order.profileImage || order.user?.profileImage ? (
+                                                <Image
+                                                    source={{ uri: order.profileImage || order.user?.profileImage }}
+                                                    style={styles.profileImage}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={styles.customerAvatar}>
+                                                    <Text style={styles.customerInitial}>{customerName.charAt(0)}</Text>
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={styles.orderId}>{order.id}</Text>
-                                    </View>
-                                </View>
-
-                                {/* Status Section */}
-                                <View style={styles.statusSection}>
-                                    <View style={styles.divider} />
-                                    <View style={styles.statusRow}>
-                                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                                            <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
-                                            <MaterialIcons name={statusConfig.icon as any} size={14} color={statusConfig.color} />
-                                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                                {statusConfig.label}
-                                            </Text>
+                                        <View style={styles.customerDetails}>
+                                            <View style={styles.nameRow}>
+                                                <Text style={styles.customerName}>{customerName}</Text>
+                                                {order.priority === 'high' && (
+                                                    <View style={styles.priorityBadge}>
+                                                        <MaterialIcons name="local-fire-department" size={10} color="#fff" />
+                                                        <Text style={styles.priorityText}>HIGH</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={styles.orderId}>{orderNumber}</Text>
                                         </View>
-                                        <Text style={styles.orderTime}>{order.time}</Text>
                                     </View>
-                                </View>
 
-                                {/* Delivery Details Section */}
-                                <View style={styles.deliveryDetailsSection}>
-                                    <View style={styles.divider} />
-                                    <View style={styles.deliveryRow}>
-                                        <MaterialIcons name="location-on" size={16} color="#FF6B35" />
-                                        <View style={styles.deliveryInfo}>
-                                            <Text style={styles.deliveryAddress}>{order.deliveryAddress}</Text>
-                                            <View style={styles.orderMeta}>
-                                                <MaterialIcons name="access-time" size={12} color="#8E8E93" />
-                                                <Text style={styles.readyTime}>Ready: {order.estimatedReady}</Text>
+                                    {/* Status Section */}
+                                    <View style={styles.statusSection}>
+                                        <View style={styles.divider} />
+                                        <View style={styles.statusRow}>
+                                            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                                                <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
+                                                <MaterialIcons name={statusConfig.icon as any} size={14} color={statusConfig.color} />
+                                                <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                                                    {statusConfig.label}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.orderTime}>{orderTime}</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Delivery Details Section */}
+                                    <View style={styles.deliveryDetailsSection}>
+                                        <View style={styles.divider} />
+                                        <View style={styles.deliveryRow}>
+                                            <MaterialIcons name="location-on" size={16} color="#FF6B35" />
+                                            <View style={styles.deliveryInfo}>
+                                                <Text style={styles.deliveryAddress}>{deliveryAddress}</Text>
+                                                <View style={styles.orderMeta}>
+                                                    <MaterialIcons name="access-time" size={12} color="#8E8E93" />
+                                                    <Text style={styles.readyTime}>Ready: {estimatedReady}</Text>
+                                                </View>
                                             </View>
                                         </View>
                                     </View>
-                                </View>
 
-                                {/* Order Summary Section */}
-                                <View style={styles.orderSummarySection}>
-                                    <View style={styles.divider} />
-                                    <View style={styles.summaryHeader}>
-                                        <MaterialIcons name="receipt-long" size={16} color="#FF6B35" />
-                                        <Text style={styles.summaryTitle}>Order Summary</Text>
-                                    </View>
+                                    {/* Order Summary Section */}
+                                    <View style={styles.orderSummarySection}>
+                                        <View style={styles.divider} />
+                                        <View style={styles.summaryHeader}>
+                                            <MaterialIcons name="receipt-long" size={16} color="#FF6B35" />
+                                            <Text style={styles.summaryTitle}>Order Summary</Text>
+                                        </View>
 
-                                    <View style={styles.itemsList}>
-                                        {order.itemsList.map((item, itemIndex) => {
-                                            // Parse item to extract quantity and name (assuming format like "2x Margherita Pizza")
-                                            const itemMatch = item.match(/^(\d+)x?\s*(.+)$/);
-                                            const quantity = itemMatch ? itemMatch[1] : '1';
-                                            const itemName = itemMatch ? itemMatch[2] : item;
-                                            // Mock individual prices for demo (in real app, this would come from order data)
-                                            const itemPrice = itemIndex === 0 ? 12.99 : itemIndex === 1 ? 14.99 : 4.99;
-                                            const totalItemPrice = parseFloat(quantity) * itemPrice;
+                                        <View style={styles.itemsList}>
+                                            {(order.items || order.itemsList || []).map((item: any, itemIndex: number) => {
+                                                // Handle API structure: { product, quantity, subtotal, productSnapshot }
+                                                // Handle mock structure: "2x Margherita Pizza"
+                                                let quantity, itemName, itemPrice;
 
-                                            return (
-                                                <View key={itemIndex} style={styles.summaryItem}>
-                                                    <Text style={styles.itemQuantityName}>
-                                                        {quantity} × {itemName}
-                                                    </Text>
-                                                    <Text style={styles.itemPrice}>${totalItemPrice.toFixed(2)}</Text>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
+                                                if (typeof item === 'string') {
+                                                    // Mock data format: "2x Margherita Pizza"
+                                                    const itemMatch = item.match(/^(\d+)x?\s*(.+)$/);
+                                                    quantity = itemMatch ? itemMatch[1] : '1';
+                                                    itemName = itemMatch ? itemMatch[2] : item;
+                                                    itemPrice = itemIndex === 0 ? 12.99 : itemIndex === 1 ? 14.99 : 4.99;
+                                                } else {
+                                                    // Real API format: { quantity, productSnapshot: { name }, subtotal }
+                                                    quantity = item.quantity || 1;
+                                                    itemName = item.productSnapshot?.name || item.product?.name || 'Unknown Item';
+                                                    itemPrice = item.subtotal || 0;
+                                                }
 
-                                    <View style={styles.summaryDivider} />
-                                    <View style={styles.totalRow}>
-                                        <Text style={styles.totalLabel}>Total</Text>
-                                        <Text style={styles.totalAmount}>${order.total.toFixed(2)}</Text>
-                                    </View>
-                                </View>
+                                                const totalItemPrice = typeof itemPrice === 'number'
+                                                    ? itemPrice
+                                                    : parseFloat(quantity) * itemPrice;
 
-                                {/* Action Buttons */}
-                                <View style={styles.actionsSection}>
-                                    {order.status === 'pending' && (
-                                        <TouchableOpacity style={styles.acceptButton}>
-                                            <MaterialIcons name="check" size={18} color="#fff" />
-                                            <Text style={styles.acceptButtonText}>Accept Order</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    {order.status === 'preparing' && (
-                                        <TouchableOpacity style={styles.readyButton}>
-                                            <MaterialIcons name="done-all" size={18} color="#fff" />
-                                            <Text style={styles.readyButtonText}>Mark Ready</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    {order.status === 'ready' && (
-                                        <TouchableOpacity
-                                            style={styles.assignButton}
-                                            onPress={() => navigation.navigate('AssignDeliveryAgent', {
-                                                orderId: order.id,
-                                                orderDetails: order
+                                                return (
+                                                    <View key={itemIndex} style={styles.summaryItem}>
+                                                        <Text style={styles.itemQuantityName}>
+                                                            {quantity} × {itemName}
+                                                        </Text>
+                                                        <Text style={styles.itemPrice}>${totalItemPrice.toFixed(2)}</Text>
+                                                    </View>
+                                                );
                                             })}
+                                        </View>
+
+                                        <View style={styles.summaryDivider} />
+                                        <View style={styles.totalRow}>
+                                            <Text style={styles.totalLabel}>Total</Text>
+                                            <Text style={styles.totalAmount}>
+                                                ${(order.totalAmount || order.total || 0).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Action Buttons */}
+                                    <View style={styles.actionsSection}>
+                                        {order.status === 'pending' && (
+                                            <TouchableOpacity style={styles.acceptButton}>
+                                                <MaterialIcons name="check" size={18} color="#fff" />
+                                                <Text style={styles.acceptButtonText}>Accept Order</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {order.status === 'preparing' && (
+                                            <TouchableOpacity style={styles.readyButton}>
+                                                <MaterialIcons name="done-all" size={18} color="#fff" />
+                                                <Text style={styles.readyButtonText}>Mark Ready</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {order.status === 'ready' && (
+                                            <TouchableOpacity
+                                                style={styles.assignButton}
+                                                onPress={() => {
+                                                    // @ts-ignore - Navigation to parent stack screen
+                                                    navigation.navigate('AssignDeliveryAgent', {
+                                                        orderId: order.id,
+                                                        orderDetails: order
+                                                    });
+                                                }}
+                                            >
+                                                <MaterialIcons name="delivery-dining" size={18} color="#fff" />
+                                                <Text style={styles.assignButtonText}>Assign Delivery</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.viewButton}
+                                            onPress={() => {
+                                                // @ts-ignore - Navigation to parent stack screen
+                                                navigation.navigate('OrderDetails', { orderId: order.id });
+                                            }}
                                         >
-                                            <MaterialIcons name="delivery-dining" size={18} color="#fff" />
-                                            <Text style={styles.assignButtonText}>Assign Delivery</Text>
+                                            <MaterialIcons name="visibility" size={16} color="#666" />
+                                            <Text style={styles.viewButtonText}>View Details</Text>
                                         </TouchableOpacity>
-                                    )}
-                                    <TouchableOpacity
-                                        style={styles.viewButton}
-                                        onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}
-                                    >
-                                        <MaterialIcons name="visibility" size={16} color="#666" />
-                                        <Text style={styles.viewButtonText}>View Details</Text>
-                                    </TouchableOpacity>
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </View>
 
                 {/* Bottom spacing */}
@@ -828,5 +1106,57 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
         color: '#666',
+    },
+    // 🔥 NEW: Loading and empty state styles
+    loadingOverlay: {
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+        marginHorizontal: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
+    },
+    centerContainer: {
+        paddingVertical: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    emptyState: {
+        paddingVertical: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 40,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });

@@ -105,7 +105,7 @@ export default function SalesReportsScreen() {
                         <Text style={styles.productStats}>{product.sales} sold</Text>
                     </View>
                     <View style={styles.productRevenue}>
-                        <Text style={styles.revenueAmount}>${product.revenue.toFixed(2)}</Text>
+                        <Text style={styles.revenueAmount}>₹{product.revenue.toFixed(0)}</Text>
                     </View>
                 </View>
             ))}
@@ -142,7 +142,7 @@ export default function SalesReportsScreen() {
                         <Text style={styles.customerName}>{customer.name}</Text>
                         <Text style={styles.customerOrders}>{customer.orders} orders</Text>
                     </View>
-                    <Text style={styles.customerSpent}>${customer.spent.toFixed(2)}</Text>
+                    <Text style={styles.customerSpent}>₹{customer.spent.toFixed(0)}</Text>
                 </View>
             ))}
         </View>

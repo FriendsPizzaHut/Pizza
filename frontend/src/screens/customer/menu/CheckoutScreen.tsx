@@ -1,664 +1,998 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, StatusBar, ActivityIndicator } from 'react-native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { CustomerStackParamList } from '../../../types/navigation';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '../../../../redux/store';
+import {
+    setAddresses,
+    selectAddress,
+    setLoading,
+    setError,
+    isCacheValid,
+    Address as AddressType,
+} from '../../../../redux/slices/addressSlice';
+import { placeOrderFromCartThunk } from '../../../../redux/thunks/orderThunks';
+import apiClient from '../../../api/apiClient';
 
-interface DeliveryAddress {
-    id: string;
-    type: 'home' | 'work' | 'other';
-    address: string;
-    city: string;
-    zipCode: string;
-    phone: string;
-    isDefault: boolean;
-}
+type CheckoutRouteProp = RouteProp<CustomerStackParamList, 'Checkout'>;
 
 interface PaymentMethod {
     id: string;
-    type: 'card' | 'cash' | 'digital';
+    type: 'cash' | 'card' | 'upi' | 'wallet';
     name: string;
     last4?: string;
-    expiryMonth?: string;
-    expiryYear?: string;
+    icon: string;
     isDefault: boolean;
 }
 
 export default function CheckoutScreen() {
-    const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery');
-    const [selectedAddress, setSelectedAddress] = useState<string>('1');
-    const [selectedPayment, setSelectedPayment] = useState<string>('1');
-    const [specialInstructions, setSpecialInstructions] = useState('');
-    const [tipAmount, setTipAmount] = useState('3.00');
-    const [selectedTipOption, setSelectedTipOption] = useState<number | 'custom'>(18);
+    const route = useRoute<CheckoutRouteProp>();
+    const navigation = useNavigation();
+    const dispatch = useDispatch<AppDispatch>();
+    const { cartTotal } = route.params || { cartTotal: 0 };
 
-    const addresses: DeliveryAddress[] = [
-        {
-            id: '1',
-            type: 'home',
-            address: '123 Main Street, Apt 4B',
-            city: 'New York, NY',
-            zipCode: '10001',
-            phone: '+1 (555) 123-4567',
-            isDefault: true,
-        },
-        {
-            id: '2',
-            type: 'work',
-            address: '456 Business Ave, Suite 200',
-            city: 'New York, NY',
-            zipCode: '10002',
-            phone: '+1 (555) 987-6543',
-            isDefault: false,
-        },
-    ];
+    // Get data from Redux
+    const userId = useSelector((state: RootState) => state.auth.userId);
+    const addresses = useSelector((state: RootState) => state.address.addresses);
+    const selectedAddressId = useSelector((state: RootState) => state.address.selectedAddressId);
+    const lastFetched = useSelector((state: RootState) => state.address.lastFetched);
+
+    // State
+    const [selectedPayment, setSelectedPayment] = useState<string>('1');
+    const [orderInstructions, setOrderInstructions] = useState('');
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+    const [userPhone, setUserPhone] = useState<string>(''); // Store user phone from profile
+
+    // Show only 3 addresses (selected + 2 others) for performance
+    const visibleAddresses = React.useMemo(() => {
+        if (addresses.length <= 3) return addresses;
+
+        // Always include selected address
+        const selected = addresses.find(a => a._id === selectedAddressId);
+        const others = addresses.filter(a => a._id !== selectedAddressId).slice(0, 2);
+
+        return selected ? [selected, ...others] : addresses.slice(0, 3);
+    }, [addresses, selectedAddressId]);
+
+    // Fetch user profile with addresses
+    useEffect(() => {
+        if (userId) {
+            // Only fetch if cache is invalid
+            if (!isCacheValid(lastFetched)) {
+                fetchUserProfile();
+            } else {
+                setIsLoadingProfile(false);
+            }
+        } else {
+            Alert.alert('Error', 'Please login to continue');
+            navigation.goBack();
+        }
+    }, [userId, lastFetched]);
+
+    const fetchUserProfile = async () => {
+        try {
+            setIsLoadingProfile(true);
+            dispatch(setLoading(true));
+
+            if (!userId) {
+                throw new Error('User ID not found');
+            }
+
+            const response = await apiClient.get(`/users/${userId}`);
+
+            if (response.data?.data?.address) {
+                // Update Redux cache
+                dispatch(setAddresses(response.data.data.address));
+            }
+
+            // Store user phone for order
+            if (response.data?.data?.phone) {
+                setUserPhone(response.data.data.phone);
+            }
+        } catch (error: any) {
+            console.error('Error fetching profile:', error);
+            const errorMessage = error.response?.data?.message || 'Failed to load profile. Please try again.';
+            dispatch(setError(errorMessage));
+            Alert.alert('Error', errorMessage);
+        } finally {
+            setIsLoadingProfile(false);
+            dispatch(setLoading(false));
+        }
+    };
 
     const paymentMethods: PaymentMethod[] = [
         {
             id: '1',
-            type: 'card',
-            name: 'Visa ending in 4567',
-            last4: '4567',
-            expiryMonth: '12',
-            expiryYear: '25',
+            type: 'cash',
+            name: 'Cash on Delivery',
+            icon: '💵',
             isDefault: true,
         },
         {
             id: '2',
             type: 'card',
-            name: 'Mastercard ending in 8901',
-            last4: '8901',
-            expiryMonth: '08',
-            expiryYear: '26',
+            name: 'Credit/Debit Card',
+            icon: '💳',
             isDefault: false,
         },
         {
             id: '3',
-            type: 'cash',
-            name: 'Cash on Delivery',
+            type: 'upi',
+            name: 'UPI Payment',
+            icon: '📱',
+            isDefault: false,
+        },
+        {
+            id: '4',
+            type: 'wallet',
+            name: 'Digital Wallet',
+            icon: '👛',
             isDefault: false,
         },
     ];
 
+    // Calculate order summary
     const orderSummary = {
-        subtotal: 35.47,
-        tax: 3.02,
-        deliveryFee: 2.99,
-        serviceFee: 1.50,
-    };
-
-    const tipOptions = [15, 18, 20, 25];
-
-    const calculateTip = () => {
-        if (selectedTipOption === 'custom') {
-            return parseFloat(tipAmount) || 0;
-        } else {
-            return (orderSummary.subtotal * (selectedTipOption as number)) / 100;
-        }
+        subtotal: cartTotal || 0,
+        tax: (cartTotal || 0) * 0.08, // 8% tax
+        deliveryFee: cartTotal > 2490 ? 0 : 40,
+        discount: 0,
     };
 
     const calculateTotal = () => {
-        const tip = calculateTip();
-        const deliveryFee = orderType === 'delivery' ? orderSummary.deliveryFee : 0;
-        return orderSummary.subtotal + orderSummary.tax + deliveryFee + orderSummary.serviceFee + tip;
+        return orderSummary.subtotal + orderSummary.tax + orderSummary.deliveryFee - orderSummary.discount;
     };
 
-    const handleTipSelection = (percentage: number) => {
-        setSelectedTipOption(percentage);
-        setTipAmount(((orderSummary.subtotal * percentage) / 100).toFixed(2));
+    const placeOrder = async () => {
+        if (isPlacingOrder) return;
+
+        // Validation
+        if (!addresses || addresses.length === 0) {
+            Alert.alert('No Address', 'Please add a delivery address to continue');
+            return;
+        }
+
+        if (!selectedAddressId) {
+            Alert.alert('Address Required', 'Please select a delivery address');
+            return;
+        }
+
+        if (!selectedPayment) {
+            Alert.alert('Payment Required', 'Please select a payment method');
+            return;
+        }
+
+        setIsPlacingOrder(true);
+
+        try {
+            const selectedAddr = addresses.find(a => a._id === selectedAddressId);
+            const selectedPay = paymentMethods.find(p => p.id === selectedPayment);
+
+            if (!selectedAddr) {
+                throw new Error('Selected address not found');
+            }
+
+            // Get contact phone from user profile or use default
+            const contactPhone = userPhone || '0000000000'; // Fallback if phone not in Redux
+
+            // Prepare order data
+            const orderData = {
+                deliveryAddress: {
+                    street: selectedAddr.street,
+                    city: selectedAddr.city,
+                    state: selectedAddr.state,
+                    pincode: selectedAddr.pincode,
+                    landmark: selectedAddr.landmark,
+                    instructions: orderInstructions || undefined,
+                },
+                contactPhone,
+                paymentMethod: selectedPay?.type || 'cash',
+                orderInstructions: orderInstructions || undefined,
+            };
+
+            // Place order using thunk (automatically clears cart on backend and Redux)
+            const order = await dispatch(placeOrderFromCartThunk(orderData)).unwrap();
+
+            // Success! Show confirmation
+            Alert.alert(
+                'Order Placed! 🎉',
+                `Your order #${order.orderNumber} has been successfully placed.\n\nEstimated delivery: ${order.estimatedDeliveryTime} mins`,
+                [
+                    {
+                        text: 'Track Order',
+                        onPress: () => {
+                            // Navigate to order tracking screen (if available)
+                            // For now, go back to home
+                            (navigation as any).reset({
+                                index: 0,
+                                routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
+                            });
+                        }
+                    },
+                ]
+            );
+        } catch (error: any) {
+            console.error('Place order error:', error);
+
+            // Handle specific error cases
+            if (error?.message?.includes('Cart is empty')) {
+                Alert.alert(
+                    'Cart is Empty',
+                    'Your cart is empty. Please add items before placing an order.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+            } else if (error?.message?.includes('Token expired') || error?.message?.includes('Session expired')) {
+                Alert.alert(
+                    'Session Expired',
+                    'Your session has expired. Please login again.',
+                    [
+                        {
+                            text: 'Login',
+                            onPress: () => {
+                                (navigation as any).reset({
+                                    index: 0,
+                                    routes: [{ name: 'Auth' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Error', error?.message || 'Failed to place order. Please try again.');
+            }
+        } finally {
+            setIsPlacingOrder(false);
+        }
     };
 
-    const handleCustomTip = (amount: string) => {
-        setTipAmount(amount);
-        setSelectedTipOption('custom');
+    const getAddressTypeIcon = (label: string) => {
+        const lowerLabel = label.toLowerCase();
+        if (lowerLabel.includes('home')) return 'home';
+        if (lowerLabel.includes('work') || lowerLabel.includes('office')) return 'work';
+        return 'place';
     };
 
-    const placeOrder = () => {
-        Alert.alert(
-            'Order Confirmation',
-            `Your order has been placed successfully! Total: $${calculateTotal().toFixed(2)}`,
-            [
-                { text: 'Track Order', onPress: () => console.log('Navigate to track order') },
-            ]
+    // Loading state
+    if (isLoadingProfile) {
+        return (
+            <View style={[styles.container, styles.centerContent]}>
+                <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+                <ActivityIndicator size="large" color="#cb202d" />
+                <Text style={styles.loadingText}>Loading your details...</Text>
+            </View>
         );
+    }
+
+    // No addresses state
+    const hasNoAddresses = !addresses || addresses.length === 0;
+
+    const handleSelectAddress = (addressId: string) => {
+        dispatch(selectAddress(addressId));
     };
 
-    const getAddressIcon = (type: string) => {
-        switch (type) {
-            case 'home': return '🏠';
-            case 'work': return '🏢';
-            default: return '📍';
-        }
+    const handleAddAddress = () => {
+        (navigation as any).navigate('AddAddress', { fromScreen: 'Checkout' });
     };
 
-    const getPaymentIcon = (type: string) => {
-        switch (type) {
-            case 'card': return '💳';
-            case 'cash': return '💵';
-            case 'digital': return '📱';
-            default: return '💳';
-        }
+    const handleManageAddresses = () => {
+        (navigation as any).navigate('ManageAddress', { fromScreen: 'Checkout' });
     };
 
     return (
-        <ScrollView style={styles.container}>
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+            {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>🛒 Checkout</Text>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Checkout</Text>
+                <View style={styles.headerPlaceholder} />
             </View>
 
-            <View style={styles.content}>
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🚀 Order Type</Text>
-                    <View style={styles.orderTypeContainer}>
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* No Addresses Warning */}
+                {hasNoAddresses && (
+                    <View style={styles.warningSection}>
+                        <MaterialIcons name="warning" size={32} color="#f59e0b" />
+                        <Text style={styles.warningTitle}>No Delivery Address</Text>
+                        <Text style={styles.warningText}>
+                            Please add a delivery address to place your order
+                        </Text>
                         <TouchableOpacity
-                            style={[
-                                styles.orderTypeButton,
-                                orderType === 'delivery' && styles.selectedOrderType
-                            ]}
-                            onPress={() => setOrderType('delivery')}
+                            style={styles.addAddressButton}
+                            onPress={handleAddAddress}
                         >
-                            <Text style={styles.orderTypeIcon}>🚚</Text>
-                            <Text style={[
-                                styles.orderTypeText,
-                                orderType === 'delivery' && styles.selectedOrderTypeText
-                            ]}>
-                                Delivery
-                            </Text>
-                            <Text style={styles.orderTypeTime}>30-45 mins</Text>
+                            <MaterialIcons name="add" size={20} color="#fff" />
+                            <Text style={styles.addAddressButtonText}>Add Address</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.orderTypeButton,
-                                orderType === 'pickup' && styles.selectedOrderType
-                            ]}
-                            onPress={() => setOrderType('pickup')}
-                        >
-                            <Text style={styles.orderTypeIcon}>🏪</Text>
-                            <Text style={[
-                                styles.orderTypeText,
-                                orderType === 'pickup' && styles.selectedOrderTypeText
-                            ]}>
-                                Pickup
-                            </Text>
-                            <Text style={styles.orderTypeTime}>15-20 mins</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {orderType === 'delivery' && (
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>📍 Delivery Address</Text>
-                            <TouchableOpacity style={styles.addButton}>
-                                <Text style={styles.addButtonText}>+ Add New</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {addresses.map((address) => (
-                            <TouchableOpacity
-                                key={address.id}
-                                style={[
-                                    styles.addressCard,
-                                    selectedAddress === address.id && styles.selectedCard
-                                ]}
-                                onPress={() => setSelectedAddress(address.id)}
-                            >
-                                <View style={styles.addressHeader}>
-                                    <View style={styles.addressTypeContainer}>
-                                        <Text style={styles.addressIcon}>
-                                            {getAddressIcon(address.type)}
-                                        </Text>
-                                        <Text style={styles.addressType}>
-                                            {address.type.charAt(0).toUpperCase() + address.type.slice(1)}
-                                        </Text>
-                                        {address.isDefault && (
-                                            <View style={styles.defaultBadge}>
-                                                <Text style={styles.defaultText}>Default</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    {selectedAddress === address.id && (
-                                        <Text style={styles.selectedIcon}>✓</Text>
-                                    )}
-                                </View>
-                                <Text style={styles.addressText}>{address.address}</Text>
-                                <Text style={styles.addressText}>{address.city} {address.zipCode}</Text>
-                                <Text style={styles.phoneText}>{address.phone}</Text>
-                            </TouchableOpacity>
-                        ))}
                     </View>
                 )}
 
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>💳 Payment Method</Text>
-                        <TouchableOpacity style={styles.addButton}>
-                            <Text style={styles.addButtonText}>+ Add New</Text>
-                        </TouchableOpacity>
-                    </View>
+                {/* Delivery Address */}
+                {!hasNoAddresses && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Delivery Address</Text>
+                            <TouchableOpacity
+                                style={styles.addNewButton}
+                                onPress={handleAddAddress}
+                            >
+                                <MaterialIcons name="add" size={16} color="#0C7C59" />
+                                <Text style={styles.addNewText}>Add New</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                    {paymentMethods.map((payment) => (
-                        <TouchableOpacity
-                            key={payment.id}
-                            style={[
-                                styles.paymentCard,
-                                selectedPayment === payment.id && styles.selectedCard
-                            ]}
-                            onPress={() => setSelectedPayment(payment.id)}
-                        >
-                            <View style={styles.paymentHeader}>
-                                <View style={styles.paymentInfo}>
-                                    <Text style={styles.paymentIcon}>
-                                        {getPaymentIcon(payment.type)}
-                                    </Text>
-                                    <View>
-                                        <Text style={styles.paymentName}>{payment.name}</Text>
-                                        {payment.expiryMonth && payment.expiryYear && (
-                                            <Text style={styles.paymentExpiry}>
-                                                Expires {payment.expiryMonth}/{payment.expiryYear}
-                                            </Text>
+                        <View style={styles.addressList}>
+                            {visibleAddresses.map((address) => (
+                                <TouchableOpacity
+                                    key={address._id}
+                                    style={[
+                                        styles.addressCard,
+                                        selectedAddressId === address._id && styles.addressCardSelected
+                                    ]}
+                                    onPress={() => handleSelectAddress(address._id || '')}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.addressHeader}>
+                                        <View style={styles.addressTypeContainer}>
+                                            <View style={[
+                                                styles.addressIconContainer,
+                                                selectedAddressId === address._id && styles.addressIconContainerSelected
+                                            ]}>
+                                                <MaterialIcons
+                                                    name={getAddressTypeIcon(address.label)}
+                                                    size={18}
+                                                    color={selectedAddressId === address._id ? '#cb202d' : '#686b78'}
+                                                />
+                                            </View>
+                                            <View style={styles.addressTypeInfo}>
+                                                <Text style={styles.addressTypeText}>
+                                                    {address.label}
+                                                </Text>
+                                                {address.isDefault && (
+                                                    <View style={styles.defaultBadge}>
+                                                        <Text style={styles.defaultBadgeText}>DEFAULT</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                        {selectedAddressId === address._id && (
+                                            <View style={styles.selectedBadge}>
+                                                <MaterialIcons name="check-circle" size={20} color="#cb202d" />
+                                            </View>
                                         )}
                                     </View>
-                                    {payment.isDefault && (
-                                        <View style={styles.defaultBadge}>
-                                            <Text style={styles.defaultText}>Default</Text>
-                                        </View>
+                                    <Text style={styles.addressText}>{address.street}</Text>
+                                    {address.landmark && (
+                                        <Text style={styles.addressLandmark}>Near: {address.landmark}</Text>
                                     )}
-                                </View>
-                                {selectedPayment === payment.id && (
-                                    <Text style={styles.selectedIcon}>✓</Text>
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {orderType === 'delivery' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>💰 Tip Your Driver</Text>
-                        <View style={styles.tipContainer}>
-                            {tipOptions.map((percentage) => (
-                                <TouchableOpacity
-                                    key={percentage}
-                                    style={[
-                                        styles.tipButton,
-                                        selectedTipOption === percentage && styles.selectedTipButton
-                                    ]}
-                                    onPress={() => handleTipSelection(percentage)}
-                                >
-                                    <Text style={[
-                                        styles.tipButtonText,
-                                        selectedTipOption === percentage && styles.selectedTipButtonText
-                                    ]}>
-                                        {percentage}%
+                                    <Text style={styles.addressCity}>
+                                        {address.city}, {address.state} {address.pincode}
                                     </Text>
-                                    <Text style={[
-                                        styles.tipAmountText,
-                                        selectedTipOption === percentage && styles.selectedTipAmountText
-                                    ]}>
-                                        ${((orderSummary.subtotal * percentage) / 100).toFixed(2)}
-                                    </Text>
+                                    <View style={styles.addressFooter}>
+                                        <MaterialIcons name="phone" size={14} color="#686b78" />
+                                        <Text style={styles.phoneText}>Contact on file</Text>
+                                    </View>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
-                        <View style={styles.customTipContainer}>
-                            <Text style={styles.customTipLabel}>Custom Amount:</Text>
-                            <TextInput
-                                style={styles.customTipInput}
-                                value={tipAmount}
-                                onChangeText={handleCustomTip}
-                                placeholder="0.00"
-                                keyboardType="numeric"
-                            />
-                        </View>
+                        {/* View All Addresses Button (if more than 3) */}
+                        {addresses.length > 3 && (
+                            <TouchableOpacity
+                                style={styles.viewAllButton}
+                                onPress={handleManageAddresses}
+                            >
+                                <Text style={styles.viewAllText}>
+                                    View All {addresses.length} Addresses
+                                </Text>
+                                <MaterialIcons name="arrow-forward" size={18} color="#cb202d" />
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
+                {/* Payment Method */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📝 Special Instructions</Text>
+                    <Text style={styles.sectionTitle}>Payment Method</Text>
+                    <View style={styles.paymentList}>
+                        {paymentMethods.map((payment) => (
+                            <TouchableOpacity
+                                key={payment.id}
+                                style={[
+                                    styles.paymentCard,
+                                    selectedPayment === payment.id && styles.paymentCardSelected
+                                ]}
+                                onPress={() => setSelectedPayment(payment.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.paymentLeft}>
+                                    <View style={[
+                                        styles.radioCircle,
+                                        selectedPayment === payment.id && styles.radioCircleSelected
+                                    ]}>
+                                        {selectedPayment === payment.id && (
+                                            <View style={styles.radioInner} />
+                                        )}
+                                    </View>
+                                    <Text style={styles.paymentIcon}>{payment.icon}</Text>
+                                    <View>
+                                        <Text style={styles.paymentName}>{payment.name}</Text>
+                                        {payment.type === 'cash' && (
+                                            <Text style={styles.paymentSubtext}>Pay on delivery</Text>
+                                        )}
+                                    </View>
+                                </View>
+                                {selectedPayment === payment.id && (
+                                    <MaterialIcons name="check-circle" size={20} color="#cb202d" />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Order Instructions */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Cooking Instructions (Optional)</Text>
                     <TextInput
                         style={styles.instructionsInput}
-                        value={specialInstructions}
-                        onChangeText={setSpecialInstructions}
-                        placeholder="Add any special instructions for your order (optional)"
+                        value={orderInstructions}
+                        onChangeText={setOrderInstructions}
+                        placeholder="e.g., Extra cheese, less spicy, well done..."
+                        placeholderTextColor="#9ca3af"
                         multiline
                         numberOfLines={3}
+                        maxLength={200}
                     />
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📋 Order Summary</Text>
-
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Subtotal</Text>
-                        <Text style={styles.summaryValue}>${orderSummary.subtotal.toFixed(2)}</Text>
-                    </View>
-
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Tax</Text>
-                        <Text style={styles.summaryValue}>${orderSummary.tax.toFixed(2)}</Text>
-                    </View>
-
-                    {orderType === 'delivery' && (
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Delivery Fee</Text>
-                            <Text style={styles.summaryValue}>${orderSummary.deliveryFee.toFixed(2)}</Text>
-                        </View>
-                    )}
-
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Service Fee</Text>
-                        <Text style={styles.summaryValue}>${orderSummary.serviceFee.toFixed(2)}</Text>
-                    </View>
-
-                    {orderType === 'delivery' && calculateTip() > 0 && (
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Tip</Text>
-                            <Text style={styles.summaryValue}>${calculateTip().toFixed(2)}</Text>
-                        </View>
-                    )}
-
-                    <View style={[styles.summaryRow, styles.totalRow]}>
-                        <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalValue}>${calculateTotal().toFixed(2)}</Text>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.placeOrderButton} onPress={placeOrder}>
-                    <Text style={styles.placeOrderText}>
-                        Place Order • ${calculateTotal().toFixed(2)}
+                    <Text style={styles.instructionsCounter}>
+                        {orderInstructions.length}/200
                     </Text>
-                </TouchableOpacity>
+                </View>
+
+                {/* Bill Details */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Bill Details</Text>
+                    <View style={styles.billDetails}>
+                        <View style={styles.billRow}>
+                            <Text style={styles.billLabel}>Item Total</Text>
+                            <Text style={styles.billValue}>₹{orderSummary.subtotal.toFixed(0)}</Text>
+                        </View>
+
+                        <View style={styles.billRow}>
+                            <View style={styles.billLabelContainer}>
+                                <Text style={styles.billLabel}>Delivery Fee</Text>
+                                {orderSummary.deliveryFee === 0 && (
+                                    <View style={styles.freeBadge}>
+                                        <Text style={styles.freeBadgeText}>FREE</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={[
+                                styles.billValue,
+                                orderSummary.deliveryFee === 0 && styles.billValueStrike
+                            ]}>
+                                ₹{orderSummary.deliveryFee === 0 ? '40' : orderSummary.deliveryFee.toFixed(0)}
+                            </Text>
+                        </View>
+
+                        <View style={styles.billRow}>
+                            <View style={styles.billLabelContainer}>
+                                <Text style={styles.billLabel}>Taxes & Charges</Text>
+                                <MaterialIcons name="info-outline" size={14} color="#686b78" />
+                            </View>
+                            <Text style={styles.billValue}>₹{orderSummary.tax.toFixed(0)}</Text>
+                        </View>
+
+                        {orderSummary.discount > 0 && (
+                            <View style={styles.billRow}>
+                                <Text style={[styles.billLabel, styles.discountLabel]}>Discount</Text>
+                                <Text style={[styles.billValue, styles.discountValue]}>
+                                    -₹{orderSummary.discount.toFixed(0)}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View style={styles.billDivider} />
+
+                        <View style={styles.billRow}>
+                            <Text style={styles.billTotalLabel}>To Pay</Text>
+                            <Text style={styles.billTotalValue}>₹{calculateTotal().toFixed(0)}</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Bottom Spacing */}
+                <View style={styles.bottomSpacing} />
+            </ScrollView>
+
+            {/* Floating Place Order Button */}
+            <View style={styles.footer}>
+                <View style={styles.footerContent}>
+                    <View style={styles.footerLeft}>
+                        <Text style={styles.footerTotalLabel}>Total Amount</Text>
+                        <Text style={styles.footerTotalValue}>₹{calculateTotal().toFixed(0)}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[
+                            styles.placeOrderButton,
+                            isPlacingOrder && styles.placeOrderButtonDisabled
+                        ]}
+                        onPress={placeOrder}
+                        disabled={isPlacingOrder}
+                        activeOpacity={0.8}
+                    >
+                        {isPlacingOrder ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Text style={styles.placeOrderText}>Place Order</Text>
+                                <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
-        </ScrollView>
+        </View>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#fff',
     },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 100,
+    },
+
+    // Header
     header: {
-        backgroundColor: '#4CAF50',
-        padding: 20,
-        paddingTop: 60,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 50,
+        paddingBottom: 16,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f8f8f8',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        flex: 1,
         textAlign: 'center',
     },
-    content: {
-        padding: 20,
+    headerPlaceholder: {
+        width: 40,
     },
-    section: {
-        backgroundColor: '#fff',
+
+    // Loading & Warning
+    centerContent: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#686b78',
+        marginTop: 12,
+    },
+    warningSection: {
+        margin: 16,
+        padding: 24,
+        backgroundColor: '#fffbeb',
         borderRadius: 12,
-        padding: 20,
-        marginBottom: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#fef3c7',
+        alignItems: 'center',
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
+    warningTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#92400e',
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    warningText: {
+        fontSize: 14,
+        color: '#78350f',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    addAddressButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#0C7C59',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    addAddressButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+
+    // Section
+    section: {
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+        borderBottomWidth: 8,
+        borderBottomColor: '#f8f8f8',
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
     },
-    addButton: {
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginBottom: 16,
+    },
+    addNewButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 15,
-        backgroundColor: '#4CAF50',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#0C7C59',
+        backgroundColor: '#f0fdf4',
     },
-    addButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
+    addNewText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#0C7C59',
     },
-    orderTypeContainer: {
-        flexDirection: 'row',
-        gap: 15,
+
+    // Address Cards
+    addressList: {
+        gap: 12,
     },
-    orderTypeButton: {
-        flex: 1,
-        alignItems: 'center',
-        padding: 20,
+    addressCard: {
+        padding: 16,
         borderRadius: 12,
         backgroundColor: '#f8f8f8',
         borderWidth: 2,
-        borderColor: 'transparent',
+        borderColor: '#f0f0f0',
     },
-    selectedOrderType: {
-        backgroundColor: '#E8F5E8',
-        borderColor: '#4CAF50',
-    },
-    orderTypeIcon: {
-        fontSize: 32,
-        marginBottom: 8,
-    },
-    orderTypeText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 4,
-    },
-    selectedOrderTypeText: {
-        color: '#4CAF50',
-    },
-    orderTypeTime: {
-        fontSize: 14,
-        color: '#666',
-    },
-    addressCard: {
-        padding: 15,
-        borderRadius: 8,
-        backgroundColor: '#f8f8f8',
-        marginBottom: 10,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    selectedCard: {
-        backgroundColor: '#E8F5E8',
-        borderColor: '#4CAF50',
+    addressCardSelected: {
+        backgroundColor: '#fff5f5',
+        borderColor: '#cb202d',
     },
     addressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     addressTypeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
+        gap: 10,
     },
-    addressIcon: {
-        fontSize: 16,
-        marginRight: 8,
+    addressIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    addressType: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginRight: 10,
+    addressIconContainerSelected: {
+        backgroundColor: '#fee2e2',
+    },
+    addressTypeInfo: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    addressTypeText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
     },
     defaultBadge: {
-        backgroundColor: '#FF9800',
         paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
+        paddingVertical: 3,
+        borderRadius: 4,
+        backgroundColor: '#fef3c7',
     },
-    defaultText: {
-        color: '#fff',
+    defaultBadgeText: {
         fontSize: 10,
-        fontWeight: 'bold',
+        fontWeight: '700',
+        color: '#92400e',
+        letterSpacing: 0.5,
     },
-    selectedIcon: {
-        fontSize: 20,
-        color: '#4CAF50',
-        fontWeight: 'bold',
+    selectedBadge: {
+        width: 24,
+        height: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     addressText: {
         fontSize: 14,
-        color: '#666',
-        marginBottom: 2,
-    },
-    phoneText: {
-        fontSize: 14,
-        color: '#888',
-    },
-    paymentCard: {
-        padding: 15,
-        borderRadius: 8,
-        backgroundColor: '#f8f8f8',
-        marginBottom: 10,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    paymentHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    paymentInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    paymentIcon: {
-        fontSize: 20,
-        marginRight: 12,
-    },
-    paymentName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 2,
-    },
-    paymentExpiry: {
-        fontSize: 12,
-        color: '#666',
-    },
-    tipContainer: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 15,
-    },
-    tipButton: {
-        flex: 1,
-        alignItems: 'center',
-        padding: 12,
-        borderRadius: 8,
-        backgroundColor: '#f8f8f8',
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    selectedTipButton: {
-        backgroundColor: '#E8F5E8',
-        borderColor: '#4CAF50',
-    },
-    tipButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
+        color: '#686b78',
+        lineHeight: 20,
         marginBottom: 4,
     },
-    selectedTipButtonText: {
-        color: '#4CAF50',
+    addressLandmark: {
+        fontSize: 13,
+        color: '#9ca3af',
+        fontStyle: 'italic',
+        marginBottom: 4,
     },
-    tipAmountText: {
+    addressCity: {
         fontSize: 14,
-        color: '#666',
+        color: '#686b78',
+        marginBottom: 8,
     },
-    selectedTipAmountText: {
-        color: '#4CAF50',
-    },
-    customTipContainer: {
+    addressFooter: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 6,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb',
     },
-    customTipLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
+    phoneText: {
+        fontSize: 13,
+        color: '#686b78',
+        fontWeight: '500',
     },
-    customTipInput: {
-        flex: 1,
+
+    // View All Button
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        backgroundColor: '#fff5f5',
         borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 16,
+        borderColor: '#fecaca',
     },
+    viewAllText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#cb202d',
+    },
+
+    // Payment Cards
+    paymentList: {
+        gap: 12,
+    },
+    paymentCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#f8f8f8',
+        borderWidth: 2,
+        borderColor: '#f0f0f0',
+    },
+    paymentCardSelected: {
+        backgroundColor: '#fff5f5',
+        borderColor: '#cb202d',
+    },
+    paymentLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    radioCircle: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#d4d5d9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    radioCircleSelected: {
+        borderColor: '#cb202d',
+    },
+    radioInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#cb202d',
+    },
+    paymentIcon: {
+        fontSize: 24,
+    },
+    paymentName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    paymentSubtext: {
+        fontSize: 12,
+        color: '#686b78',
+    },
+
+    // Instructions Input
     instructionsInput: {
         borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
+        borderColor: '#e5e7eb',
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 14,
+        color: '#2d2d2d',
         textAlignVertical: 'top',
-        minHeight: 80,
+        minHeight: 100,
+        backgroundColor: '#f8f8f8',
     },
-    summaryRow: {
+    instructionsCounter: {
+        fontSize: 12,
+        color: '#9ca3af',
+        textAlign: 'right',
+        marginTop: 6,
+    },
+
+    // Bill Details
+    billDetails: {
+        gap: 12,
+    },
+    billRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 8,
     },
-    summaryLabel: {
-        fontSize: 16,
-        color: '#666',
+    billLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
-    summaryValue: {
-        fontSize: 16,
+    billLabel: {
+        fontSize: 14,
+        color: '#686b78',
+        fontWeight: '500',
+    },
+    billValue: {
+        fontSize: 14,
         fontWeight: '600',
-        color: '#333',
+        color: '#2d2d2d',
     },
-    totalRow: {
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        marginTop: 10,
-        paddingTop: 15,
+    billValueStrike: {
+        textDecorationLine: 'line-through',
+        color: '#9ca3af',
     },
-    totalLabel: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
+    freeBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: '#d1fae5',
     },
-    totalValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#4CAF50',
+    freeBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#059669',
+        letterSpacing: 0.5,
     },
+    discountLabel: {
+        color: '#059669',
+    },
+    discountValue: {
+        color: '#059669',
+    },
+    billDivider: {
+        height: 1,
+        backgroundColor: '#e5e7eb',
+        marginVertical: 8,
+    },
+    billTotalLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+    },
+    billTotalValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+    },
+
+    // Footer
     footer: {
-        padding: 20,
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         backgroundColor: '#fff',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        paddingBottom: 20,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
+        borderTopColor: '#f0f0f0',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+    },
+    footerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+    },
+    footerLeft: {
+        flex: 1,
+    },
+    footerTotalLabel: {
+        fontSize: 12,
+        color: '#686b78',
+        marginBottom: 2,
+    },
+    footerTotalValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#2d2d2d',
     },
     placeOrderButton: {
-        backgroundColor: '#4CAF50',
-        padding: 18,
-        borderRadius: 12,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#0C7C59',
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        minWidth: 160,
+    },
+    placeOrderButtonDisabled: {
+        backgroundColor: '#9ca3af',
     },
     placeOrderText: {
+        fontSize: 16,
+        fontWeight: '700',
         color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
+    },
+
+    bottomSpacing: {
+        height: 20,
     },
 });

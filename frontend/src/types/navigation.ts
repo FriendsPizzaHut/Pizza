@@ -43,6 +43,10 @@ export type CustomerStackParamList = {
     DrinkDetails: { drinkId: string };
     Cart: undefined;
     Checkout: undefined;
+    // Address Management Sub-screens
+    AddAddress: { fromScreen?: 'Checkout' | 'ManageAddresses' };
+    EditAddress: { addressId: string; fromScreen?: 'Checkout' | 'ManageAddresses' };
+    ManageAddress: { fromScreen?: 'Checkout' | 'Profile' };
     // Order Sub-screens
     TrackOrder: { orderId: string };
 };

@@ -214,6 +214,7 @@ apiClient.interceptors.response.use(
                 status: error.response?.status,
                 message: error.message,
                 data: error.response?.data,
+                type: 'network',
             });
         }
 
@@ -224,9 +225,54 @@ apiClient.interceptors.response.use(
 
             switch (status) {
                 case 401:
-                    // Unauthorized - Clear auth state and redirect to login
+                    // Unauthorized - Try to refresh token
+                    if (!config._retry) {
+                        config._retry = true;
+
+                        try {
+                            // Attempt token refresh
+                            const refreshTokenValue = await AsyncStorage.getItem('@refresh_token');
+
+                            if (refreshTokenValue) {
+                                if (__DEV__) {
+                                    console.log('🔄 Attempting token refresh...');
+                                }
+
+                                // Call refresh endpoint
+                                const refreshResponse = await axios.post(`${getApiUrl()}/api/v1/auth/refresh`, {
+                                    refreshToken: refreshTokenValue,
+                                });
+
+                                if (refreshResponse.data?.data?.accessToken) {
+                                    const newToken = refreshResponse.data.data.accessToken;
+                                    await AsyncStorage.setItem('@auth_token', newToken);
+
+                                    // Update expiry if provided
+                                    if (refreshResponse.data.data.expiresIn) {
+                                        const expiryTime = Date.now() + refreshResponse.data.data.expiresIn * 1000;
+                                        await AsyncStorage.setItem('@token_expiry', expiryTime.toString());
+                                    }
+
+                                    if (__DEV__) {
+                                        console.log('✅ Token refreshed successfully');
+                                    }
+
+                                    // Update the failed request with new token
+                                    config.headers.Authorization = `Bearer ${newToken}`;
+
+                                    // Retry the original request
+                                    return apiClient.request(config);
+                                }
+                            }
+                        } catch (refreshError) {
+                            console.error('Token refresh failed:', refreshError);
+                        }
+                    }
+
+                    // If refresh failed or no refresh token, clear auth state
+                    await AsyncStorage.removeItem('@auth_token');
+                    await AsyncStorage.removeItem('@refresh_token');
                     await AsyncStorage.removeItem('authState');
-                    // You can dispatch a Redux action here to update auth state
                     console.warn('Session expired. Please login again.');
                     break;
 

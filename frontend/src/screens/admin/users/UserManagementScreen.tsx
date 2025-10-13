@@ -268,7 +268,7 @@ const UserManagementScreen = () => {
                         <MaterialIcons name="attach-money" size={16} color="#4CAF50" />
                     </View>
                     <View style={styles.statInfo}>
-                        <Text style={[styles.statValue, { color: '#4CAF50' }]}>${item.totalSpent.toFixed(2)}</Text>
+                        <Text style={[styles.statValue, { color: '#4CAF50' }]}>₹{item.totalSpent.toFixed(0)}</Text>
                         <Text style={styles.statLabel}>Total Spent</Text>
                     </View>
                 </View>
@@ -326,7 +326,7 @@ const UserManagementScreen = () => {
                             </View>
                             <View style={[styles.statCard, { backgroundColor: '#E8F5E9' }]}>
                                 <MaterialIcons name="attach-money" size={24} color="#4CAF50" />
-                                <Text style={styles.statCardValue}>${selectedUser.totalSpent.toFixed(2)}</Text>
+                                <Text style={styles.statCardValue}>₹{selectedUser.totalSpent.toFixed(0)}</Text>
                                 <Text style={styles.statCardLabel}>Total Spent</Text>
                             </View>
                         </View>
@@ -431,7 +431,7 @@ const UserManagementScreen = () => {
                                             </View>
                                             <View style={styles.orderHistoryDetailItem}>
                                                 <MaterialIcons name="attach-money" size={12} color="#999" />
-                                                <Text style={styles.orderHistoryDetailText}>${order.total.toFixed(2)}</Text>
+                                                <Text style={styles.orderHistoryDetailText}>₹{order.total.toFixed(0)}</Text>
                                             </View>
                                         </View>
                                     </View>

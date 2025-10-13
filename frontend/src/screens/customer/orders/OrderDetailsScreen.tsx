@@ -202,7 +202,7 @@ export default function OrderDetailsScreen() {
                                 <Text style={styles.itemName}>
                                     {item.quantity}x {item.name}
                                 </Text>
-                                <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+                                <Text style={styles.itemPrice}>₹{item.price.toFixed(0)}</Text>
                             </View>
 
                             {item.size && (
@@ -223,25 +223,25 @@ export default function OrderDetailsScreen() {
 
                     <View style={styles.pricingRow}>
                         <Text style={styles.pricingLabel}>Subtotal</Text>
-                        <Text style={styles.pricingValue}>${order.pricing.subtotal.toFixed(2)}</Text>
+                        <Text style={styles.pricingValue}>₹{order.pricing.subtotal.toFixed(0)}</Text>
                     </View>
 
                     <View style={styles.pricingRow}>
                         <Text style={styles.pricingLabel}>Tax</Text>
-                        <Text style={styles.pricingValue}>${order.pricing.tax.toFixed(2)}</Text>
+                        <Text style={styles.pricingValue}>₹{order.pricing.tax.toFixed(0)}</Text>
                     </View>
 
                     {order.orderType === 'delivery' && (
                         <View style={styles.pricingRow}>
                             <Text style={styles.pricingLabel}>Delivery Fee</Text>
-                            <Text style={styles.pricingValue}>${order.pricing.deliveryFee.toFixed(2)}</Text>
+                            <Text style={styles.pricingValue}>₹{order.pricing.deliveryFee.toFixed(0)}</Text>
                         </View>
                     )}
 
                     {order.pricing.tip > 0 && (
                         <View style={styles.pricingRow}>
                             <Text style={styles.pricingLabel}>Tip</Text>
-                            <Text style={styles.pricingValue}>${order.pricing.tip.toFixed(2)}</Text>
+                            <Text style={styles.pricingValue}>₹{order.pricing.tip.toFixed(0)}</Text>
                         </View>
                     )}
 
@@ -249,14 +249,14 @@ export default function OrderDetailsScreen() {
                         <View style={styles.pricingRow}>
                             <Text style={[styles.pricingLabel, { color: '#4CAF50' }]}>Discount</Text>
                             <Text style={[styles.pricingValue, { color: '#4CAF50' }]}>
-                                -${order.pricing.discount.toFixed(2)}
+                                -₹{order.pricing.discount.toFixed(0)}
                             </Text>
                         </View>
                     )}
 
                     <View style={[styles.pricingRow, styles.totalRow]}>
                         <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalValue}>${order.pricing.total.toFixed(2)}</Text>
+                        <Text style={styles.totalValue}>₹{order.pricing.total.toFixed(0)}</Text>
                     </View>
                 </View>
 

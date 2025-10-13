@@ -10,54 +10,93 @@ import Product from '../models/Product.js';
 import { getCache, setCache, deleteCache, deleteCachePattern, CACHE_KEYS, CACHE_TTL } from '../utils/cache.js';
 
 /**
- * Get all products with optional filters (with caching)
- * @param {Object} filters - Query filters { category, isVegetarian, isAvailable, sortBy }
- * @returns {Array} - List of products
+ * Get all products with optional filters, search, and pagination
+ * @param {Object} filters - Query filters { category, isVegetarian, isAvailable, sortBy, search, page, limit }
+ * @returns {Object} - { products, total, page, limit, totalPages, hasMore }
  */
 export const getAllProducts = async (filters = {}) => {
-    const { category, isVegetarian, isAvailable, sortBy = 'createdAt' } = filters;
-
-    // Create cache key based on filters
-    const filterKey = JSON.stringify(filters);
-    const cacheKey = `${CACHE_KEYS.PRODUCTS_ALL}:${filterKey}`;
-
-    // Try cache first
-    const cached = await getCache(cacheKey);
-    if (cached) {
-        console.log(`✅ Products served from cache: ${cacheKey}`);
-        return cached;
-    }
+    const {
+        category,
+        isVegetarian,
+        isAvailable,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        search,
+        page = 1,
+        limit = 10
+    } = filters;
 
     // Build query
     const query = {};
-    if (category) {
+
+    // Category filter
+    if (category && category !== 'all') {
         query.category = category;
     }
+
+    // Vegetarian filter
     if (isVegetarian !== undefined) {
         query.isVegetarian = isVegetarian === 'true' || isVegetarian === true;
     }
+
+    // Availability filter
     if (isAvailable !== undefined) {
         query.isAvailable = isAvailable === 'true' || isAvailable === true;
     }
 
-    // Build sort options
-    const sortOptions = {};
-    if (sortBy === 'price') {
-        sortOptions.basePrice = 1;
-    } else if (sortBy === 'rating') {
-        sortOptions.rating = -1;
-    } else if (sortBy === 'popular') {
-        sortOptions.salesCount = -1;
-    } else {
-        sortOptions.createdAt = -1;
+    // Search filter - searches across name and description
+    if (search && search.trim()) {
+        query.$or = [
+            { name: { $regex: search.trim(), $options: 'i' } },
+            { description: { $regex: search.trim(), $options: 'i' } }
+        ];
     }
 
-    const products = await Product.find(query).sort(sortOptions);
+    // Build sort options
+    const sortOptions = {};
+    const order = sortOrder === 'asc' ? 1 : -1;
 
-    // Cache for 1 hour (menu doesn't change often)
-    await setCache(cacheKey, products, CACHE_TTL.ONE_HOUR);
+    if (sortBy === 'price') {
+        sortOptions.basePrice = order;
+    } else if (sortBy === 'rating') {
+        sortOptions.rating = order;
+    } else if (sortBy === 'popular') {
+        sortOptions.salesCount = order;
+    } else if (sortBy === 'name') {
+        sortOptions.name = order;
+    } else {
+        sortOptions.createdAt = order;
+    }
 
-    return products;
+    // Calculate pagination
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Execute query with pagination
+    const [products, total] = await Promise.all([
+        Product.find(query)
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(limitNum)
+            .lean(),
+        Product.countDocuments(query)
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limitNum);
+    const hasMore = pageNum < totalPages;
+
+    console.log(`📊 Products query: page=${pageNum}, limit=${limitNum}, total=${total}, search="${search || 'none'}"`);
+
+    return {
+        products,
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+        hasMore
+    };
 };
 
 /**

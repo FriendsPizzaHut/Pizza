@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,81 +8,199 @@ import {
     Image,
     TextInput,
     Dimensions,
-    StatusBar
+    StatusBar,
+    ActivityIndicator,
+    RefreshControl,
+    Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../../types/navigation';
 import { Typography, Colors, Spacing, BorderRadius, Shadows, createCardStyle } from '../../../constants/designSystem';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../../redux/store';
+import { fetchProductsThunk, loadMoreProductsThunk, refreshProductsThunk } from '../../../../redux/thunks/productThunks';
+import { setSearchQuery, setCategory } from '../../../../redux/slices/productSlice';
+import { addToCartThunk } from '../../../../redux/thunks/cartThunks';
+import { selectCartItemCount } from '../../../../redux/slices/cartSlice';
+import { Product } from '../../../services/productService';
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList>;
 
 const { width } = Dimensions.get('window');
 
+// Helper function to get display price from pricing
+const getDisplayPrice = (pricing: number | { small?: number; medium?: number; large?: number }): number => {
+    if (typeof pricing === 'number') {
+        return pricing;
+    }
+    // For multi-size pricing, return the medium price or smallest available
+    return pricing.medium || pricing.small || pricing.large || 0;
+};
+
+// Helper function to get original price (for discount display)
+const getOriginalPrice = (basePrice: number, discountPercent: number): number | null => {
+    if (discountPercent > 0) {
+        return parseFloat((basePrice / (1 - discountPercent / 100)).toFixed(2));
+    }
+    return null;
+};
+
+// Helper function to format preparation time
+const formatPrepTime = (minutes: number): string => {
+    const min = Math.floor(minutes);
+    const max = Math.floor(minutes * 1.2); // Add 20% buffer
+    return `${min}-${max} min`;
+};
+
 export default function MenuScreen() {
     const navigation = useNavigation<NavigationProp>();
-    const [searchQuery, setSearchQuery] = useState('');
+    const dispatch = useDispatch<AppDispatch>();
 
-    const menuItems = [
-        {
-            id: 'margherita',
-            name: 'Margherita Classic',
-            description: 'Fresh mozzarella, tomato sauce, basil leaves',
-            price: 12.99,
-            originalPrice: 15.99,
-            rating: 4.5,
-            reviews: 256,
-            image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            isVeg: true,
-            preparationTime: '15-20 min',
-            discount: '20% OFF'
-        },
-        {
-            id: 'pepperoni',
-            name: 'Pepperoni Deluxe',
-            description: 'Premium pepperoni, mozzarella, spicy tomato sauce',
-            price: 14.99,
-            originalPrice: 17.99,
-            rating: 4.7,
-            reviews: 342,
-            image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            isVeg: false,
-            preparationTime: '18-25 min',
-            discount: '15% OFF'
-        },
-        {
-            id: 'vegetarian',
-            name: 'Veggie Supreme',
-            description: 'Bell peppers, mushrooms, onions, olives, corn',
-            price: 16.99,
-            originalPrice: 19.99,
-            rating: 4.3,
-            reviews: 189,
-            image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            isVeg: true,
-            preparationTime: '20-25 min',
-            discount: '25% OFF'
-        },
-        {
-            id: 'meatlover',
-            name: 'Meat Lovers Paradise',
-            description: 'Pepperoni, sausage, bacon, chicken, beef',
-            price: 18.99,
-            originalPrice: 22.99,
-            rating: 4.8,
-            reviews: 428,
-            image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            isVeg: false,
-            preparationTime: '25-30 min',
-            discount: '30% OFF'
-        },
-    ];
+    // Redux state
+    const {
+        products,
+        total,
+        page,
+        hasMore,
+        isLoading,
+        isLoadingMore,
+        isRefreshing,
+        error,
+        selectedCategory,
+        searchQuery: reduxSearchQuery
+    } = useSelector((state: RootState) => state.product);
 
-    const filteredItems = menuItems.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    // Cart state
+    const cartItemCount = useSelector(selectCartItemCount);
+
+    // Local search state for immediate UI update
+    const [localSearchQuery, setLocalSearchQuery] = useState('');
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // Fetch products on mount and when filters change
+    useFocusEffect(
+        useCallback(() => {
+            if (isInitialLoad) {
+                dispatch(fetchProductsThunk({
+                    page: 1,
+                    limit: 20,
+                    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+                    search: reduxSearchQuery || undefined,
+                    isAvailable: true // Only show available products to customers
+                }));
+                setIsInitialLoad(false);
+            }
+        }, [])
     );
+
+    // Handle category change
+    const handleCategoryChange = (category: string) => {
+        dispatch(setCategory(category.toLowerCase()));
+        dispatch(fetchProductsThunk({
+            page: 1,
+            limit: 20,
+            category: category.toLowerCase() !== 'all' ? category.toLowerCase() : undefined,
+            search: reduxSearchQuery || undefined,
+            isAvailable: true
+        }));
+    };
+
+    // Handle search with debouncing
+    useEffect(() => {
+        const delaySearch = setTimeout(() => {
+            if (localSearchQuery !== reduxSearchQuery) {
+                dispatch(setSearchQuery(localSearchQuery));
+                dispatch(fetchProductsThunk({
+                    page: 1,
+                    limit: 20,
+                    category: selectedCategory !== 'all' ? selectedCategory : undefined,
+                    search: localSearchQuery || undefined,
+                    isAvailable: true
+                }));
+            }
+        }, 500);
+
+        return () => clearTimeout(delaySearch);
+    }, [localSearchQuery]);
+
+    // Handle refresh
+    const handleRefresh = () => {
+        dispatch(refreshProductsThunk({
+            limit: 20,
+            category: selectedCategory !== 'all' ? selectedCategory : undefined,
+            search: reduxSearchQuery || undefined,
+            isAvailable: true
+        }));
+    };
+
+    // Handle load more
+    const handleLoadMore = () => {
+        if (!isLoadingMore && hasMore && products.length > 0) {
+            dispatch(loadMoreProductsThunk({
+                page: page + 1,
+                limit: 20,
+                category: selectedCategory !== 'all' ? selectedCategory : undefined,
+                search: reduxSearchQuery || undefined,
+                isAvailable: true
+            }));
+        }
+    };
+
+    // Handle add to cart
+    const handleAddToCart = (product: Product) => {
+        // For pizzas, navigate to PizzaDetailsScreen for full customization
+        if (product.category === 'pizza') {
+            navigation.navigate('PizzaDetails', { pizzaId: product._id });
+        } else {
+            // Add directly to cart for single-price items (drinks, sides, desserts)
+            dispatch(addToCartThunk({
+                productId: product._id,
+                quantity: 1
+            }))
+                .unwrap()
+                .then(() => {
+                    Alert.alert('Success', `${product.name} added to cart!`);
+                })
+                .catch((error) => {
+                    Alert.alert('Error', error || 'Failed to add item to cart');
+                });
+        }
+    };
+
+    // Static fallback data for favorites (these can be recently ordered items from user's history in future)
+    const favoriteItems = [
+        {
+            id: 'fav1',
+            name: 'Margherita',
+            image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150&h=150&fit=crop',
+            lastOrdered: '2 days ago',
+            orderCount: 8
+        },
+        {
+            id: 'fav2',
+            name: 'Pepperoni',
+            image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=150&h=150&fit=crop',
+            lastOrdered: '5 days ago',
+            orderCount: 6
+        },
+        {
+            id: 'fav3',
+            name: 'Veggie Supreme',
+            image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=150&h=150&fit=crop',
+            lastOrdered: '1 week ago',
+            orderCount: 4
+        },
+        {
+            id: 'fav4',
+            name: 'BBQ Chicken',
+            image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=150&h=150&fit=crop',
+            lastOrdered: '1 week ago',
+            orderCount: 3
+        }
+    ];
 
     const renderStars = (rating: number) => {
         const stars = [];
@@ -114,9 +232,11 @@ export default function MenuScreen() {
                         onPress={() => navigation.navigate('Cart')}
                     >
                         <MaterialIcons name="shopping-cart" size={24} color="#2d2d2d" />
-                        <View style={styles.cartBadge}>
-                            <Text style={styles.cartBadgeText}>0</Text>
-                        </View>
+                        {cartItemCount > 0 && (
+                            <View style={styles.cartBadge}>
+                                <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -126,8 +246,8 @@ export default function MenuScreen() {
                         style={styles.searchInput}
                         placeholder="Search for pizzas..."
                         placeholderTextColor="#999"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        value={localSearchQuery}
+                        onChangeText={setLocalSearchQuery}
                     />
                 </View>
             </View>
@@ -135,15 +255,45 @@ export default function MenuScreen() {
             {/* Categories */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
                 <View style={styles.categories}>
-                    {['All', 'Vegetarian', 'Non-Veg', 'Bestseller', 'New'].map((category, index) => (
-                        <TouchableOpacity key={index} style={[styles.categoryChip, index === 0 && styles.activeCategoryChip]}>
-                            <Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{category}</Text>
+                    {['All', 'Pizza', 'Sides', 'Beverages', 'Desserts'].map((category, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.categoryChip,
+                                selectedCategory === category.toLowerCase() && styles.activeCategoryChip
+                            ]}
+                            onPress={() => handleCategoryChange(category)}
+                        >
+                            <Text style={[
+                                styles.categoryText,
+                                selectedCategory === category.toLowerCase() && styles.activeCategoryText
+                            ]}>
+                                {category}
+                            </Text>
                         </TouchableOpacity>
                     ))}
                 </View>
             </ScrollView>
 
-            <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.menuList}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={Colors.primary}
+                    />
+                }
+                onScroll={({ nativeEvent }) => {
+                    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+                    if (isCloseToBottom) {
+                        handleLoadMore();
+                    }
+                }}
+                scrollEventThrottle={400}
+            >
                 {/* Favorite Orders Section */}
                 <View style={styles.favoritesSection}>
                     <View style={styles.sectionHeader}>
@@ -155,47 +305,18 @@ export default function MenuScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.favoritesContainer}
                     >
-                        {[
-                            {
-                                id: 'fav1',
-                                name: 'Margherita',
-                                image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150&h=150&fit=crop',
-                                lastOrdered: '2 days ago',
-                                orderCount: 8
-                            },
-                            {
-                                id: 'fav2',
-                                name: 'Pepperoni',
-                                image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=150&h=150&fit=crop',
-                                lastOrdered: '5 days ago',
-                                orderCount: 6
-                            },
-                            {
-                                id: 'fav3',
-                                name: 'Veggie Supreme',
-                                image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=150&h=150&fit=crop',
-                                lastOrdered: '1 week ago',
-                                orderCount: 4
-                            },
-                            {
-                                id: 'fav4',
-                                name: 'BBQ Chicken',
-                                image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=150&h=150&fit=crop',
-                                lastOrdered: '1 week ago',
-                                orderCount: 3
-                            }
-                        ].map((favorite) => (
+                        {favoriteItems.map((favorite) => (
                             <TouchableOpacity
                                 key={favorite.id}
                                 style={styles.favoriteCard}
                                 activeOpacity={0.8}
                                 onPress={() => {
                                     // Find the corresponding menu item and navigate
-                                    const menuItem = menuItems.find(item =>
+                                    const menuItem = products.find(item =>
                                         item.name.toLowerCase().includes(favorite.name.toLowerCase())
                                     );
                                     if (menuItem) {
-                                        navigation.navigate('PizzaDetails', { pizzaId: menuItem.id });
+                                        navigation.navigate('PizzaDetails', { pizzaId: menuItem._id });
                                     }
                                 }}
                             >
@@ -241,100 +362,158 @@ export default function MenuScreen() {
                 <View style={styles.menuSection}>
                     <Text style={styles.sectionTitle}>Our Delicious Menu</Text>
                     <Text style={styles.sectionSubtitle}>
-                        {filteredItems.length} handcrafted pizzas ready to order
+                        {isLoading ? 'Loading...' : `${total} ${total === 1 ? 'item' : 'items'} ready to order`}
                     </Text>
 
-                    {filteredItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.menuItem}
-                            onPress={() => navigation.navigate('PizzaDetails', { pizzaId: item.id })}
-                            activeOpacity={0.95}
-                        >
-                            {/* Image Section at Top */}
-                            <View style={styles.imageSection}>
-                                <Image
-                                    source={{ uri: item.image }}
-                                    style={styles.pizzaImage}
-                                    resizeMode="cover"
-                                />
+                    {/* Loading State */}
+                    {isLoading && products.length === 0 && (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={Colors.primary} />
+                            <Text style={styles.loadingText}>Loading delicious menu...</Text>
+                        </View>
+                    )}
 
-                                {/* Badges over image */}
-                                <View style={styles.badgesContainer}>
-                                    <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#0F8A65' : '#D32F2F' }]}>
-                                        <View style={[styles.vegDot, { backgroundColor: item.isVeg ? '#0F8A65' : '#D32F2F' }]} />
+                    {/* Error State */}
+                    {error && products.length === 0 && (
+                        <View style={styles.errorContainer}>
+                            <Text style={styles.errorText}>⚠️ {error}</Text>
+                            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+                                <Text style={styles.retryButtonText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Empty State */}
+                    {!isLoading && !error && products.length === 0 && (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>🍕</Text>
+                            <Text style={styles.emptyTitle}>No items found</Text>
+                            <Text style={styles.emptySubtitle}>
+                                {reduxSearchQuery
+                                    ? 'Try adjusting your search or filters'
+                                    : 'Check back soon for delicious items!'}
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Menu Items */}
+                    {products.map((item: Product) => {
+                        const displayPrice = getDisplayPrice(item.pricing);
+                        const originalPrice = getOriginalPrice(displayPrice, item.discountPercent);
+                        const prepTime = item.preparationTime || 20; // Default 20 minutes
+
+                        return (
+                            <TouchableOpacity
+                                key={item._id}
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    // Only navigate to PizzaDetails for pizza items
+                                    if (item.category === 'pizza') {
+                                        navigation.navigate('PizzaDetails', { pizzaId: item._id });
+                                    }
+                                    // For other items, do nothing on card press - they use ADD button
+                                }}
+                                activeOpacity={item.category === 'pizza' ? 0.95 : 1}
+                            >
+                                {/* Image Section at Top */}
+                                <View style={styles.imageSection}>
+                                    <Image
+                                        source={{ uri: item.imageUrl }}
+                                        style={styles.pizzaImage}
+                                        resizeMode="cover"
+                                        defaultSource={require('../../../../assets/adaptive-icon.png')}
+                                    />
+
+                                    {/* Badges over image */}
+                                    <View style={styles.badgesContainer}>
+                                        <View style={[
+                                            styles.vegIndicator,
+                                            { borderColor: item.isVegetarian ? '#0F8A65' : '#D32F2F' }
+                                        ]}>
+                                            <View style={[
+                                                styles.vegDot,
+                                                { backgroundColor: item.isVegetarian ? '#0F8A65' : '#D32F2F' }
+                                            ]} />
+                                        </View>
+                                        {item.rating >= 4.5 && (
+                                            <View style={styles.bestsellerBadge}>
+                                                <Text style={styles.bestsellerText}>BESTSELLER</Text>
+                                            </View>
+                                        )}
                                     </View>
-                                    {item.rating >= 4.5 && (
-                                        <View style={styles.bestsellerBadge}>
-                                            <Text style={styles.bestsellerText}>BESTSELLER</Text>
+
+                                    {/* Discount badge */}
+                                    {item.discountPercent > 0 && (
+                                        <View style={styles.discountBadgeTop}>
+                                            <Text style={styles.discountText}>{item.discountPercent}% OFF</Text>
                                         </View>
                                     )}
+
+                                    {/* ADD button over image */}
+                                    <TouchableOpacity
+                                        style={styles.addButtonOverlay}
+                                        activeOpacity={0.8}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handleAddToCart(item);
+                                        }}
+                                    >
+                                        <Text style={styles.addButtonText}>ADD</Text>
+                                    </TouchableOpacity>
                                 </View>
 
-                                {/* Discount badge */}
-                                {item.discount && (
-                                    <View style={styles.discountBadgeTop}>
-                                        <Text style={styles.discountText}>{item.discount}</Text>
+                                {/* Content Section Below Image */}
+                                <View style={styles.contentSection}>
+                                    {/* Item Name */}
+                                    <Text style={styles.itemName}>{item.name}</Text>
+
+                                    {/* Rating and Time */}
+                                    <View style={styles.ratingContainer}>
+                                        <View style={styles.ratingBadge}>
+                                            <Text style={styles.ratingText}>★ {item.rating.toFixed(1)}</Text>
+                                        </View>
+                                        <Text style={styles.reviews}>
+                                            ({item.salesCount > 0 ? item.salesCount : 'New'})
+                                        </Text>
+                                        <Text style={styles.preparationTime}>• {formatPrepTime(prepTime)}</Text>
                                     </View>
-                                )}
 
-                                {/* ADD button over image */}
-                                <TouchableOpacity style={styles.addButtonOverlay} activeOpacity={0.8}>
-                                    <Text style={styles.addButtonText}>ADD</Text>
-                                </TouchableOpacity>
-                            </View>
+                                    {/* Description */}
+                                    <Text style={styles.itemDescription} numberOfLines={2}>
+                                        {item.description}
+                                    </Text>
 
-                            {/* Content Section Below Image */}
-                            <View style={styles.contentSection}>
-                                {/* Pizza Name */}
-                                <Text style={styles.itemName}>{item.name}</Text>
-
-                                {/* Rating and Time */}
-                                <View style={styles.ratingContainer}>
-                                    <View style={styles.ratingBadge}>
-                                        <Text style={styles.ratingText}>★ {item.rating}</Text>
+                                    {/* Price Section */}
+                                    <View style={styles.priceContainer}>
+                                        <Text style={styles.itemPrice}>₹{displayPrice.toFixed(0)}</Text>
+                                        {originalPrice && (
+                                            <Text style={styles.originalPrice}>₹{originalPrice.toFixed(0)}</Text>
+                                        )}
                                     </View>
-                                    <Text style={styles.reviews}>({item.reviews})</Text>
-                                    <Text style={styles.preparationTime}>• {item.preparationTime}</Text>
                                 </View>
+                            </TouchableOpacity>
+                        );
+                    })}
 
-                                {/* Description */}
-                                <Text style={styles.itemDescription} numberOfLines={2}>
-                                    {item.description}
-                                </Text>
+                    {/* Load More Indicator */}
+                    {isLoadingMore && (
+                        <View style={styles.loadMoreContainer}>
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                            <Text style={styles.loadMoreText}>Loading more items...</Text>
+                        </View>
+                    )}
 
-                                {/* Price Section */}
-                                <View style={styles.priceContainer}>
-                                    <Text style={styles.itemPrice}>${item.price}</Text>
-                                    {item.originalPrice && (
-                                        <Text style={styles.originalPrice}>${item.originalPrice}</Text>
-                                    )}
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                    {/* End of List Message */}
+                    {!isLoading && !isLoadingMore && products.length > 0 && !hasMore && (
+                        <View style={styles.endOfListContainer}>
+                            <Text style={styles.endOfListText}>🎉 You've seen all items!</Text>
+                        </View>
+                    )}
                 </View>
 
-                {/* Bottom spacing for floating cart */}
+                {/* Bottom spacing */}
                 <View style={styles.bottomSpacing} />
             </ScrollView>
-
-            {/* Floating Cart Button */}
-            <TouchableOpacity
-                style={styles.floatingCartButton}
-                onPress={() => navigation.navigate('Cart')}
-                activeOpacity={0.9}
-            >
-                <View style={styles.cartContent}>
-                    <View style={styles.cartLeft}>
-                        <View style={styles.floatingCartBadge}>
-                            <Text style={styles.floatingCartBadgeText}>3</Text>
-                        </View>
-                        <Text style={styles.cartText}>View Cart</Text>
-                    </View>
-                    <Text style={styles.cartTotal}>$47.97</Text>
-                </View>
-            </TouchableOpacity>
         </View>
     );
 }
@@ -477,7 +656,6 @@ const styles = StyleSheet.create({
     contentSection: {
         padding: Spacing.lg,
     },
-
     vegIndicator: {
         width: 16,
         height: 16,
@@ -566,7 +744,6 @@ const styles = StyleSheet.create({
         color: Colors.text.tertiary,
         textDecorationLine: 'line-through',
     },
-
     pizzaImageBackground: {
         width: 120,
         height: 120,
@@ -611,52 +788,9 @@ const styles = StyleSheet.create({
         ...Typography.semibold.text200,
         color: Colors.surface,
     },
-
     bottomSpacing: {
-        height: 100,
+        height: 40,
     },
-    floatingCartButton: {
-        position: 'absolute',
-        bottom: Spacing.xl,
-        left: Spacing.xl,
-        right: Spacing.xl,
-        backgroundColor: Colors.primary,
-        borderRadius: BorderRadius.xl,
-        ...Shadows.xl,
-    },
-    cartContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.xl,
-        paddingVertical: Spacing.lg,
-    },
-    cartLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    floatingCartBadge: {
-        backgroundColor: Colors.surface,
-        borderRadius: BorderRadius.lg,
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: Spacing.md,
-    },
-    floatingCartBadgeText: {
-        ...Typography.semibold.text200,
-        color: Colors.primary,
-    },
-    cartText: {
-        ...Typography.semibold.text400,
-        color: Colors.surface,
-    },
-    cartTotal: {
-        ...Typography.semibold.text400,
-        color: Colors.surface,
-    },
-
     // Favorites Section
     favoritesSection: {
         paddingTop: Spacing.xl,
@@ -766,5 +900,77 @@ const styles = StyleSheet.create({
         ...Typography.regular.text300,
         color: Colors.text.secondary,
         marginBottom: Spacing.lg,
+    },
+    // Loading, Error, Empty States
+    loadingContainer: {
+        paddingVertical: Spacing.xl * 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        ...Typography.regular.text400,
+        color: Colors.text.secondary,
+        marginTop: Spacing.md,
+    },
+    errorContainer: {
+        paddingVertical: Spacing.xl * 2,
+        paddingHorizontal: Spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    errorText: {
+        ...Typography.regular.text400,
+        color: Colors.error,
+        textAlign: 'center',
+        marginBottom: Spacing.lg,
+    },
+    retryButton: {
+        backgroundColor: Colors.primary,
+        paddingHorizontal: Spacing.xl,
+        paddingVertical: Spacing.md,
+        borderRadius: BorderRadius.md,
+    },
+    retryButtonText: {
+        ...Typography.semibold.text400,
+        color: Colors.surface,
+    },
+    emptyContainer: {
+        paddingVertical: Spacing.xl * 2,
+        paddingHorizontal: Spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyText: {
+        fontSize: 64,
+        marginBottom: Spacing.lg,
+    },
+    emptyTitle: {
+        ...Typography.semibold.text500,
+        color: Colors.text.primary,
+        marginBottom: Spacing.sm,
+    },
+    emptySubtitle: {
+        ...Typography.regular.text400,
+        color: Colors.text.secondary,
+        textAlign: 'center',
+    },
+    loadMoreContainer: {
+        paddingVertical: Spacing.xl,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadMoreText: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
+        marginLeft: Spacing.sm,
+    },
+    endOfListContainer: {
+        paddingVertical: Spacing.xl,
+        alignItems: 'center',
+    },
+    endOfListText: {
+        ...Typography.regular.text400,
+        color: Colors.text.secondary,
     },
 });

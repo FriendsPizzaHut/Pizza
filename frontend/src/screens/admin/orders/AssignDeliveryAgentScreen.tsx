@@ -237,7 +237,7 @@ export default function AssignDeliveryAgentScreen() {
                     </View>
                     <View style={styles.orderInfoRow}>
                         <Text style={styles.orderInfoLabel}>Total Amount:</Text>
-                        <Text style={styles.orderInfoValue}>${orderDetails?.total?.toFixed(2) || '35.99'}</Text>
+                        <Text style={styles.orderInfoValue}>₹{orderDetails?.total?.toFixed(0) || '2988'}</Text>
                     </View>
                 </View>
 

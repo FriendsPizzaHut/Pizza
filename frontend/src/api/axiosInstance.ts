@@ -2,12 +2,15 @@ import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getToken, refreshToken } from '../utils/cache';
 import { formatError } from '../utils/errorHandler';
+import { ENV } from '../config/environment';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const BASE_URL = ENV.API_URL;
+
+console.log('🔧 Axios Base URL:', BASE_URL);
 
 const axiosInstance = axios.create({
     baseURL: BASE_URL,
-    timeout: 10000,
+    timeout: ENV.API_TIMEOUT || 30000,
 });
 
 // Request interceptor: attach JWT

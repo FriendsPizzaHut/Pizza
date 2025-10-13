@@ -15,14 +15,26 @@ import * as productService from '../services/productService.js';
 import { sendResponse } from '../utils/response.js';
 
 /**
- * Get all products with filters
+ * Get all products with filters, search, and pagination
  * GET /api/v1/products
+ * Query params: category, isVegetarian, isAvailable, sortBy, sortOrder, search, page, limit
  * @access Public
  */
 export const getAllProducts = async (req, res, next) => {
     try {
-        const products = await productService.getAllProducts(req.query);
-        sendResponse(res, 200, 'Products retrieved successfully', products);
+        const result = await productService.getAllProducts(req.query);
+
+        // Send paginated response with metadata
+        res.status(200).json({
+            success: true,
+            message: 'Products retrieved successfully',
+            data: result.products,
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages: result.totalPages,
+            hasMore: result.hasMore
+        });
     } catch (error) {
         next(error);
     }
