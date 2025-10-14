@@ -130,6 +130,89 @@ export const getOrdersByUser = async (userId) => {
 };
 
 /**
+ * Get single order by ID with full details
+ * @param {String} orderId - Order ID
+ * @returns {Object} - Order with full details
+ */
+export const getOrderById = async (orderId) => {
+    const order = await Order.findById(orderId)
+        .populate('user', 'name email phone profileImage')
+        .populate({
+            path: 'items.product',
+            select: 'name price category imageUrl description'
+        })
+        .populate('deliveryAgent', 'name phone email profileImage');
+
+    return order;
+};
+
+/**
+ * Accept order (pending → confirmed)
+ * @param {String} orderId - Order ID
+ * @returns {Object} - Updated order
+ */
+export const acceptOrder = async (orderId) => {
+    const order = await Order.findById(orderId)
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name imageUrl');
+
+    if (!order) {
+        const error = new Error('Order not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (order.status !== 'pending') {
+        const error = new Error(`Cannot accept order with status: ${order.status}`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    order.status = 'confirmed';
+    order.confirmedAt = new Date();
+    await order.save();
+
+    // Invalidate dashboard cache
+    await invalidateDashboardCache();
+
+    return order;
+};
+
+/**
+ * Reject order (set status to cancelled)
+ * @param {String} orderId - Order ID
+ * @param {String} reason - Rejection reason
+ * @returns {Object} - Updated order
+ */
+export const rejectOrder = async (orderId, reason) => {
+    const order = await Order.findById(orderId)
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name imageUrl');
+
+    if (!order) {
+        const error = new Error('Order not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (['delivered', 'cancelled'].includes(order.status)) {
+        const error = new Error(`Cannot reject order with status: ${order.status}`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    order.status = 'cancelled';
+    order.cancellationReason = reason || 'Rejected by admin';
+    order.cancelledAt = new Date();
+    await order.save();
+
+    // Invalidate dashboard cache
+    await invalidateDashboardCache();
+
+    return order;
+};
+
+/**
  * Get orders for OrdersScreen (optimized for mobile)
  * Returns minimal data for list view with proper formatting
  * @param {String} userId - User ID
@@ -301,8 +384,8 @@ export const assignDeliveryAgent = async (orderId, deliveryAgentId) => {
     }
 
     // Check if order is in valid status for assignment
-    if (!['confirmed', 'preparing'].includes(order.status)) {
-        const error = new Error('Order must be confirmed or preparing to assign delivery agent');
+    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+        const error = new Error('Order must be confirmed, preparing, or ready to assign delivery agent');
         error.statusCode = 400;
         throw error;
     }

@@ -151,6 +151,91 @@ export const assignDeliveryAgent = async (req, res, next) => {
 };
 
 /**
+ * Get single order by ID
+ * GET /api/v1/orders/:id
+ * @access Private (Admin or Order Owner)
+ */
+export const getOrderById = async (req, res, next) => {
+    try {
+        const order = await orderService.getOrderById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        // Check if user is admin or order owner
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'owner';
+        const isOwner = order.user._id.toString() === req.user._id.toString();
+        const isDeliveryAgent = order.deliveryAgent && order.deliveryAgent._id.toString() === req.user._id.toString();
+
+        if (!isAdmin && !isOwner && !isDeliveryAgent) {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to view this order'
+            });
+        }
+
+        sendResponse(res, 200, 'Order retrieved successfully', { order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Accept order (change status from pending to confirmed)
+ * POST /api/v1/orders/:id/accept
+ * @access Private (Admin only)
+ */
+export const acceptOrder = async (req, res, next) => {
+    try {
+        const order = await orderService.acceptOrder(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        // Emit socket event for real-time update
+        emitOrderStatusUpdate(order);
+
+        sendResponse(res, 200, 'Order accepted successfully', { order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Reject/Cancel order
+ * POST /api/v1/orders/:id/reject
+ * @access Private (Admin only)
+ */
+export const rejectOrder = async (req, res, next) => {
+    try {
+        const { reason } = req.body;
+        const order = await orderService.rejectOrder(req.params.id, reason);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        // Emit socket event for real-time update
+        emitOrderCancelled(order);
+
+        sendResponse(res, 200, 'Order rejected successfully', { order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
  * Cancel/delete order
  * DELETE /api/v1/orders/:id
  * @access Private
@@ -175,7 +260,10 @@ export default {
     createOrderFromCart,
     getAllOrders,
     getOrdersByUser,
+    getOrderById,
     getMyOrders,
+    acceptOrder,
+    rejectOrder,
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,

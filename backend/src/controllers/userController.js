@@ -50,7 +50,25 @@ export const getUserById = async (req, res, next) => {
  */
 export const updateUser = async (req, res, next) => {
     try {
+        console.log('🔧 [UPDATE USER CONTROLLER] Request received');
+        console.log('  - User ID:', req.params.id);
+        console.log('  - Request Body:', JSON.stringify(req.body, null, 2));
+        console.log('  - Approval Fields in Body:', {
+            isApproved: req.body.isApproved,
+            isRejected: req.body.isRejected,
+            rejectionReason: req.body.rejectionReason
+        });
+
         const user = await userService.updateUser(req.params.id, req.body);
+
+        console.log('✅ [UPDATE USER CONTROLLER] User updated successfully');
+        console.log('  - Updated User ID:', user._id);
+        console.log('  - Updated User Role:', user.role);
+        console.log('  - Approval Status After Update:', {
+            isApproved: user.isApproved,
+            isRejected: user.isRejected,
+            rejectionReason: user.rejectionReason
+        });
 
         // Emit real-time update if delivery agent status changed
         if (user.role === 'delivery' && req.body.deliveryStatus) {
@@ -65,6 +83,8 @@ export const updateUser = async (req, res, next) => {
 
         sendResponse(res, 200, 'User updated successfully', user);
     } catch (error) {
+        console.error('❌ [UPDATE USER CONTROLLER] Error:', error.message);
+        console.error('  - Stack:', error.stack);
         next(error);
     }
 };
@@ -83,4 +103,18 @@ export const deleteUser = async (req, res, next) => {
     }
 };
 
-export default { getAllUsers, getUserById, updateUser, deleteUser };
+/**
+ * Get all delivery agents with their availability status
+ * GET /api/v1/users/delivery-agents
+ * @access Private/Admin
+ */
+export const getDeliveryAgents = async (req, res, next) => {
+    try {
+        const agents = await userService.getDeliveryAgents();
+        sendResponse(res, 200, 'Delivery agents retrieved successfully', { agents });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default { getAllUsers, getUserById, updateUser, deleteUser, getDeliveryAgents };

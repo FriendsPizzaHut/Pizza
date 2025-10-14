@@ -5,33 +5,39 @@
  * Handles CRUD operations for users.
  */
 
-import User from '../models/User.js';
+import User, { DeliveryBoy, Customer, Admin } from '../models/User.js';
 import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
 import Notification from '../models/Notification.js';
 
 /**
- * Get all users with pagination
- * @param {Number} page - Page number
- * @param {Number} limit - Items per page
+ * Get all users with pagination and filters
+ * @param {Object} query - Query parameters (page, limit, role)
  * @returns {Object} - Users and pagination info
  */
-export const getAllUsers = async (page = 1, limit = 10) => {
+export const getAllUsers = async (query = {}) => {
+    const { page = 1, limit = 10, role } = query;
     const skip = (page - 1) * limit;
 
-    const users = await User.find()
+    // Build filter query
+    const filter = {};
+    if (role) {
+        filter.role = role;
+    }
+
+    const users = await User.find(filter)
         .select('-password')
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 });
 
-    const total = await User.countDocuments();
+    const total = await User.countDocuments(filter);
 
     return {
         users,
         pagination: {
-            page,
-            limit,
+            page: parseInt(page),
+            limit: parseInt(limit),
             total,
             totalPages: Math.ceil(total / limit),
         },
@@ -62,20 +68,70 @@ export const getUserById = async (userId) => {
  * @returns {Object} - Updated user
  */
 export const updateUser = async (userId, updateData) => {
+    console.log('🔍 [USER SERVICE] Update user called');
+    console.log('  - User ID:', userId);
+    console.log('  - Update Data (raw):', JSON.stringify(updateData, null, 2));
+
     // Prevent updating sensitive fields
     delete updateData.password;
     delete updateData.role;
 
-    const user = await User.findByIdAndUpdate(userId, updateData, {
-        new: true,
-        runValidators: true,
-    }).select('-password');
+    console.log('  - Update Data (after security filters):', JSON.stringify(updateData, null, 2));
+    console.log('  - Approval fields present:', {
+        isApproved: 'isApproved' in updateData ? updateData.isApproved : 'NOT PRESENT',
+        isRejected: 'isRejected' in updateData ? updateData.isRejected : 'NOT PRESENT',
+        rejectionReason: 'rejectionReason' in updateData ? updateData.rejectionReason : 'NOT PRESENT'
+    });
+
+    // Fetch user before update to see current state
+    const userBefore = await User.findById(userId).select('-password');
+    console.log('  - User BEFORE update:', {
+        _id: userBefore?._id,
+        name: userBefore?.name,
+        role: userBefore?.role,
+        isApproved: userBefore?.isApproved,
+        isRejected: userBefore?.isRejected,
+        rejectionReason: userBefore?.rejectionReason
+    });
+
+    // Determine which model to use based on user role
+    let UserModel = User;
+    if (userBefore?.role === 'delivery') {
+        UserModel = DeliveryBoy;
+        console.log('  - Using DeliveryBoy discriminator model');
+    } else if (userBefore?.role === 'customer') {
+        UserModel = Customer;
+        console.log('  - Using Customer discriminator model');
+    } else if (userBefore?.role === 'admin') {
+        UserModel = Admin;
+        console.log('  - Using Admin discriminator model');
+    }
+
+    // Use $set operator explicitly for discriminator fields
+    const user = await UserModel.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        {
+            new: true,
+            runValidators: true,
+        }
+    ).select('-password');
 
     if (!user) {
+        console.error('❌ [USER SERVICE] User not found after update');
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
     }
+
+    console.log('  - User AFTER update:', {
+        _id: user._id,
+        name: user.name,
+        role: user.role,
+        isApproved: user.isApproved,
+        isRejected: user.isRejected,
+        rejectionReason: user.rejectionReason
+    });
 
     return user;
 };
@@ -112,9 +168,88 @@ export const deleteUser = async (userId) => {
     };
 };
 
+/**
+ * Get all delivery agents with their current status and availability
+ * @returns {Array} - List of delivery agents with status
+ */
+export const getDeliveryAgents = async () => {
+    console.log('🚚 [GET DELIVERY AGENTS] Fetching all delivery agents...');
+
+    // Find all users with role 'delivery' (get all first to debug)
+    const allDeliveryAgents = await User.find({ role: 'delivery' })
+        .select('name email phone profileImage vehicleInfo status totalDeliveries assignedOrders isApproved isRejected isActive')
+        .lean();
+
+    console.log(`📊 [GET DELIVERY AGENTS] Found ${allDeliveryAgents.length} total delivery agents`);
+
+    // Filter only approved agents
+    const deliveryAgents = allDeliveryAgents.filter(agent => agent.isApproved === true);
+
+    console.log(`✅ [GET DELIVERY AGENTS] ${deliveryAgents.length} approved agents`);
+    allDeliveryAgents.forEach(agent => {
+        console.log(`   - ${agent.name}: isApproved=${agent.isApproved}, isActive=${agent.isActive}, isOnline=${agent.status?.isOnline}`);
+    });
+
+    // Calculate current active deliveries for each agent
+    const agentsWithStatus = await Promise.all(
+        deliveryAgents.map(async (agent) => {
+            // Count active deliveries (orders that are assigned or in progress)
+            const activeDeliveries = await Order.countDocuments({
+                deliveryAgent: agent._id,
+                status: { $in: ['out_for_delivery', 'ready'] }
+            });
+
+            // Determine agent status
+            let agentStatus = 'offline';
+            if (agent.status?.isOnline) {
+                agentStatus = activeDeliveries > 0 ? 'busy' : 'online';
+            }
+
+            // Calculate rating (placeholder - you can implement proper rating system later)
+            const rating = 4.5 + (Math.random() * 0.5); // Mock rating between 4.5-5.0
+
+            return {
+                id: agent._id,
+                name: agent.name,
+                email: agent.email,
+                phone: agent.phone,
+                profileImage: agent.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(agent.name)}`,
+                vehicleType: agent.vehicleInfo?.type || 'bike',
+                vehicleNumber: agent.vehicleInfo?.number || 'N/A',
+                status: agentStatus,
+                isOnline: agent.status?.isOnline || false,
+                isApproved: agent.isApproved || false, // Include approval status
+                isActive: agent.isActive || false,
+                activeDeliveries: activeDeliveries,
+                maxDeliveries: 3, // Default max capacity
+                totalDeliveries: agent.totalDeliveries || 0,
+                rating: parseFloat(rating.toFixed(1)),
+                lastOnline: agent.status?.lastOnline || null
+            };
+        })
+    );
+
+    // Sort: online first, then by active deliveries (fewer first)
+    agentsWithStatus.sort((a, b) => {
+        if (a.status === 'online' && b.status !== 'online') return -1;
+        if (a.status !== 'online' && b.status === 'online') return 1;
+        if (a.status === 'busy' && b.status !== 'busy') return -1;
+        if (a.status !== 'busy' && b.status === 'busy') return 1;
+        return a.activeDeliveries - b.activeDeliveries;
+    });
+
+    console.log(`📤 [GET DELIVERY AGENTS] Returning ${agentsWithStatus.length} agents`);
+    agentsWithStatus.forEach(agent => {
+        console.log(`   ✈️  ${agent.name}: status=${agent.status}, approved=${agent.isApproved}, online=${agent.isOnline}`);
+    });
+
+    return agentsWithStatus;
+};
+
 export default {
     getAllUsers,
     getUserById,
     updateUser,
     deleteUser,
+    getDeliveryAgents,
 };

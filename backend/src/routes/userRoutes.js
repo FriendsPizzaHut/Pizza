@@ -14,6 +14,7 @@ import {
     getUserById,
     updateUser,
     deleteUser,
+    getDeliveryAgents,
 } from '../controllers/userController.js';
 import {
     addAddress,
@@ -29,6 +30,9 @@ const router = express.Router();
 
 // Get all users (admin only)
 router.get('/', protect, adminOnly, getAllUsers);
+
+// Get all delivery agents with status (admin only)
+router.get('/delivery-agents/all', protect, adminOnly, getDeliveryAgents);
 
 // Get single user by ID (authenticated users only)
 router.get('/:id', protect, getUserById);

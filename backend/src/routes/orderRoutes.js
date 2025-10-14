@@ -15,7 +15,10 @@ import {
     createOrderFromCart,
     getAllOrders,
     getOrdersByUser,
+    getOrderById,
     getMyOrders,
+    acceptOrder,
+    rejectOrder,
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,
@@ -38,8 +41,17 @@ router.get('/my-orders', protect, getMyOrders);
 // Get all orders (admin only)
 router.get('/', protect, adminOnly, getAllOrders);
 
+// Get single order by ID (authenticated users - own order, admin, or assigned delivery agent)
+router.get('/:id', protect, getOrderById);
+
 // Get orders by user (authenticated users - own orders)
 router.get('/user/:userId', protect, getOrdersByUser);
+
+// Accept order (admin only) - pending → confirmed
+router.post('/:id/accept', protect, adminOnly, acceptOrder);
+
+// Reject/cancel order (admin only)
+router.post('/:id/reject', protect, adminOnly, rejectOrder);
 
 // Update order status (admin or delivery agents, with validation)
 router.patch('/:id/status', protect, deliveryOnly, validate(updateOrderStatusValidator), updateOrderStatus);

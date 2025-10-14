@@ -58,6 +58,14 @@ export default function ProfileScreen() {
             action: () => navigation.navigate('UserManagement'),
         },
         {
+            title: 'Delivery Agent Approvals',
+            icon: 'delivery-dining',
+            iconType: 'MaterialIcons' as const,
+            color: '#9C27B0',
+            bgColor: '#F3E5F5',
+            action: () => navigation.navigate('DeliveryAgentApprovals'),
+        },
+        {
             title: 'Manage Offers',
             icon: 'local-offer',
             iconType: 'MaterialIcons' as const,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,11 +9,13 @@ import {
     Platform,
     Image,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axiosInstance from '../../../api/axiosInstance';
 
 // Define the route params type
 type AssignDeliveryRouteProp = RouteProp<
@@ -33,10 +35,9 @@ interface DeliveryAgent {
     vehicleType: string;
     vehicleNumber: string;
     status: 'online' | 'busy' | 'offline'; // online = available, busy = out for delivery, offline = not logged in
-    currentLocation: string;
-    distance: string;
-    estimatedArrival: string;
     profileImage: string;
+    isOnline: boolean;
+    isApproved: boolean; // Only show approved agents
 }
 
 export default function AssignDeliveryAgentScreen() {
@@ -45,95 +46,72 @@ export default function AssignDeliveryAgentScreen() {
     const { orderId, orderDetails } = route.params;
 
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+    const [deliveryAgents, setDeliveryAgents] = useState<DeliveryAgent[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [assigning, setAssigning] = useState(false);
 
-    // Mock delivery agents data - in real app, fetch from backend
-    const deliveryAgents: DeliveryAgent[] = [
-        {
-            id: 'DA-001',
-            name: 'Mike Johnson',
-            phone: '+1 (555) 234-5678',
-            email: 'mike.johnson@delivery.com',
-            rating: 4.8,
-            totalDeliveries: 342,
-            activeDeliveries: 1,
-            maxDeliveries: 3,
-            vehicleType: 'Motorcycle',
-            vehicleNumber: 'ABC-1234',
-            status: 'busy', // Currently out for delivery
-            currentLocation: '2.5 km away',
-            distance: '2.5 km',
-            estimatedArrival: '8 mins',
-            profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
-        },
-        {
-            id: 'DA-002',
-            name: 'Sarah Chen',
-            phone: '+1 (555) 345-6789',
-            email: 'sarah.chen@delivery.com',
-            rating: 4.9,
-            totalDeliveries: 456,
-            activeDeliveries: 0,
-            maxDeliveries: 3,
-            vehicleType: 'Scooter',
-            vehicleNumber: 'XYZ-5678',
-            status: 'online', // Online and available for delivery
-            currentLocation: '1.2 km away',
-            distance: '1.2 km',
-            estimatedArrival: '5 mins',
-            profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop',
-        },
-        {
-            id: 'DA-003',
-            name: 'David Miller',
-            phone: '+1 (555) 456-7890',
-            email: 'david.miller@delivery.com',
-            rating: 4.7,
-            totalDeliveries: 289,
-            activeDeliveries: 2,
-            maxDeliveries: 3,
-            vehicleType: 'Motorcycle',
-            vehicleNumber: 'DEF-9012',
-            status: 'busy', // Currently out for delivery (2 active orders)
-            currentLocation: '3.8 km away',
-            distance: '3.8 km',
-            estimatedArrival: '12 mins',
-            profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-        },
-        {
-            id: 'DA-004',
-            name: 'Emma Davis',
-            phone: '+1 (555) 567-8901',
-            email: 'emma.davis@delivery.com',
-            rating: 4.6,
-            totalDeliveries: 198,
-            activeDeliveries: 1,
-            maxDeliveries: 2,
-            vehicleType: 'Bicycle',
-            vehicleNumber: 'BIC-3456',
-            status: 'online', // Online and available (can take 1 more order)
-            currentLocation: '4.5 km away',
-            distance: '4.5 km',
-            estimatedArrival: '15 mins',
-            profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
-        },
-        {
-            id: 'DA-005',
-            name: 'James Wilson',
-            phone: '+1 (555) 678-9012',
-            email: 'james.wilson@delivery.com',
-            rating: 4.5,
-            totalDeliveries: 156,
-            activeDeliveries: 0,
-            maxDeliveries: 3,
-            vehicleType: 'Car',
-            vehicleNumber: 'GHI-7890',
-            status: 'offline', // Not logged in
-            currentLocation: 'Offline',
-            distance: 'N/A',
-            estimatedArrival: 'N/A',
-            profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop',
-        },
-    ];
+    // Format address object to string
+    const formatAddress = (address: any): string => {
+        if (!address) return 'N/A';
+        if (typeof address === 'string') return address;
+
+        const parts = [
+            address.street,
+            address.city,
+            address.state,
+            address.pincode || address.zipCode
+        ].filter(Boolean);
+
+        return parts.join(', ') || 'N/A';
+    };
+
+    // Format customer name
+    const getCustomerName = (): string => {
+        if (orderDetails?.user?.name) return orderDetails.user.name;
+        if (orderDetails?.customer?.name) return orderDetails.customer.name;
+        if (orderDetails?.customer && typeof orderDetails.customer === 'string') return orderDetails.customer;
+        return 'Customer';
+    };
+
+    const customerName = getCustomerName();
+    const deliveryAddress = formatAddress(orderDetails?.deliveryAddress);
+    const totalAmount = orderDetails?.totalAmount || orderDetails?.total || 0;
+
+    // Fetch delivery agents from API
+    useEffect(() => {
+        fetchDeliveryAgents();
+    }, []);
+
+    const fetchDeliveryAgents = async () => {
+        try {
+            console.log('📡 Fetching approved delivery agents...');
+            setLoading(true);
+
+            const response = await axiosInstance.get('/users/delivery-agents/all');
+
+            console.log('✅ Delivery agents fetched:', response.data);
+
+            if (response.data.success && response.data.data.agents) {
+                // Filter to show only approved agents
+                const approvedAgents = response.data.data.agents.filter(
+                    (agent: DeliveryAgent) => agent.isApproved === true
+                );
+                setDeliveryAgents(approvedAgents);
+                console.log(`  - Found ${approvedAgents.length} approved delivery agents`);
+            }
+        } catch (error: any) {
+            console.error('❌ Error fetching delivery agents:', error.message);
+            Alert.alert(
+                'Error',
+                'Failed to load delivery agents. Please try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Delivery agents are now fetched from API in useEffect
 
     const getStatusConfig = (status: DeliveryAgent['status']) => {
         switch (status) {
@@ -148,37 +126,76 @@ export default function AssignDeliveryAgentScreen() {
         }
     };
 
-    const handleAssign = () => {
+    const handleAssign = async () => {
         if (!selectedAgent) {
             Alert.alert('No Agent Selected', 'Please select a delivery agent to assign this order.');
             return;
         }
 
         const agent = deliveryAgents.find((a) => a.id === selectedAgent);
+        if (!agent) return;
 
-        Alert.alert(
-            'Confirm Assignment',
-            `Assign order ${orderId} to ${agent?.name}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Assign',
-                    onPress: () => {
-                        // In real app, make API call to assign order
-                        Alert.alert(
-                            'Success',
-                            `Order ${orderId} has been assigned to ${agent?.name}`,
-                            [
-                                {
-                                    text: 'OK',
-                                    onPress: () => navigation.goBack(),
-                                },
-                            ]
-                        );
+        // Check if agent is busy and show warning
+        if (agent.status === 'busy') {
+            Alert.alert(
+                'Agent is Busy',
+                `${agent.name} is currently out for delivery with ${agent.activeDeliveries} active order(s). Do you still want to assign this order?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Assign Anyway',
+                        style: 'destructive',
+                        onPress: () => performAssignment(agent),
                     },
-                },
-            ]
-        );
+                ]
+            );
+        } else {
+            // Agent is online and available - proceed with confirmation
+            Alert.alert(
+                'Confirm Assignment',
+                `Assign order ${orderId} to ${agent.name}?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Assign',
+                        onPress: () => performAssignment(agent),
+                    },
+                ]
+            );
+        }
+    };
+
+    const performAssignment = async (agent: DeliveryAgent) => {
+        try {
+            console.log(`🚀 Assigning order ${orderId} to ${agent.name}...`);
+            setAssigning(true);
+
+            const response = await axiosInstance.patch(`/orders/${orderDetails._id || orderDetails.id}/assign-delivery`, {
+                deliveryAgentId: agent.id
+            });
+
+            console.log('✅ Order assigned successfully');
+
+            Alert.alert(
+                'Success',
+                `Order ${orderId} has been assigned to ${agent.name}`,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.goBack(),
+                    },
+                ]
+            );
+        } catch (error: any) {
+            console.error('❌ Error assigning order:', error.message);
+            Alert.alert(
+                'Assignment Failed',
+                error.response?.data?.message || 'Failed to assign delivery agent. Please try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setAssigning(false);
+        }
     };
 
     const renderStars = (rating: number) => {
@@ -223,21 +240,58 @@ export default function AssignDeliveryAgentScreen() {
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Order Info Card */}
                 <View style={styles.orderInfoCard}>
+                    {/* Header with gradient-like background */}
                     <View style={styles.orderInfoHeader}>
-                        <MaterialIcons name="receipt-long" size={20} color="#cb202d" />
-                        <Text style={styles.orderInfoTitle}>Order Information</Text>
+                        <View style={styles.orderInfoHeaderLeft}>
+                            <View style={styles.orderIconContainer}>
+                                <MaterialIcons name="receipt-long" size={24} color="#cb202d" />
+                            </View>
+                            <View>
+                                <Text style={styles.orderInfoTitle}>Order Information</Text>
+                                <Text style={styles.orderIdText}>#{orderId}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={styles.orderInfoRow}>
-                        <Text style={styles.orderInfoLabel}>Customer:</Text>
-                        <Text style={styles.orderInfoValue}>{orderDetails?.customer || 'John Doe'}</Text>
+
+                    <View style={styles.orderInfoDivider} />
+
+                    {/* Customer Info */}
+                    <View style={styles.orderInfoSection}>
+                        <View style={styles.infoIconRow}>
+                            <View style={styles.infoIconCircle}>
+                                <MaterialIcons name="person" size={18} color="#2196F3" />
+                            </View>
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Customer</Text>
+                                <Text style={styles.infoValue}>{customerName}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={styles.orderInfoRow}>
-                        <Text style={styles.orderInfoLabel}>Delivery Address:</Text>
-                        <Text style={styles.orderInfoValue}>{orderDetails?.deliveryAddress || '123 Main St, Apt 4B'}</Text>
+
+                    {/* Delivery Address */}
+                    <View style={styles.orderInfoSection}>
+                        <View style={styles.infoIconRow}>
+                            <View style={styles.infoIconCircle}>
+                                <MaterialIcons name="location-on" size={18} color="#FF6B35" />
+                            </View>
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Delivery Address</Text>
+                                <Text style={styles.infoValue}>{deliveryAddress}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={styles.orderInfoRow}>
-                        <Text style={styles.orderInfoLabel}>Total Amount:</Text>
-                        <Text style={styles.orderInfoValue}>₹{orderDetails?.total?.toFixed(0) || '2988'}</Text>
+
+                    {/* Total Amount */}
+                    <View style={styles.orderInfoSection}>
+                        <View style={styles.infoIconRow}>
+                            <View style={styles.infoIconCircle}>
+                                <MaterialIcons name="account-balance-wallet" size={18} color="#4CAF50" />
+                            </View>
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Total Amount</Text>
+                                <Text style={styles.infoValueAmount}>₹{totalAmount.toFixed(0)}</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
 
@@ -245,141 +299,154 @@ export default function AssignDeliveryAgentScreen() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <MaterialIcons name="delivery-dining" size={20} color="#cb202d" />
-                        <Text style={styles.sectionTitle}>Available Delivery Agents</Text>
+                        <Text style={styles.sectionTitle}>Approved Delivery Agents</Text>
                     </View>
                     <Text style={styles.sectionSubtitle}>
-                        Select an agent to assign this order
+                        Only approved agents are shown • Select one to assign this order
                     </Text>
 
-                    {deliveryAgents.map((agent) => {
-                        const statusConfig = getStatusConfig(agent.status);
-                        const isSelected = selectedAgent === agent.id;
-                        // Agent can be assigned if: online AND has capacity for more deliveries
-                        const isAvailable = (agent.status === 'online' || agent.status === 'busy') && agent.activeDeliveries < agent.maxDeliveries;
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#cb202d" />
+                            <Text style={styles.loadingText}>Loading delivery agents...</Text>
+                        </View>
+                    ) : deliveryAgents.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <MaterialIcons name="person-off" size={64} color="#E0E0E0" />
+                            <Text style={styles.emptyTitle}>No Approved Agents Available</Text>
+                            <Text style={styles.emptyText}>
+                                There are no approved delivery agents available for assignment. Please approve delivery agents first.
+                            </Text>
+                        </View>
+                    ) : (
+                        deliveryAgents.map((agent) => {
+                            const statusConfig = getStatusConfig(agent.status);
+                            const isSelected = selectedAgent === agent.id;
+                            // Agent can be assigned if: online AND has capacity for more deliveries
+                            const isAvailable = (agent.status === 'online' || agent.status === 'busy') && agent.activeDeliveries < agent.maxDeliveries;
 
-                        return (
-                            <TouchableOpacity
-                                key={agent.id}
-                                style={[
-                                    styles.agentCard,
-                                    isSelected && styles.agentCardSelected,
-                                    !isAvailable && styles.agentCardDisabled,
-                                ]}
-                                onPress={() => {
-                                    if (isAvailable) {
-                                        setSelectedAgent(agent.id);
-                                    } else {
-                                        let message = '';
-                                        if (agent.status === 'offline') {
-                                            message = `${agent.name} is currently offline and not available for delivery.`;
+                            return (
+                                <TouchableOpacity
+                                    key={agent.id}
+                                    style={[
+                                        styles.agentCard,
+                                        isSelected && styles.agentCardSelected,
+                                        !isAvailable && styles.agentCardDisabled,
+                                    ]}
+                                    onPress={() => {
+                                        if (isAvailable) {
+                                            setSelectedAgent(agent.id);
                                         } else {
-                                            message = `${agent.name} is at maximum capacity (${agent.activeDeliveries}/${agent.maxDeliveries} deliveries) and cannot take more orders.`;
+                                            let message = '';
+                                            if (agent.status === 'offline') {
+                                                message = `${agent.name} is currently offline and not available for delivery.`;
+                                            } else {
+                                                message = `${agent.name} is at maximum capacity (${agent.activeDeliveries}/${agent.maxDeliveries} deliveries) and cannot take more orders.`;
+                                            }
+                                            Alert.alert('Agent Unavailable', message);
                                         }
-                                        Alert.alert('Agent Unavailable', message);
-                                    }
-                                }}
-                                disabled={!isAvailable}
-                                activeOpacity={0.7}
-                            >
-                                {/* Top Section with Profile */}
-                                <View style={styles.agentTopSection}>
-                                    <Image
-                                        source={{ uri: agent.profileImage }}
-                                        style={styles.agentImage}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.agentInfo}>
-                                        <View style={styles.agentNameRow}>
-                                            <Text style={styles.agentName}>{agent.name}</Text>
-                                            {isSelected && (
-                                                <View style={styles.selectedBadge}>
-                                                    <MaterialIcons name="check" size={16} color="#fff" />
+                                    }}
+                                    disabled={!isAvailable}
+                                    activeOpacity={0.7}
+                                >
+                                    {/* Top Section with Profile */}
+                                    <View style={styles.agentTopSection}>
+                                        <Image
+                                            source={{ uri: agent.profileImage }}
+                                            style={styles.agentImage}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.agentInfo}>
+                                            <View style={styles.agentNameRow}>
+                                                <Text style={styles.agentName}>{agent.name}</Text>
+                                                {isSelected && (
+                                                    <View style={styles.selectedBadge}>
+                                                        <MaterialIcons name="check" size={16} color="#fff" />
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <View style={styles.agentEmailRow}>
+                                                <MaterialIcons name="email" size={14} color="#666" />
+                                                <Text style={styles.agentEmail}>{agent.email}</Text>
+                                            </View>
+                                            <View style={styles.ratingRow}>
+                                                <View style={styles.starsContainer}>
+                                                    {renderStars(agent.rating)}
                                                 </View>
-                                            )}
-                                        </View>
-                                        <Text style={styles.agentId}>{agent.id}</Text>
-                                        <View style={styles.ratingRow}>
-                                            <View style={styles.starsContainer}>
-                                                {renderStars(agent.rating)}
-                                            </View>
-                                            <Text style={styles.ratingText}>{agent.rating.toFixed(1)}</Text>
-                                            <Text style={styles.deliveriesText}>
-                                                ({agent.totalDeliveries} deliveries)
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                <View style={styles.agentDivider} />
-
-                                {/* Status and Capacity */}
-                                <View style={styles.agentDetailsSection}>
-                                    <View style={styles.statusRow}>
-                                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                                            <MaterialIcons
-                                                name={statusConfig.icon as any}
-                                                size={14}
-                                                color={statusConfig.color}
-                                            />
-                                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                                {statusConfig.label}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.capacityBadge}>
-                                            <Text style={styles.capacityText}>
-                                                {agent.activeDeliveries}/{agent.maxDeliveries} orders
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Vehicle Info */}
-                                    <View style={styles.vehicleRow}>
-                                        <MaterialIcons name="two-wheeler" size={16} color="#666" />
-                                        <Text style={styles.vehicleText}>
-                                            {agent.vehicleType} • {agent.vehicleNumber}
-                                        </Text>
-                                    </View>
-
-                                    {/* Location and ETA */}
-                                    {agent.status !== 'offline' && (
-                                        <View style={styles.locationRow}>
-                                            <View style={styles.locationItem}>
-                                                <MaterialIcons name="location-on" size={16} color="#FF6B35" />
-                                                <Text style={styles.locationText}>{agent.distance}</Text>
-                                            </View>
-                                            <View style={styles.locationItem}>
-                                                <MaterialIcons name="access-time" size={16} color="#2196F3" />
-                                                <Text style={styles.locationText}>
-                                                    ETA: {agent.estimatedArrival}
+                                                <Text style={styles.ratingText}>{agent.rating.toFixed(1)}</Text>
+                                                <Text style={styles.deliveriesText}>
+                                                    ({agent.totalDeliveries} deliveries)
                                                 </Text>
                                             </View>
                                         </View>
-                                    )}
-
-                                    {/* Contact Info */}
-                                    <View style={styles.contactRow}>
-                                        <TouchableOpacity style={styles.contactButton}>
-                                            <MaterialIcons name="phone" size={16} color="#2196F3" />
-                                            <Text style={styles.contactButtonText}>{agent.phone}</Text>
-                                        </TouchableOpacity>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
+
+                                    <View style={styles.agentDivider} />
+
+                                    {/* Status and Capacity */}
+                                    <View style={styles.agentDetailsSection}>
+                                        <View style={styles.statusRow}>
+                                            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                                                <MaterialIcons
+                                                    name={statusConfig.icon as any}
+                                                    size={14}
+                                                    color={statusConfig.color}
+                                                />
+                                                <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                                                    {statusConfig.label}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.capacityBadge}>
+                                                <MaterialIcons name="assignment" size={14} color="#666" />
+                                                <Text style={styles.capacityText}>
+                                                    {agent.activeDeliveries} {agent.activeDeliveries === 1 ? 'order' : 'orders'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Vehicle Info */}
+                                        <View style={styles.vehicleRow}>
+                                            <MaterialIcons name="two-wheeler" size={16} color="#666" />
+                                            <Text style={styles.vehicleText}>
+                                                {agent.vehicleType.charAt(0).toUpperCase() + agent.vehicleType.slice(1)} • {agent.vehicleNumber}
+                                            </Text>
+                                        </View>
+
+                                        {/* Contact Info */}
+                                        <View style={styles.contactRow}>
+                                            <TouchableOpacity style={styles.contactButton}>
+                                                <MaterialIcons name="phone" size={16} color="#2196F3" />
+                                                <Text style={styles.contactButtonText}>{agent.phone}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
                 </View>
 
                 <View style={{ height: 100 }} />
             </ScrollView>
 
             {/* Assign Button */}
-            {selectedAgent && (
+            {selectedAgent && !loading && (
                 <View style={styles.assignButtonContainer}>
-                    <TouchableOpacity style={styles.assignButton} onPress={handleAssign}>
-                        <MaterialIcons name="person-add" size={20} color="#fff" />
-                        <Text style={styles.assignButtonText}>
-                            Assign to {deliveryAgents.find((a) => a.id === selectedAgent)?.name}
-                        </Text>
+                    <TouchableOpacity
+                        style={[styles.assignButton, assigning && styles.buttonDisabled]}
+                        onPress={handleAssign}
+                        disabled={assigning}
+                    >
+                        {assigning ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <MaterialIcons name="person-add" size={20} color="#fff" />
+                                <Text style={styles.assignButtonText}>
+                                    Assign to {deliveryAgents.find((a) => a.id === selectedAgent)?.name}
+                                </Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
             )}
@@ -442,48 +509,107 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         marginHorizontal: 16,
         marginTop: 16,
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 20,
+        overflow: 'hidden',
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+            },
+            android: {
+                elevation: 6,
+            },
+        }),
+    },
+    orderInfoHeader: {
+        backgroundColor: '#FFF5F5',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    orderInfoHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    orderIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#cb202d',
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 8,
+                shadowOpacity: 0.15,
+                shadowRadius: 4,
             },
             android: {
                 elevation: 3,
             },
         }),
     },
-    orderInfoHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 12,
-    },
     orderInfoTitle: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '800',
         color: '#2d2d2d',
+        marginBottom: 2,
     },
-    orderInfoRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    orderInfoLabel: {
-        fontSize: 14,
-        color: '#666',
-        fontWeight: '500',
-    },
-    orderInfoValue: {
-        fontSize: 14,
-        color: '#2d2d2d',
+    orderIdText: {
+        fontSize: 12,
         fontWeight: '600',
+        color: '#cb202d',
+        letterSpacing: 0.5,
+    },
+    orderInfoDivider: {
+        height: 1,
+        backgroundColor: '#F0F0F0',
+    },
+    orderInfoSection: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F8F8F8',
+    },
+    infoIconRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 14,
+    },
+    infoIconCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F5F5F5',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    infoContent: {
         flex: 1,
-        textAlign: 'right',
+    },
+    infoLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#8E8E93',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    infoValue: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        lineHeight: 22,
+    },
+    infoValueAmount: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#4CAF50',
+        letterSpacing: -0.5,
     },
 
     // Section
@@ -567,10 +693,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    agentId: {
-        fontSize: 12,
-        color: '#8E8E93',
+    agentEmailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         marginBottom: 6,
+    },
+    agentEmail: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
     },
     ratingRow: {
         flexDirection: 'row',
@@ -616,10 +748,13 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     capacityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#F0F0F0',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8,
+        gap: 4,
     },
     capacityText: {
         fontSize: 12,
@@ -632,21 +767,6 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     vehicleText: {
-        fontSize: 13,
-        color: '#666',
-        fontWeight: '500',
-    },
-    locationRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    locationItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    locationText: {
         fontSize: 13,
         color: '#666',
         fontWeight: '500',
@@ -705,5 +825,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    buttonDisabled: {
+        opacity: 0.6,
+    },
+
+    // Loading and Empty States
+    loadingContainer: {
+        paddingVertical: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    emptyContainer: {
+        paddingVertical: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 40,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });

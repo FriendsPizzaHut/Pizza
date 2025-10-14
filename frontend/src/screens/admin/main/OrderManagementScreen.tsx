@@ -582,7 +582,7 @@ export default function OrderManagementScreen() {
                                                 onPress={() => {
                                                     // @ts-ignore - Navigation to parent stack screen
                                                     navigation.navigate('AssignDeliveryAgent', {
-                                                        orderId: order.id,
+                                                        orderId: order.orderNumber || order._id || order.id,
                                                         orderDetails: order
                                                     });
                                                 }}
@@ -595,7 +595,7 @@ export default function OrderManagementScreen() {
                                             style={styles.viewButton}
                                             onPress={() => {
                                                 // @ts-ignore - Navigation to parent stack screen
-                                                navigation.navigate('OrderDetails', { orderId: order.id });
+                                                navigation.navigate('OrderDetails', { orderId: order._id || order.id });
                                             }}
                                         >
                                             <MaterialIcons name="visibility" size={16} color="#666" />

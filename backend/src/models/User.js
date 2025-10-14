@@ -170,6 +170,18 @@ const Customer = User.discriminator('customer', customerSchema);
 // 🚴 DELIVERY BOY DISCRIMINATOR
 // ==========================================
 const deliveryBoySchema = new mongoose.Schema({
+    isApproved: {
+        type: Boolean,
+        default: false,
+    },
+    isRejected: {
+        type: Boolean,
+        default: false,
+    },
+    rejectionReason: {
+        type: String,
+        default: null,
+    },
     status: {
         isOnline: {
             type: Boolean,

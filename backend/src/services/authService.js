@@ -39,6 +39,11 @@ export const registerUser = async (userData) => {
 
     // Add delivery-specific fields if role is delivery
     if (role === 'delivery') {
+        // Set approval status (defaults are in schema, but being explicit here)
+        userDataToCreate.isApproved = false;
+        userDataToCreate.isRejected = false;
+        userDataToCreate.rejectionReason = null;
+
         if (vehicleInfo) {
             userDataToCreate.vehicleInfo = vehicleInfo;
         }
@@ -84,28 +89,70 @@ export const registerUser = async (userData) => {
  * @returns {Object} - User and tokens
  */
 export const loginUser = async (email, password) => {
+    console.log('🔐 [LOGIN] Attempting login for:', email);
+
     // Find user by email and explicitly select password field (it's excluded by default)
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
+        console.log('❌ [LOGIN] User not found');
         const error = new Error('Invalid email or password');
         error.statusCode = 401;
         throw error;
     }
 
-    // Check if user is active - ONLY for delivery boys
-    if (user.role === 'delivery' && !user.isActive) {
-        const error = new Error('Your delivery partner account is pending admin approval. Please wait for verification.');
-        error.statusCode = 403;
-        throw error;
-    }
+    console.log('👤 [LOGIN] User found:', {
+        id: user._id,
+        role: user.role,
+        isActive: user.isActive,
+        isApproved: user.isApproved,
+        isRejected: user.isRejected
+    });
 
-    // Verify password
+    // Verify password first (before checking approval status)
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
         const error = new Error('Invalid email or password');
         error.statusCode = 401;
         throw error;
+    }
+
+    // Check approval status for delivery agents
+    if (user.role === 'delivery') {
+        console.log('🚴 [LOGIN] Delivery agent - checking approval status');
+
+        // Check if rejected
+        if (user.isRejected) {
+            console.log('❌ [LOGIN] Account rejected:', user.rejectionReason);
+            const error = new Error(
+                user.rejectionReason
+                    ? `Your delivery partner application has been rejected. Reason: ${user.rejectionReason}`
+                    : 'Your delivery partner application has been rejected. Please contact admin for more details.'
+            );
+            error.statusCode = 403;
+            error.code = 'ACCOUNT_REJECTED';
+            throw error;
+        }
+
+        // Check if not yet approved (pending state)
+        if (!user.isApproved) {
+            console.log('⏳ [LOGIN] Account pending approval');
+            const error = new Error('Your delivery partner account is pending admin approval. Please wait for verification.');
+            error.statusCode = 403;
+            error.code = 'APPROVAL_PENDING';
+            throw error;
+        }
+
+        // If approved, check if account is active
+        if (!user.isActive) {
+            console.log('🚫 [LOGIN] Account inactive');
+            const error = new Error('Your account has been deactivated. Please contact admin.');
+            error.statusCode = 403;
+            error.code = 'ACCOUNT_INACTIVE';
+            throw error;
+        }
+
+        console.log('✅ [LOGIN] Delivery agent approved and active');
     }
 
     // Generate tokens
@@ -122,6 +169,8 @@ export const loginUser = async (email, password) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
+
+    console.log('✅ [LOGIN] Login successful for:', email, '| Role:', user.role);
 
     return {
         user: user.getPublicProfile(),
