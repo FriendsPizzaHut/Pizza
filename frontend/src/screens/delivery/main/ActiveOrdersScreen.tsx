@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions, Image, Animated, PanResponder, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions, Image, Animated, PanResponder, Easing, ActivityIndicator, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { DeliveryStackParamList, DeliveryTabParamList } from '../../../types/nav
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDeliveryOrders } from '../../../hooks/useDeliveryOrders';
 
 const { width } = Dimensions.get('window');
 
@@ -274,80 +275,63 @@ const SwipeToConfirm: React.FC<SwipeToConfirmProps> = ({ onConfirm, status, butt
 export default function ActiveOrdersScreen() {
     const navigation = useNavigation<NavigationProp>();
 
-    const [orders, setOrders] = useState([
-        {
-            id: '#ORD-158',
-            customerName: 'Sarah Johnson',
-            customerPhone: '+1 (555) 123-4567',
-            restaurant: 'Pizza Palace',
-            restaurantAddress: '123 Restaurant St.',
-            restaurantPhone: '+1 (555) 111-2222',
-            deliveryAddress: '456 Oak Avenue, Apt 4B',
-            distance: '2.1 km',
-            estimatedTime: '15 mins',
-            status: 'picked_up',
-            total: '₹485.50',
-            items: ['Large Pepperoni Pizza', 'Garlic Bread', 'Coke'],
-            earnings: '₹65.00',
-            orderTime: '2:30 PM',
-            currentStep: 2, // 0: going to restaurant, 1: at restaurant, 2: picked up, 3: delivered
-            paymentMethod: 'cod', // 'online' or 'cod'
-        },
-        {
-            id: '#ORD-159',
-            customerName: 'Mike Chen',
-            customerPhone: '+1 (555) 987-6543',
-            restaurant: 'Burger Junction',
-            restaurantAddress: '789 Food Street',
-            restaurantPhone: '+1 (555) 333-4444',
-            deliveryAddress: '123 Maple Ave, Suite 12',
-            distance: '3.5 km',
-            estimatedTime: '22 mins',
-            status: 'ready_for_pickup',
-            total: '₹599.99',
-            items: ['2 Medium Pizzas', 'Buffalo Wings', 'Sprite'],
-            earnings: '₹78.00',
-            orderTime: '1:15 PM',
-            currentStep: 1,
-            paymentMethod: 'online', // 'online' or 'cod'
-        },
-    ]);
+    // Use custom hook for orders management
+    const {
+        orders,
+        loading,
+        error,
+        refreshing,
+        onRefresh,
+        updateOrderStatus,
+        removeOrder,
+    } = useDeliveryOrders();
 
     const handlePickup = async (orderId: string) => {
-        // Simulate backend API call with delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        setOrders(prevOrders =>
-            prevOrders.map(order =>
-                order.id === orderId
-                    ? { ...order, status: 'picked_up', currentStep: 2 }
-                    : order
-            )
-        );
+        try {
+            console.log('📦 [PICKUP] Marking order as picked up:', orderId);
+            await updateOrderStatus(orderId, 'out_for_delivery');
+        } catch (error: any) {
+            console.error('❌ [PICKUP] Error:', error.message);
+            Alert.alert('Error', 'Failed to update pickup status. Please try again.');
+        }
     };
 
     const handleDelivery = async (orderId: string) => {
-        // Simulate backend API call with delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+            console.log('✅ [DELIVERY] Marking order as delivered:', orderId);
 
-        setOrders(prevOrders =>
-            prevOrders.map(order => {
-                if (order.id === orderId) {
-                    // Check payment method
-                    if (order.paymentMethod === 'cod') {
-                        // COD: Move to awaiting_payment state
-                        return { ...order, status: 'awaiting_payment', currentStep: 3 };
-                    } else {
-                        // Online payment: Mark as delivered
-                        return { ...order, status: 'delivered', currentStep: 3 };
-                    }
-                }
-                return order;
-            })
-        );
+            const order = orders.find(o => o._id === orderId);
+            if (order?.paymentMethod === 'cod') {
+                // COD: Navigate to payment collection screen
+                navigation.navigate('PaymentCollection', {
+                    orderId: order._id,
+                    orderNumber: order.id,
+                    customerName: order.customerName,
+                    customerPhone: order.customerPhone,
+                    totalAmount: order.totalAmount,
+                    orderItems: order.items.map(item => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price,
+                    })),
+                    deliveryAddress: order.deliveryAddress,
+                });
+            } else {
+                // Online payment: Mark as delivered
+                await updateOrderStatus(orderId, 'delivered');
+
+                // Remove from list after 3 seconds
+                setTimeout(() => {
+                    removeOrder(orderId);
+                }, 3000);
+            }
+        } catch (error: any) {
+            console.error('❌ [DELIVERY] Error:', error.message);
+            Alert.alert('Error', 'Failed to update delivery status. Please try again.');
+        }
     };
 
-    // Auto-remove online payment orders after 5 seconds when delivered
+    // Auto-remove online payment orders after delivery
     useEffect(() => {
         const deliveredOnlineOrders = orders.filter(
             order => order.status === 'delivered' && order.paymentMethod === 'online'
@@ -356,9 +340,7 @@ export default function ActiveOrdersScreen() {
         if (deliveredOnlineOrders.length > 0) {
             const timers = deliveredOnlineOrders.map(order => {
                 return setTimeout(() => {
-                    setOrders(prevOrders =>
-                        prevOrders.filter(o => o.id !== order.id)
-                    );
+                    removeOrder(order._id);
                 }, 5000);
             });
 
@@ -366,19 +348,19 @@ export default function ActiveOrdersScreen() {
                 timers.forEach(timer => clearTimeout(timer));
             };
         }
-    }, [orders]);
+    }, [orders, removeOrder]);
 
     // Get color based on order status
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'ready_for_pickup':
-                return '#FF9800'; // Orange for pickup
-            case 'picked_up':
-                return '#0C7C59'; // Green for delivery
+            case 'ready':
+                return '#FF9800'; // Orange for pickup (assigned, needs pickup)
+            case 'out_for_delivery':
+                return '#0C7C59'; // Green for delivery (in transit)
             case 'awaiting_payment':
                 return '#FF9800'; // Orange for COD collection
             case 'delivered':
-                return '#2196F3'; // Blue for completed
+                return '#4CAF50'; // Green for completed
             default:
                 return '#0C7C59';
         }
@@ -408,7 +390,18 @@ export default function ActiveOrdersScreen() {
                 </View>
             </SafeAreaView>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.content}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#cb202d']}
+                        tintColor="#cb202d"
+                    />
+                }
+            >
                 {/* Advertisement Banner */}
                 <View style={styles.advertisementBanner}>
                     <Image
@@ -417,7 +410,23 @@ export default function ActiveOrdersScreen() {
                         resizeMode="cover"
                     />
                 </View>
-                {orders.length === 0 ? (
+
+                {/* Loading State */}
+                {loading && orders.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#cb202d" />
+                        <Text style={styles.loadingText}>Loading your orders...</Text>
+                    </View>
+                ) : error ? (
+                    <View style={styles.errorContainer}>
+                        <MaterialIcons name="error-outline" size={64} color="#F44336" />
+                        <Text style={styles.errorTitle}>Failed to Load Orders</Text>
+                        <Text style={styles.errorMessage}>{error}</Text>
+                        <TouchableOpacity style={styles.retryButton} onPress={() => onRefresh()}>
+                            <Text style={styles.retryButtonText}>Retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : orders.length === 0 ? (
                     <View style={styles.emptyState}>
                         <MaterialIcons name="delivery-dining" size={64} color="#E0E0E0" />
                         <Text style={styles.emptyStateTitle}>No Active Orders</Text>
@@ -457,7 +466,7 @@ export default function ActiveOrdersScreen() {
                                             </Text>
                                         </View>
                                     </View>
-                                    <Text style={styles.orderNumber}>Order {order.id}</Text>
+                                    <Text style={styles.orderNumber}>{order.id}</Text>
                                 </View>
                             </View>
 
@@ -468,10 +477,10 @@ export default function ActiveOrdersScreen() {
                                     <View style={styles.statusBadge}>
                                         <View style={styles.statusDot} />
                                         <Text style={styles.statusText}>
-                                            {order.status === 'picked_up' ? 'On the way to customer' : 'Ready for pickup'}
+                                            {order.status === 'out_for_delivery' ? 'On the way to customer' : 'Ready for pickup'}
                                         </Text>
                                     </View>
-                                    <Text style={styles.orderTime}>{order.orderTime}</Text>
+                                    <Text style={styles.orderTime}>{new Date(order.orderTime).toLocaleTimeString()}</Text>
                                 </View>
                             </View>
 
@@ -498,23 +507,44 @@ export default function ActiveOrdersScreen() {
 
                                 <View style={styles.itemsList}>
                                     {order.items.map((item, itemIndex) => {
-                                        // Parse item to extract quantity and name (assuming format like "2x Margherita Pizza")
-                                        const itemMatch = item.match(/^(\d+)x?\s*(.+)$/);
-                                        const quantity = itemMatch ? itemMatch[1] : '1';
-                                        const itemName = itemMatch ? itemMatch[2] : item;
-                                        // Mock individual prices for demo (in real app, this would come from order data)
-                                        const itemPrice = itemIndex === 0 ? 24.99 : itemIndex === 1 ? 8.99 : 4.99;
-                                        const totalItemPrice = parseFloat(quantity) * itemPrice;
+                                        const quantity = item.quantity;
+                                        const itemName = item.name;
+                                        const itemPrice = item.price;
+                                        const totalItemPrice = quantity * itemPrice;
 
                                         return (
                                             <View key={itemIndex} style={styles.summaryItem}>
                                                 <Text style={styles.itemQuantityName}>
                                                     {quantity} × {itemName}
                                                 </Text>
-                                                <Text style={styles.itemPrice}>${totalItemPrice.toFixed(2)}</Text>
+                                                <Text style={styles.itemPrice}>₹{totalItemPrice.toFixed(2)}</Text>
                                             </View>
                                         );
                                     })}
+                                </View>
+
+                                <View style={styles.summaryDivider} />
+
+                                {/* Pricing Breakdown */}
+                                <View style={styles.pricingBreakdown}>
+                                    <View style={styles.breakdownRow}>
+                                        <Text style={styles.breakdownLabel}>Subtotal</Text>
+                                        <Text style={styles.breakdownValue}>₹{order.subtotal?.toFixed(2) || '0.00'}</Text>
+                                    </View>
+                                    <View style={styles.breakdownRow}>
+                                        <Text style={styles.breakdownLabel}>Tax</Text>
+                                        <Text style={styles.breakdownValue}>₹{order.tax?.toFixed(2) || '0.00'}</Text>
+                                    </View>
+                                    <View style={styles.breakdownRow}>
+                                        <Text style={styles.breakdownLabel}>Delivery Fee</Text>
+                                        <Text style={styles.breakdownValue}>₹{order.deliveryFee?.toFixed(2) || '0.00'}</Text>
+                                    </View>
+                                    {order.discount > 0 && (
+                                        <View style={styles.breakdownRow}>
+                                            <Text style={[styles.breakdownLabel, styles.discountText]}>Discount</Text>
+                                            <Text style={[styles.breakdownValue, styles.discountText]}>-₹{order.discount?.toFixed(2)}</Text>
+                                        </View>
+                                    )}
                                 </View>
 
                                 <View style={styles.summaryDivider} />
@@ -526,19 +556,19 @@ export default function ActiveOrdersScreen() {
 
                             {/* Swipe Slider */}
                             <View style={styles.actionsSection}>
-                                {order.status === 'ready_for_pickup' ? (
+                                {order.status === 'ready' ? (
                                     <SwipeToConfirm
                                         key={`${order.id}-${order.status}`}
-                                        onConfirm={() => handlePickup(order.id)}
+                                        onConfirm={() => handlePickup(order._id)}
                                         status={order.status}
                                         buttonText="Slide to Pickup"
                                         buttonColor={getStatusColor(order.status)}
                                         icon="arrow-forward"
                                     />
-                                ) : order.status === 'picked_up' ? (
+                                ) : order.status === 'out_for_delivery' ? (
                                     <SwipeToConfirm
                                         key={`${order.id}-${order.status}`}
-                                        onConfirm={() => handleDelivery(order.id)}
+                                        onConfirm={() => handleDelivery(order._id)}
                                         status={order.status}
                                         buttonText="Slide to Complete"
                                         buttonColor={getStatusColor(order.status)}
@@ -555,14 +585,16 @@ export default function ActiveOrdersScreen() {
                                         </View>
                                         <TouchableOpacity
                                             style={styles.collectPaymentButton}
-                                            onPress={() => {
-                                                navigation.navigate('PaymentCollection', {
-                                                    orderId: order.id,
-                                                    customerName: order.customerName,
-                                                    totalAmount: order.total,
-                                                    orderItems: order.items,
-                                                    deliveryAddress: order.deliveryAddress,
-                                                });
+                                            onPress={async () => {
+                                                try {
+                                                    await updateOrderStatus(order._id, 'delivered');
+                                                    Alert.alert('Success', 'Payment collected successfully!');
+                                                    setTimeout(() => {
+                                                        removeOrder(order._id);
+                                                    }, 3000);
+                                                } catch (error) {
+                                                    Alert.alert('Error', 'Failed to confirm payment collection');
+                                                }
                                             }}
                                         >
                                             <MaterialIcons name="payment" size={20} color="#fff" />
@@ -878,6 +910,29 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         marginVertical: 8,
     },
+    pricingBreakdown: {
+        gap: 8,
+        marginBottom: 4,
+    },
+    breakdownRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    breakdownLabel: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500',
+    },
+    breakdownValue: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500',
+    },
+    discountText: {
+        color: '#4CAF50',
+        fontWeight: '600',
+    },
     totalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -895,6 +950,54 @@ const styles = StyleSheet.create({
         color: '#2d2d2d',
     },
 
+    // Loading State
+    loadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 20,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+
+    // Error State
+    errorContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 20,
+    },
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#F44336',
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    errorMessage: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    retryButton: {
+        backgroundColor: '#cb202d',
+        paddingHorizontal: 32,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    // Empty State
     emptyState: {
         alignItems: 'center',
         justifyContent: 'center',

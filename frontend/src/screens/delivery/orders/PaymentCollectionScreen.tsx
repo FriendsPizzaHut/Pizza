@@ -1,93 +1,119 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Alert, Dimensions, Image, ScrollView } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Alert, Dimensions, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DeliveryStackParamList } from '../../../types/navigation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axiosInstance from '../../../api/axiosInstance';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../../redux/store';
 
 const { width, height } = Dimensions.get('window');
 
 type NavigationProp = NativeStackNavigationProp<DeliveryStackParamList>;
-type PaymentMethod = 'qr' | 'cash';
-
-interface PaymentCollectionParams {
-    orderId: string;
-    customerName: string;
-    totalAmount: string;
-    orderItems: string[];
-    deliveryAddress: string;
-}
+type PaymentCollectionRouteProp = RouteProp<DeliveryStackParamList, 'PaymentCollection'>;
+type PaymentMethod = 'cash' | 'upi';
 
 export default function PaymentCollectionScreen() {
     const navigation = useNavigation<NavigationProp>();
-    const route = useRoute();
-    const params = route.params as PaymentCollectionParams;
+    const route = useRoute<PaymentCollectionRouteProp>();
+    const params = route.params;
+    const userId = useSelector((state: RootState) => state.auth.userId);
 
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr');
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
     const [isCollecting, setIsCollecting] = useState(false);
     const [paymentCompleted, setPaymentCompleted] = useState(false);
 
-    // Mock order data if params not available
-    const orderData = params || {
-        orderId: '#ORD-158',
-        customerName: 'Sarah Johnson',
-        totalAmount: '₹485.50',
-        orderItems: ['Large Pepperoni Pizza', 'Garlic Bread', 'Coke'],
-        deliveryAddress: '456 Oak Avenue, Apt 4B'
+    const handlePaymentCollection = async (method: 'cash' | 'upi') => {
+        setIsCollecting(true);
+
+        try {
+            console.log('💰 [PAYMENT] Collecting payment:', {
+                orderId: params.orderId,
+                method,
+                amount: params.totalAmount
+            });
+
+            // Step 1: Create payment record
+            // For COD orders: paymentMethod='cod', collectionMethod='cash'|'upi'
+            const paymentResponse = await axiosInstance.post('/payments', {
+                order: params.orderId,
+                user: userId,
+                amount: params.totalAmount,
+                paymentMethod: 'cod', // Order payment method
+                collectionMethod: method, // How payment was collected (cash/upi)
+                paymentStatus: 'completed',
+            });
+
+            console.log('✅ [PAYMENT] Payment record created:', paymentResponse.data);
+
+            // Step 2: Update order status to delivered
+            await axiosInstance.patch(`/orders/${params.orderId}/status`, {
+                status: 'delivered'
+            });
+
+            console.log('✅ [PAYMENT] Order marked as delivered');
+
+            setPaymentCompleted(true);
+            setIsCollecting(false);
+
+            Alert.alert(
+                'Payment Collected! 🎉',
+                `${method === 'cash' ? 'Cash' : 'UPI'} payment of ₹${params.totalAmount.toFixed(2)} has been collected successfully!`,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            // Navigate back to active orders (order will be removed by auto-cleanup)
+                            navigation.goBack();
+                        }
+                    }
+                ]
+            );
+        } catch (error: any) {
+            console.error('❌ [PAYMENT] Error:', error.message);
+            setIsCollecting(false);
+            Alert.alert(
+                'Payment Failed',
+                error.response?.data?.message || 'Failed to process payment. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const handleCashCollection = () => {
-        setIsCollecting(true);
-
         Alert.alert(
-            'Cash Collection',
-            `Collect ₹${orderData.totalAmount} from ${orderData.customerName}`,
+            'Collect Cash Payment',
+            `Confirm you have received ₹${params.totalAmount.toFixed(2)} from ${params.customerName}?`,
             [
                 {
                     text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => setIsCollecting(false)
+                    style: 'cancel'
                 },
                 {
                     text: 'Cash Received',
-                    onPress: () => {
-                        setPaymentCompleted(true);
-                        setIsCollecting(false);
-                        Alert.alert(
-                            'Payment Complete',
-                            'Cash payment has been collected successfully!',
-                            [
-                                {
-                                    text: 'OK',
-                                    onPress: () => navigation.goBack()
-                                }
-                            ]
-                        );
-                    }
+                    onPress: () => handlePaymentCollection('cash')
                 }
             ]
         );
     };
 
-    const handleQRPayment = () => {
-        setIsCollecting(true);
-
-        // Simulate QR scanner
-        setTimeout(() => {
-            setPaymentCompleted(true);
-            setIsCollecting(false);
-            Alert.alert(
-                'Payment Complete',
-                'QR payment has been processed successfully!',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => navigation.goBack()
-                    }
-                ]
-            );
-        }, 2000);
+    const handleUPIPayment = () => {
+        Alert.alert(
+            'UPI/QR Payment',
+            `Has customer paid ₹${params.totalAmount.toFixed(2)} via UPI?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Payment Received',
+                    onPress: () => handlePaymentCollection('upi')
+                }
+            ]
+        );
     };
 
     const renderQRScanner = () => (
@@ -122,12 +148,16 @@ export default function PaymentCollectionScreen() {
 
             <TouchableOpacity
                 style={[styles.actionButton, isCollecting && styles.disabledButton]}
-                onPress={handleQRPayment}
+                onPress={handleUPIPayment}
                 disabled={isCollecting}
             >
-                <MaterialIcons name="qr-code-scanner" size={20} color="#fff" />
+                {isCollecting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                    <MaterialIcons name="qr-code-scanner" size={20} color="#fff" />
+                )}
                 <Text style={styles.actionButtonText}>
-                    {isCollecting ? 'Processing Payment...' : 'Verify QR Payment'}
+                    {isCollecting ? 'Processing Payment...' : 'Confirm UPI Payment'}
                 </Text>
             </TouchableOpacity>
         </View>
@@ -166,9 +196,13 @@ export default function PaymentCollectionScreen() {
                 onPress={handleCashCollection}
                 disabled={isCollecting}
             >
-                <MaterialIcons name="check-circle" size={20} color="#fff" />
+                {isCollecting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                    <MaterialIcons name="check-circle" size={20} color="#fff" />
+                )}
                 <Text style={styles.actionButtonText}>
-                    {isCollecting ? 'Confirming...' : 'Cash Collected'}
+                    {isCollecting ? 'Processing...' : 'Confirm Cash Received'}
                 </Text>
             </TouchableOpacity>
         </View>
@@ -200,7 +234,7 @@ export default function PaymentCollectionScreen() {
                     <View style={styles.orderHeader}>
                         <View style={styles.orderIdContainer}>
                             <MaterialIcons name="receipt" size={20} color="#E23744" />
-                            <Text style={styles.orderId}>{orderData.orderId}</Text>
+                            <Text style={styles.orderId}>{params.orderNumber}</Text>
                         </View>
                         <View style={styles.codBadge}>
                             <MaterialIcons name="money" size={14} color="#FF9800" />
@@ -219,10 +253,10 @@ export default function PaymentCollectionScreen() {
                             resizeMode="cover"
                         />
                         <View style={styles.customerInfo}>
-                            <Text style={styles.customerName}>{orderData.customerName}</Text>
+                            <Text style={styles.customerName}>{params.customerName}</Text>
                             <View style={styles.addressRow}>
                                 <MaterialIcons name="location-on" size={14} color="#999" />
-                                <Text style={styles.deliveryAddress}>{orderData.deliveryAddress}</Text>
+                                <Text style={styles.deliveryAddress}>{params.deliveryAddress}</Text>
                             </View>
                         </View>
                     </View>
@@ -235,11 +269,11 @@ export default function PaymentCollectionScreen() {
                             <MaterialIcons name="account-balance-wallet" size={24} color="#E23744" />
                             <Text style={styles.amountLabel}>Amount to Collect</Text>
                         </View>
-                        <Text style={styles.amountValue}>{orderData.totalAmount}</Text>
+                        <Text style={styles.amountValue}>₹{params.totalAmount.toFixed(2)}</Text>
                         <View style={styles.amountBreakdown}>
                             <View style={styles.breakdownRow}>
                                 <Text style={styles.breakdownLabel}>Order Total</Text>
-                                <Text style={styles.breakdownValue}>{orderData.totalAmount}</Text>
+                                <Text style={styles.breakdownValue}>₹{params.totalAmount.toFixed(2)}</Text>
                             </View>
                         </View>
                     </View>
@@ -280,27 +314,27 @@ export default function PaymentCollectionScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.toggleButton,
-                                paymentMethod === 'qr' && styles.activeToggleButton
+                                paymentMethod === 'upi' && styles.activeToggleButton
                             ]}
-                            onPress={() => setPaymentMethod('qr')}
+                            onPress={() => setPaymentMethod('upi')}
                         >
                             <View style={[
                                 styles.toggleIconContainer,
-                                paymentMethod === 'qr' && styles.activeToggleIconContainer
+                                paymentMethod === 'upi' && styles.activeToggleIconContainer
                             ]}>
                                 <MaterialIcons
                                     name="qr-code-scanner"
                                     size={24}
-                                    color={paymentMethod === 'qr' ? '#fff' : '#E23744'}
+                                    color={paymentMethod === 'upi' ? '#fff' : '#E23744'}
                                 />
                             </View>
                             <Text style={[
                                 styles.toggleText,
-                                paymentMethod === 'qr' && styles.activeToggleText
+                                paymentMethod === 'upi' && styles.activeToggleText
                             ]}>
-                                QR Code
+                                UPI / QR
                             </Text>
-                            {paymentMethod === 'qr' && (
+                            {paymentMethod === 'upi' && (
                                 <MaterialIcons name="check-circle" size={20} color="#E23744" />
                             )}
                         </TouchableOpacity>
@@ -309,17 +343,19 @@ export default function PaymentCollectionScreen() {
 
                 {/* Payment Interface */}
                 <View style={styles.paymentInterface}>
-                    {paymentMethod === 'qr' ? renderQRScanner() : renderCashCollection()}
+                    {paymentMethod === 'upi' ? renderQRScanner() : renderCashCollection()}
                 </View>
 
                 {/* Order Summary */}
                 <View style={styles.orderSummarySection}>
                     <Text style={styles.sectionLabel}>ORDER SUMMARY</Text>
                     <View style={styles.orderSummaryCard}>
-                        {orderData.orderItems.map((item, index) => (
+                        {params.orderItems.map((item, index) => (
                             <View key={index} style={styles.orderItemRow}>
                                 <View style={styles.itemDot} />
-                                <Text style={styles.orderItem}>{item}</Text>
+                                <Text style={styles.orderItem}>
+                                    {item.quantity}x {item.name} - ₹{item.price.toFixed(2)}
+                                </Text>
                             </View>
                         ))}
                     </View>

@@ -22,6 +22,7 @@ import {
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,
+    getDeliveryAgentOrders,
 } from '../controllers/orderController.js';
 import { protect, adminOnly, deliveryOnly } from '../middlewares/authMiddleware.js';
 import { validate } from '../middlewares/validateMiddleware.js';
@@ -37,6 +38,9 @@ router.post('/', protect, validate(createOrderValidator), createOrder);
 
 // Get my orders - optimized for mobile (authenticated users - own orders)
 router.get('/my-orders', protect, getMyOrders);
+
+// Get delivery agent's assigned orders (delivery agents only)
+router.get('/delivery-agent/my-orders', protect, deliveryOnly, getDeliveryAgentOrders);
 
 // Get all orders (admin only)
 router.get('/', protect, adminOnly, getAllOrders);

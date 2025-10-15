@@ -54,13 +54,6 @@ export type CustomerStackParamList = {
 export type DeliveryTabParamList = {
     Home: undefined;
     ActiveOrders: undefined;
-    PaymentCollection: {
-        orderId: string;
-        customerName: string;
-        totalAmount: string;
-        orderItems: string[];
-        deliveryAddress: string;
-    } | undefined;
     Profile: undefined;
 };
 
@@ -70,6 +63,15 @@ export type DeliveryStackParamList = {
     OrderDetails: { orderId: string };
     Navigation: { orderId: string; address: string };
     CustomerContact: { orderId: string; customerPhone: string };
+    PaymentCollection: {
+        orderId: string;
+        orderNumber: string;
+        customerName: string;
+        customerPhone: string;
+        totalAmount: number;
+        orderItems: Array<{ name: string; quantity: number; price: number }>;
+        deliveryAddress: string;
+    };
     // Profile Sub-screens
     DeliverySettings: undefined;
     SupportTickets: undefined;

@@ -32,8 +32,13 @@ export const createPaymentValidator = [
     body('paymentMethod')
         .notEmpty()
         .withMessage('Payment method is required')
-        .isIn(['cash', 'card', 'upi', 'wallet'])
-        .withMessage('Payment method must be cash, card, upi, or wallet'),
+        .isIn(['cash', 'card', 'upi', 'wallet', 'cod'])
+        .withMessage('Payment method must be cash, card, upi, wallet, or cod'),
+
+    body('collectionMethod')
+        .optional()
+        .isIn(['cash', 'upi', 'card'])
+        .withMessage('Collection method must be cash, upi, or card'),
 
     body('status')
         .optional()

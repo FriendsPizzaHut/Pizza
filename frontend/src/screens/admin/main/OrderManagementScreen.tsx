@@ -542,8 +542,11 @@ export default function OrderManagementScreen() {
                                                     ? itemPrice
                                                     : parseFloat(quantity) * itemPrice;
 
+                                                // Create unique key using order ID + item details
+                                                const uniqueKey = `${order._id || order.id}-item-${itemIndex}-${itemName}`;
+
                                                 return (
-                                                    <View key={itemIndex} style={styles.summaryItem}>
+                                                    <View key={uniqueKey} style={styles.summaryItem}>
                                                         <Text style={styles.itemQuantityName}>
                                                             {quantity} × {itemName}
                                                         </Text>

@@ -255,6 +255,29 @@ export const deleteOrder = async (req, res, next) => {
     }
 };
 
+/**
+ * Get orders assigned to delivery agent
+ * GET /api/v1/orders/delivery-agent/my-orders
+ * @access Private/Delivery Agent
+ */
+export const getDeliveryAgentOrders = async (req, res, next) => {
+    try {
+        const deliveryAgentId = req.user.id;
+        const { status, limit } = req.query;
+
+        console.log(`🚴 [DELIVERY AGENT ORDERS] Agent: ${deliveryAgentId}`);
+
+        const orders = await orderService.getDeliveryAgentOrders(deliveryAgentId, {
+            status,
+            limit: limit ? parseInt(limit) : 20
+        });
+
+        sendResponse(res, 200, 'Orders retrieved successfully', { orders });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export default {
     createOrder,
     createOrderFromCart,
@@ -267,4 +290,5 @@ export default {
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,
+    getDeliveryAgentOrders,
 };

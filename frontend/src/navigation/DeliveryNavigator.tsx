@@ -7,13 +7,13 @@ import { DeliveryTabParamList, DeliveryStackParamList } from '../types/navigatio
 // Main Tab Screens
 import DeliveryHomeScreen from '../screens/delivery/main/HomeScreen';
 import ActiveOrdersScreen from '../screens/delivery/main/ActiveOrdersScreen';
-import PaymentCollectionScreen from '../screens/delivery/main/PaymentCollectionScreen';
 import DeliveryProfileScreen from '../screens/delivery/main/ProfileScreen';
 
 // Sub-screens
 import DeliveryOrderDetailsScreen from '../screens/delivery/orders/OrderDetailsScreen';
 import NavigationScreen from '../screens/delivery/orders/NavigationScreen';
 import CustomerContactScreen from '../screens/delivery/orders/CustomerContactScreen';
+import PaymentCollectionScreen from '../screens/delivery/orders/PaymentCollectionScreen';
 import DeliveryAccountSettingsScreen from '../screens/delivery/profile/AccountSettingsScreen';
 
 const Tab = createBottomTabNavigator<DeliveryTabParamList>();
@@ -33,9 +33,6 @@ function DeliveryTabs() {
                             break;
                         case 'ActiveOrders':
                             iconName = focused ? 'bicycle' : 'bicycle-outline';
-                            break;
-                        case 'PaymentCollection':
-                            iconName = focused ? 'card' : 'card-outline';
                             break;
                         case 'Profile':
                             iconName = focused ? 'person' : 'person-outline';
@@ -64,7 +61,6 @@ function DeliveryTabs() {
         >
             <Tab.Screen name="Home" component={DeliveryHomeScreen} />
             <Tab.Screen name="ActiveOrders" component={ActiveOrdersScreen} />
-            <Tab.Screen name="PaymentCollection" component={PaymentCollectionScreen} options={{ title: 'Payment' }} />
             <Tab.Screen name="Profile" component={DeliveryProfileScreen} />
         </Tab.Navigator>
     );
@@ -84,6 +80,14 @@ export default function DeliveryNavigator() {
             <Stack.Screen name="OrderDetails" component={DeliveryOrderDetailsScreen} />
             <Stack.Screen name="Navigation" component={NavigationScreen} />
             <Stack.Screen name="CustomerContact" component={CustomerContactScreen} />
+            <Stack.Screen
+                name="PaymentCollection"
+                component={PaymentCollectionScreen}
+                options={{
+                    headerShown: false,
+                    presentation: 'card',
+                }}
+            />
 
             {/* Profile Sub-screens */}
             <Stack.Screen name="DeliverySettings" component={DeliveryAccountSettingsScreen} />

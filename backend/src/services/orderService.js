@@ -392,12 +392,15 @@ export const assignDeliveryAgent = async (orderId, deliveryAgentId) => {
 
     // Update order with delivery agent
     order.deliveryAgent = deliveryAgentId;
-    order.status = 'out_for_delivery';
+    // Keep status as 'ready' - agent needs to accept/pickup first
+    // Status will change to 'out_for_delivery' when agent picks up
 
-    if (!order.statusHistory) {
-        order.statusHistory = {};
-    }
-    order.statusHistory.out_for_delivery = new Date();
+    // Add status history entry for assignment
+    order.statusHistory.push({
+        status: 'ready',
+        timestamp: new Date(),
+        note: 'Delivery agent assigned'
+    });
 
     await order.save();
 
@@ -431,6 +434,78 @@ export const deleteOrder = async (orderId) => {
     return { message: 'Order deleted successfully' };
 };
 
+/**
+ * Get orders assigned to a delivery agent
+ * @param {String} deliveryAgentId - Delivery agent user ID
+ * @param {Object} filters - Optional filters (status, limit)
+ * @returns {Array} - List of orders assigned to the agent
+ */
+export const getDeliveryAgentOrders = async (deliveryAgentId, filters = {}) => {
+    console.log(`📦 [GET DELIVERY AGENT ORDERS] Agent ID: ${deliveryAgentId}`);
+    console.log(`   Filters:`, filters);
+
+    const { status, limit = 20 } = filters;
+
+    // Build query
+    const query = {
+        deliveryAgent: deliveryAgentId,
+        // Show active orders: ready (assigned, needs pickup), out_for_delivery (in transit)
+        status: { $in: ['ready', 'out_for_delivery'] }
+    };
+
+    // Apply status filter if provided
+    if (status) {
+        query.status = status;
+    }
+
+    // Fetch orders
+    const orders = await Order.find(query)
+        .populate('user', 'name phone email profileImage')
+        .populate('items.product', 'name price images category')
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+    console.log(`   ✅ Found ${orders.length} orders for delivery agent`);
+
+    // Transform orders to match frontend format
+    const transformedOrders = orders.map(order => ({
+        id: order.orderNumber,
+        _id: order._id,
+        customerName: order.user?.name || 'Unknown Customer',
+        customerPhone: order.user?.phone || 'N/A',
+        customerEmail: order.user?.email,
+        profileImage: order.user?.profileImage,
+        deliveryAddress: order.deliveryAddress,
+        restaurant: 'Pizza Palace', // You can enhance this later
+        restaurantAddress: '123 Restaurant St.',
+        restaurantPhone: '+1 (555) 111-2222',
+        distance: '2.5 km', // Calculate based on coordinates later
+        estimatedTime: '15 mins',
+        status: order.status,
+        total: `₹${order.totalAmount.toFixed(2)}`,
+        totalAmount: order.totalAmount,
+        items: order.items.map(item => ({
+            name: item.productSnapshot?.name || item.product?.name || 'Item',
+            quantity: item.quantity,
+            price: item.subtotal / item.quantity, // Price per unit
+            subtotal: item.subtotal
+        })),
+        // Order pricing breakdown
+        subtotal: order.subtotal,
+        tax: order.tax,
+        deliveryFee: order.deliveryFee,
+        discount: order.discount || 0,
+        earnings: `₹${(order.totalAmount * 0.1).toFixed(2)}`, // 10% commission
+        orderTime: order.createdAt,
+        currentStep: order.status === 'ready' ? 1 : order.status === 'out_for_delivery' ? 2 : 0,
+        paymentMethod: order.paymentMethod === 'cash' ? 'cod' : order.paymentMethod || 'online',
+        paymentStatus: order.paymentStatus || 'pending',
+    }));
+
+    return transformedOrders;
+};
+
 export default {
     createOrder,
     createOrderFromCart,
@@ -440,4 +515,5 @@ export default {
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,
+    getDeliveryAgentOrders,
 };

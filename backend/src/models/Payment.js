@@ -26,8 +26,14 @@ const paymentSchema = new mongoose.Schema(
         },
         paymentMethod: {
             type: String,
-            enum: ['card', 'upi', 'cod'],
+            enum: ['card', 'upi', 'cod', 'cash'],
             required: [true, 'Payment method is required'],
+        },
+        // For COD orders, track how payment was actually collected
+        collectionMethod: {
+            type: String,
+            enum: ['cash', 'upi', 'card'],
+            required: false, // Only required for COD orders
         },
         paymentStatus: {
             type: String,
