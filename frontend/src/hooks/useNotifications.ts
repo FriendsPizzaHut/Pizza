@@ -1,165 +1,131 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import notificationService from '../services/notifications';
+import NotificationService from '../services/notifications/NotificationService';
+import type { NotificationInitOptions, NotificationData } from '../types/notification';
 
 /**
  * Notifications Hook
  * 
- * Provides notification functionality and event handlers.
- * Handles incoming notifications and user interactions.
+ * React hook for managing notification lifecycle with memoized callbacks and cleanup
+ * 
+ * @example
+ * ```tsx
+ * const { initialize, cleanup } = useNotifications({
+ *   userId: user._id,
+ *   userRole: 'admin',
+ *   onNotificationReceived: (notification) => {
+ *     Toast.show({ type: 'info', text1: notification.request.content.title });
+ *   },
+ *   onNotificationTap: (response) => {
+ *     const orderId = response.notification.request.content.data.orderId;
+ *     navigation.navigate('OrderDetails', { orderId });
+ *   }
+ * });
+ * ```
  */
 
-export interface NotificationData {
-    title: string;
-    body: string;
-    data?: any;
+interface UseNotificationsReturn {
+    initialize: () => Promise<boolean>;
+    cleanup: () => void;
+    showLocalNotification: (title: string, body: string, data?: NotificationData) => Promise<void>;
+    currentToken: string | null;
 }
 
-export const useNotifications = () => {
-    const [notification, setNotification] = useState<Notifications.Notification | null>(null);
-    const [isInitialized, setIsInitialized] = useState(false);
-    const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
-    const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
+export const useNotifications = (
+    options: NotificationInitOptions
+): UseNotificationsReturn => {
+    const { userId, userRole, onNotificationReceived, onNotificationTap } = options;
+    const isInitializedRef = useRef(false);
 
-    /**
-     * Initialize Notifications
-     */
-    useEffect(() => {
-        const init = async () => {
-            try {
-                await notificationService.initialize();
-                setIsInitialized(true);
-            } catch (error) {
-                console.error('Error initializing notifications:', error);
+    // Memoized notification received handler
+    const handleNotificationReceived = useCallback(
+        (notification: Notifications.Notification) => {
+            if (onNotificationReceived) {
+                onNotificationReceived(notification);
             }
-        };
+        },
+        [onNotificationReceived]
+    );
 
-        init();
-    }, []);
-
-    /**
-     * Setup Notification Listeners
-     */
-    useEffect(() => {
-        // Listener for notifications received while app is foregrounded
-        notificationListener.current = Notifications.addNotificationReceivedListener(
-            (notification) => {
-                if (__DEV__) {
-                    console.log('📬 Notification received:', notification);
-                }
-                setNotification(notification);
+    // Memoized notification tap handler
+    const handleNotificationTap = useCallback(
+        (response: Notifications.NotificationResponse) => {
+            if (onNotificationTap) {
+                onNotificationTap(response);
             }
-        );
+        },
+        [onNotificationTap]
+    );
 
-        // Listener for when user taps on notification
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(
-            (response) => {
-                if (__DEV__) {
-                    console.log('👆 Notification tapped:', response);
-                }
-
-                const data = response.notification.request.content.data;
-                handleNotificationTap(data);
-            }
-        );
-
-        // Cleanup listeners
-        return () => {
-            if (notificationListener.current) {
-                notificationListener.current.remove();
-            }
-            if (responseListener.current) {
-                responseListener.current.remove();
-            }
-        };
-    }, []);
-
-    /**
-     * Handle Notification Tap
-     */
-    const handleNotificationTap = (data: any) => {
-        // This will be customized based on notification type
-        if (__DEV__) {
-            console.log('Handling notification tap with data:', data);
+    // Initialize notification system
+    const initialize = useCallback(async (): Promise<boolean> => {
+        if (isInitializedRef.current) {
+            console.log('⚠️ [useNotifications] Already initialized, skipping');
+            return true;
         }
 
-        // Navigate to appropriate screen based on notification data
-        if (data?.type === 'order') {
-            // Navigate to order details
-            // navigation.navigate('OrderDetails', { orderId: data.orderId });
-        } else if (data?.type === 'promotion') {
-            // Navigate to promotions/offers
-            // navigation.navigate('Offers');
-        }
-    };
-
-    /**
-     * Schedule Local Notification
-     */
-    const scheduleNotification = async (
-        title: string,
-        body: string,
-        data?: any,
-        trigger?: Notifications.NotificationTriggerInput
-    ): Promise<string | null> => {
         try {
-            const notificationId = await notificationService.scheduleNotification(
-                title,
-                body,
-                data,
-                trigger
+            console.log('🔔 [useNotifications] Initializing for:', { userId, userRole });
+
+            const success = await NotificationService.initialize(
+                userId,
+                userRole,
+                handleNotificationReceived,
+                handleNotificationTap
             );
-            return notificationId;
+
+            if (success) {
+                isInitializedRef.current = true;
+                console.log('✅ [useNotifications] Initialization successful');
+            } else {
+                console.warn('⚠️ [useNotifications] Initialization failed');
+            }
+
+            return success;
         } catch (error) {
-            console.error('Error scheduling notification:', error);
-            return null;
+            console.error('❌ [useNotifications] Initialization error:', error);
+            return false;
         }
-    };
+    }, [userId, userRole, handleNotificationReceived, handleNotificationTap]);
 
-    /**
-     * Cancel Notification
-     */
-    const cancelNotification = async (notificationId: string): Promise<void> => {
-        await notificationService.cancelNotification(notificationId);
-    };
+    // Cleanup notification listeners
+    const cleanup = useCallback(() => {
+        console.log('🧹 [useNotifications] Cleaning up');
+        NotificationService.cleanup();
+        isInitializedRef.current = false;
+    }, []);
 
-    /**
-     * Cancel All Notifications
-     */
-    const cancelAllNotifications = async (): Promise<void> => {
-        await notificationService.cancelAllNotifications();
-    };
+    // Show local notification (for testing)
+    const showLocalNotification = useCallback(
+        async (title: string, body: string, data?: NotificationData): Promise<void> => {
+            try {
+                await NotificationService.showLocalNotification(title, body, data);
+            } catch (error) {
+                console.error('❌ [useNotifications] Error showing local notification:', error);
+            }
+        },
+        []
+    );
 
-    /**
-     * Set Badge Count
-     */
-    const setBadgeCount = async (count: number): Promise<void> => {
-        await notificationService.setBadgeCount(count);
-    };
+    // Get current token
+    const getCurrentToken = useCallback((): string | null => {
+        return NotificationService.getCurrentToken();
+    }, []);
 
-    /**
-     * Clear Badge
-     */
-    const clearBadge = async (): Promise<void> => {
-        await notificationService.clearBadge();
-    };
-
-    /**
-     * Get Push Token
-     */
-    const getPushToken = (): string | null => {
-        return notificationService.getCurrentToken();
-    };
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (isInitializedRef.current) {
+                cleanup();
+            }
+        };
+    }, [cleanup]);
 
     return {
-        notification,
-        isInitialized,
-        scheduleNotification,
-        cancelNotification,
-        cancelAllNotifications,
-        setBadgeCount,
-        clearBadge,
-        getPushToken,
+        initialize,
+        cleanup,
+        showLocalNotification,
+        currentToken: getCurrentToken(),
     };
 };
 

@@ -120,6 +120,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import deviceTokenRoutes from './routes/deviceTokenRoutes.js';
 
 // Mount routes with /api/v1 prefix
 // Auth routes have stricter rate limiting
@@ -139,6 +140,7 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/activity', activityRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/upload', uploadRoutes);
+app.use('/api/v1/device-tokens', deviceTokenRoutes);
 
 /**
  * ROOT ENDPOINT

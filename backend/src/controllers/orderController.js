@@ -15,6 +15,7 @@
 import * as orderService from '../services/orderService.js';
 import { sendResponse } from '../utils/response.js';
 import { emitNewOrder, emitOrderStatusUpdate, emitOrderCancelled, emitDeliveryAssignment } from '../socket/events.js';
+import { notifyAdminsNewOrder, notifyDeliveryAgentOrderAssigned } from '../services/notifications/firebaseService.js';
 
 /**
  * Create new order
@@ -27,6 +28,13 @@ export const createOrder = async (req, res, next) => {
 
         // Emit real-time notification to admin and delivery agents
         emitNewOrder(order);
+
+        // Send push notification to admins (non-blocking)
+        // This runs asynchronously and won't delay the response
+        notifyAdminsNewOrder(order).catch(err => {
+            // Log error but don't fail the request
+            console.error('[ORDER] Failed to send push notification:', err);
+        });
 
         sendResponse(res, 201, 'Order created successfully', order);
     } catch (error) {
@@ -48,6 +56,13 @@ export const createOrderFromCart = async (req, res, next) => {
 
         // Emit real-time notification to admin and delivery agents
         emitNewOrder(order);
+
+        // Send push notification to admins (non-blocking)
+        // This runs asynchronously and won't delay the response
+        notifyAdminsNewOrder(order).catch(err => {
+            // Log error but don't fail the request
+            console.error('[ORDER] Failed to send push notification:', err);
+        });
 
         sendResponse(res, 201, 'Order placed successfully', order);
     } catch (error) {
@@ -143,6 +158,11 @@ export const assignDeliveryAgent = async (req, res, next) => {
 
         // Emit real-time notification to delivery agent, admin, and customer
         emitDeliveryAssignment(order);
+
+        // Send push notification to delivery agent (non-blocking)
+        notifyDeliveryAgentOrderAssigned(order, deliveryAgentId).catch(err => {
+            console.error('[ORDER] Failed to send push notification to delivery agent:', err);
+        });
 
         sendResponse(res, 200, 'Delivery agent assigned successfully', order);
     } catch (error) {

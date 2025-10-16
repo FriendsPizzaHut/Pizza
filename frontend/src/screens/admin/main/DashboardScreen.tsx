@@ -41,12 +41,11 @@ export default function AdminDashboardScreen() {
     ];
 
     const adminActions = [
-        { title: 'Manage Orders', description: 'View and manage all orders', icon: 'shopping-bag', color: '#cb202d' },
-        { title: 'Menu Management', description: 'Update menu items and prices', icon: 'restaurant-menu', color: '#4CAF50' },
-        { title: 'Delivery Tracking', description: 'Track all delivery personnel', icon: 'location-on', color: '#2196F3' },
-        { title: 'Staff Management', description: 'Manage delivery staff', icon: 'people', color: '#FF9800' },
-        { title: 'Analytics', description: 'View detailed reports', icon: 'bar-chart', color: '#9C27B0' },
-        { title: 'Settings', description: 'App and business settings', icon: 'settings', color: '#607D8B' },
+        { title: 'Manage Orders', description: 'View and manage all orders', icon: 'shopping-bag', color: '#cb202d', action: 'OrderManagement' },
+        { title: 'Menu Management', description: 'Update menu items and prices', icon: 'restaurant-menu', color: '#4CAF50', action: null },
+        { title: 'Delivery Tracking', description: 'Track all delivery personnel', icon: 'location-on', color: '#2196F3', action: null },
+        { title: 'Staff Management', description: 'Manage delivery staff', icon: 'people', color: '#FF9800', action: null },
+        { title: 'Analytics', description: 'View detailed reports', icon: 'bar-chart', color: '#9C27B0', action: null },
     ];
 
     const recentActivity = [
@@ -1118,5 +1117,47 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 24,
+    },
+    // Notification Debug Button Styles
+    debugButton: {
+        backgroundColor: 'white',
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 8,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FF6B35',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    debugButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+    },
+    debugIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FFF5F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    debugTextContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    debugTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#2d2d2d',
+        marginBottom: 2,
+    },
+    debugSubtitle: {
+        fontSize: 13,
+        color: '#666',
     },
 });

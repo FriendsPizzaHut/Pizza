@@ -79,8 +79,7 @@ const cartSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: [true, 'User reference is required'],
-            unique: true, // Each user can have only one cart
-            index: true,
+            unique: true, // Each user can have only one cart (unique automatically creates index)
         },
         items: [cartItemSchema],
         // Cart totals
@@ -134,7 +133,7 @@ const cartSchema = new mongoose.Schema(
 );
 
 // Indexes for performance
-cartSchema.index({ user: 1 });
+// Note: user already has unique index from schema definition
 cartSchema.index({ updatedAt: 1 });
 
 /**

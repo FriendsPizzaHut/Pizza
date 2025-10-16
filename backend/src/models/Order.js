@@ -62,16 +62,15 @@ const orderSchema = new mongoose.Schema(
         // Order identification
         orderNumber: {
             type: String,
-            unique: true,
+            unique: true, // unique automatically creates index
             required: true,
-            index: true,
         },
 
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: [true, 'User is required'],
-            index: true,
+            // index created via compound index below
         },
 
         items: {
@@ -123,7 +122,7 @@ const orderSchema = new mongoose.Schema(
             type: String,
             enum: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'awaiting_payment', 'delivered', 'cancelled', 'refunded'],
             default: 'pending',
-            index: true,
+            // index created explicitly below
         },
 
         // Status history
@@ -209,10 +208,10 @@ const orderSchema = new mongoose.Schema(
 );
 
 // Indexes for analytics and cleanup
-orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ status: 1 });
+orderSchema.index({ user: 1, createdAt: -1 }); // Compound index for user's orders
+orderSchema.index({ status: 1 }); // For filtering by status
 orderSchema.index({ createdAt: -1 }); // For sorting recent orders
-orderSchema.index({ orderNumber: 1 });
+// Note: orderNumber already has unique index from schema definition
 
 /**
  * Pre-save middleware: Add status to history when status changes

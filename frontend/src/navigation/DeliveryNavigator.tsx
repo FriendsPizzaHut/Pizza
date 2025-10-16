@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { DeliveryTabParamList, DeliveryStackParamList } from '../types/navigation';
+import NotificationInitializer from '../components/common/NotificationInitializer';
 
 // Main Tab Screens
 import DeliveryHomeScreen from '../screens/delivery/main/HomeScreen';
@@ -68,29 +69,32 @@ function DeliveryTabs() {
 
 export default function DeliveryNavigator() {
     return (
-        <Stack.Navigator
-            screenOptions={{
-                headerShown: false,
-                animation: 'slide_from_right',
-            }}
-        >
-            <Stack.Screen name="DeliveryTabs" component={DeliveryTabs} />
-
-            {/* Order Sub-screens */}
-            <Stack.Screen name="OrderDetails" component={DeliveryOrderDetailsScreen} />
-            <Stack.Screen name="Navigation" component={NavigationScreen} />
-            <Stack.Screen name="CustomerContact" component={CustomerContactScreen} />
-            <Stack.Screen
-                name="PaymentCollection"
-                component={PaymentCollectionScreen}
-                options={{
+        <>
+            <NotificationInitializer role="delivery" />
+            <Stack.Navigator
+                screenOptions={{
                     headerShown: false,
-                    presentation: 'card',
+                    animation: 'slide_from_right',
                 }}
-            />
+            >
+                <Stack.Screen name="DeliveryTabs" component={DeliveryTabs} />
 
-            {/* Profile Sub-screens */}
-            <Stack.Screen name="DeliverySettings" component={DeliveryAccountSettingsScreen} />
-        </Stack.Navigator>
+                {/* Order Sub-screens */}
+                <Stack.Screen name="OrderDetails" component={DeliveryOrderDetailsScreen} />
+                <Stack.Screen name="Navigation" component={NavigationScreen} />
+                <Stack.Screen name="CustomerContact" component={CustomerContactScreen} />
+                <Stack.Screen
+                    name="PaymentCollection"
+                    component={PaymentCollectionScreen}
+                    options={{
+                        headerShown: false,
+                        presentation: 'card',
+                    }}
+                />
+
+                {/* Profile Sub-screens */}
+                <Stack.Screen name="DeliverySettings" component={DeliveryAccountSettingsScreen} />
+            </Stack.Navigator>
+        </>
     );
 }

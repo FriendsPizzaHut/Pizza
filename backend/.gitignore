@@ -8,6 +8,9 @@ yarn.lock
 .env.local
 .env.*.local
 
+# Firebase service account (keep secret!)
+firebase-service-account.json
+
 # Logs
 logs/
 *.log

@@ -88,6 +88,8 @@ export type AdminStackParamList = {
     AdminTabs: undefined;
     // Main Screens
     Notifications: undefined;
+    // Debug Screens
+    NotificationDebug: undefined;
     // Order Management Sub-screens
     OrderDetails: { orderId: string };
     AssignDelivery: { orderId: string };

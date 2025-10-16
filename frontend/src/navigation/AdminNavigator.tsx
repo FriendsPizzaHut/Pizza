@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminTabParamList, AdminStackParamList } from '../types/navigation';
+import NotificationInitializer from '../components/common/NotificationInitializer';
 
 // Main Tab Screens
 import AdminDashboardScreen from '../screens/admin/main/DashboardScreen';
@@ -90,39 +91,42 @@ function AdminTabs() {
 
 export default function AdminNavigator() {
     return (
-        <Stack.Navigator
-            screenOptions={{
-                headerShown: false,
-                animation: 'slide_from_right',
-            }}
-        >
-            <Stack.Screen name="AdminTabs" component={AdminTabs} />
+        <>
+            <NotificationInitializer />
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            >
+                <Stack.Screen name="AdminTabs" component={AdminTabs} />
 
-            {/* Main Screens */}
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                {/* Main Screens */}
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
-            {/* Order Management Sub-screens */}
-            <Stack.Screen name="OrderDetails" component={AdminOrderDetailsScreen} />
-            <Stack.Screen name="AssignDelivery" component={AssignDeliveryScreen} />
-            <Stack.Screen name="AssignDeliveryAgent" component={AssignDeliveryAgentScreen} />
+                {/* Order Management Sub-screens */}
+                <Stack.Screen name="OrderDetails" component={AdminOrderDetailsScreen} />
+                <Stack.Screen name="AssignDelivery" component={AssignDeliveryScreen} />
+                <Stack.Screen name="AssignDeliveryAgent" component={AssignDeliveryAgentScreen} />
 
-            {/* Menu Management Sub-screens */}
-            <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} />
-            <Stack.Screen name="EditMenuItem" component={EditMenuItemScreen} />
-            <Stack.Screen name="CategoryManagement" component={CategoryManagementScreen} />
+                {/* Menu Management Sub-screens */}
+                <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} />
+                <Stack.Screen name="EditMenuItem" component={EditMenuItemScreen} />
+                <Stack.Screen name="CategoryManagement" component={CategoryManagementScreen} />
 
-            {/* Analytics Sub-screens */}
-            <Stack.Screen name="SalesReports" component={SalesReportsScreen} />
-            <Stack.Screen name="DeliveryAnalytics" component={DeliveryAnalyticsScreen} />
+                {/* Analytics Sub-screens */}
+                <Stack.Screen name="SalesReports" component={SalesReportsScreen} />
+                <Stack.Screen name="DeliveryAnalytics" component={DeliveryAnalyticsScreen} />
 
-            {/* Management Sub-screens */}
-            <Stack.Screen name="StaffManagement" component={StaffManagementScreen} />
-            <Stack.Screen name="RestaurantSettings" component={RestaurantSettingsScreen} />
-            <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
-            <Stack.Screen name="UserManagement" component={UserManagementScreen} />
-            <Stack.Screen name="DeliveryAgentApprovals" component={DeliveryAgentApprovalsScreen} />
-            <Stack.Screen name="OfferManagement" component={OfferManagementScreen} />
-            <Stack.Screen name="AddOffer" component={AddOfferScreen} />
-        </Stack.Navigator>
+                {/* Management Sub-screens */}
+                <Stack.Screen name="StaffManagement" component={StaffManagementScreen} />
+                <Stack.Screen name="RestaurantSettings" component={RestaurantSettingsScreen} />
+                <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                <Stack.Screen name="UserManagement" component={UserManagementScreen} />
+                <Stack.Screen name="DeliveryAgentApprovals" component={DeliveryAgentApprovalsScreen} />
+                <Stack.Screen name="OfferManagement" component={OfferManagementScreen} />
+                <Stack.Screen name="AddOffer" component={AddOfferScreen} />
+            </Stack.Navigator>
+        </>
     );
 }
