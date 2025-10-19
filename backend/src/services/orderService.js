@@ -8,8 +8,10 @@
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Cart from '../models/Cart.js';
+import User from '../models/User.js';
 import { invalidateDashboardCache } from './dashboardService.js';
 import { processOrderUpdates } from './postOrderService.js';
+import { updateAnalyticsOnOrderDelivery } from './analyticsService.js';
 
 /**
  * Create new order
@@ -147,7 +149,7 @@ export const getOrderById = async (orderId) => {
 };
 
 /**
- * Accept order (pending → confirmed)
+ * Accept order (pending → accepted)
  * @param {String} orderId - Order ID
  * @returns {Object} - Updated order
  */
@@ -168,8 +170,8 @@ export const acceptOrder = async (orderId) => {
         throw error;
     }
 
-    order.status = 'confirmed';
-    order.confirmedAt = new Date();
+    order.status = 'accepted';
+    order.acceptedAt = new Date();
     await order.save();
 
     // Invalidate dashboard cache
@@ -233,7 +235,7 @@ export const getMyOrders = async (userId, options = {}) => {
 
     // Fetch orders with minimal data and lean() for performance
     const orders = await Order.find(query)
-        .select('orderNumber items status totalAmount subtotal tax deliveryFee discount createdAt deliveryAddress contactPhone estimatedDeliveryTime deliveredAt paymentMethod')
+        .select('orderNumber items status totalAmount subtotal tax deliveryFee discount createdAt deliveryAddress contactPhone estimatedDeliveryTime deliveredAt paymentMethod deliveryAgentDetails')
         .populate({
             path: 'items.product',
             select: 'name imageUrl category',
@@ -262,7 +264,7 @@ export const getMyOrders = async (userId, options = {}) => {
 
         // Determine status type for UI
         let statusType = 'completed';
-        if (['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)) {
+        if (['pending', 'accepted', 'assigned', 'out_for_delivery'].includes(order.status)) {
             statusType = 'active';
         } else if (order.status === 'cancelled') {
             statusType = 'cancelled';
@@ -279,9 +281,8 @@ export const getMyOrders = async (userId, options = {}) => {
         // Format status for display
         const statusDisplayMap = {
             'pending': 'Order Placed',
-            'confirmed': 'Confirmed',
-            'preparing': 'Preparing',
-            'ready': 'Ready',
+            'accepted': 'Accepted',
+            'assigned': 'Agent Assigned',
             'out_for_delivery': 'Out for Delivery',
             'delivered': 'Delivered',
             'cancelled': 'Cancelled',
@@ -316,6 +317,12 @@ export const getMyOrders = async (userId, options = {}) => {
                 hour12: true,
             }),
             estimatedTime,
+            // Delivery agent details (available when status is 'assigned' or later)
+            deliveryAgent: order.deliveryAgentDetails ? {
+                name: order.deliveryAgentDetails.name,
+                phone: order.deliveryAgentDetails.phone,
+                vehicleNumber: order.deliveryAgentDetails.vehicleNumber,
+            } : null,
         };
     });
 
@@ -348,6 +355,11 @@ export const updateOrderStatus = async (orderId, updateData) => {
     // Update status
     order.status = updateData.status;
 
+    // Update payment status if provided
+    if (updateData.paymentStatus) {
+        order.paymentStatus = updateData.paymentStatus;
+    }
+
     // Set delivered timestamp if status is delivered
     if (updateData.status === 'delivered') {
         order.deliveredAt = new Date();
@@ -363,6 +375,14 @@ export const updateOrderStatus = async (orderId, updateData) => {
 
     // Invalidate dashboard cache (order status change affects stats)
     await invalidateDashboardCache();
+
+    // 📊 Update customer and product analytics when order is delivered
+    if (updateData.status === 'delivered') {
+        // Run analytics update in background (don't wait for it)
+        updateAnalyticsOnOrderDelivery(orderId).catch(error => {
+            console.error('Analytics update failed (non-blocking):', error.message);
+        });
+    }
 
     return order;
 };
@@ -383,23 +403,39 @@ export const assignDeliveryAgent = async (orderId, deliveryAgentId) => {
         throw error;
     }
 
-    // Check if order is in valid status for assignment
-    if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
-        const error = new Error('Order must be confirmed, preparing, or ready to assign delivery agent');
+    // Check if order is in valid status for assignment (only accepted orders can be assigned)
+    if (order.status !== 'accepted') {
+        const error = new Error('Order must be accepted before assigning delivery agent');
         error.statusCode = 400;
+        throw error;
+    }
+
+    // Find delivery agent to get details
+    const deliveryAgent = await User.findById(deliveryAgentId).select('name phone vehicleDetails');
+
+    if (!deliveryAgent) {
+        const error = new Error('Delivery agent not found');
+        error.statusCode = 404;
         throw error;
     }
 
     // Update order with delivery agent
     order.deliveryAgent = deliveryAgentId;
-    // Keep status as 'ready' - agent needs to accept/pickup first
-    // Status will change to 'out_for_delivery' when agent picks up
+    order.status = 'assigned';
+    order.assignedAt = new Date();
+
+    // Store delivery agent details snapshot for customer view
+    order.deliveryAgentDetails = {
+        name: deliveryAgent.name,
+        phone: deliveryAgent.phone,
+        vehicleNumber: deliveryAgent.vehicleDetails?.vehicleNumber || 'N/A'
+    };
 
     // Add status history entry for assignment
     order.statusHistory.push({
-        status: 'ready',
+        status: 'assigned',
         timestamp: new Date(),
-        note: 'Delivery agent assigned'
+        note: `Delivery agent assigned: ${deliveryAgent.name}`
     });
 
     await order.save();
@@ -449,8 +485,8 @@ export const getDeliveryAgentOrders = async (deliveryAgentId, filters = {}) => {
     // Build query
     const query = {
         deliveryAgent: deliveryAgentId,
-        // Show active orders: ready (assigned, needs pickup), out_for_delivery (in transit)
-        status: { $in: ['ready', 'out_for_delivery'] }
+        // Show active orders: assigned (needs pickup), out_for_delivery (in transit)
+        status: { $in: ['assigned', 'out_for_delivery'] }
     };
 
     // Apply status filter if provided

@@ -23,6 +23,7 @@ import AddAddressScreen from '../screens/customer/menu/AddAddressScreen';
 import EditAddressScreen from '../screens/customer/menu/EditAddressScreen';
 import TrackOrderScreen from '../screens/customer/orders/TrackOrderScreen';
 import OrderDetailsScreen from '../screens/customer/orders/OrderDetailsScreen';
+import ItemDetailsScreen from '../screens/customer/menu/ItemDetailsScreen';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 const Stack = createNativeStackNavigator<CustomerStackParamList>();
@@ -97,6 +98,7 @@ export default function CustomerNavigator() {
 
             {/* Menu Sub-screens */}
             <Stack.Screen name="PizzaDetails" component={PizzaDetailsScreen} />
+            <Stack.Screen name="ItemDetails" component={ItemDetailsScreen} />
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
 

@@ -118,9 +118,22 @@ const orderSchema = new mongoose.Schema(
             discountAmount: Number,
         },
 
+        // Applied offer
+        appliedOffer: {
+            offerId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Offer',
+            },
+            code: String,
+            title: String,
+            discountType: String,
+            discountValue: Number,
+            discountAmount: Number,
+        },
+
         status: {
             type: String,
-            enum: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'awaiting_payment', 'delivered', 'cancelled', 'refunded'],
+            enum: ['pending', 'accepted', 'assigned', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'],
             default: 'pending',
             // index created explicitly below
         },
@@ -134,9 +147,25 @@ const orderSchema = new mongoose.Schema(
             },
         ],
 
+        // Timestamp fields for status tracking
+        acceptedAt: {
+            type: Date,
+        },
+
+        assignedAt: {
+            type: Date,
+        },
+
         deliveryAgent: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
+        },
+
+        // Delivery agent details snapshot (for customer view)
+        deliveryAgentDetails: {
+            name: String,
+            phone: String,
+            vehicleNumber: String,
         },
 
         paymentStatus: {

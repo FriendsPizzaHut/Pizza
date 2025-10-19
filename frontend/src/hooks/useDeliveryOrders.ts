@@ -30,7 +30,7 @@ interface DeliveryOrder {
     deliveryAddress: string;
     distance: string;
     estimatedTime: string;
-    status: 'ready' | 'out_for_delivery' | 'delivered' | 'awaiting_payment';
+    status: 'assigned' | 'out_for_delivery' | 'delivered' | 'awaiting_payment';
     total: string;
     totalAmount: number;
     items: OrderItem[];
@@ -127,7 +127,7 @@ export const useDeliveryOrders = () => {
                 : `${data.deliveryAddress?.street || ''}, ${data.deliveryAddress?.city || ''}, ${data.deliveryAddress?.state || ''} ${data.deliveryAddress?.pincode || ''}`.trim(),
             distance: '2.5 km',
             estimatedTime: '15 mins',
-            status: data.status || 'ready',
+            status: data.status || 'assigned',
             total: `₹${data.totalAmount?.toFixed(2) || '0.00'}`,
             totalAmount: data.totalAmount || 0,
             items: data.items?.map((item: any) => ({

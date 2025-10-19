@@ -21,20 +21,10 @@ import { RootState } from '../../../../redux/store';
 import { io, Socket } from 'socket.io-client';
 import Constants from 'expo-constants';
 import axiosInstance from '../../../api/axiosInstance';
+import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
 
 // 🔥 PART 5.1: axiosInstance imported (not used yet)
 console.log('✅ PART 5.1 - axiosInstance imported successfully');
-
-// 🔥 PART 2: Socket URL Configuration
-// Get socket URL from environment (remove /api/v1 suffix if present)
-const SOCKET_URL = __DEV__
-    ? (Constants.expoConfig?.extra?.apiUrlDevelopment || 'http://localhost:5000').replace(/\/api\/v1$/, '')
-    : (Constants.expoConfig?.extra?.apiUrlProduction || 'https://pizzabackend-u9ui.onrender.com').replace(/\/api\/v1$/, '');
-
-console.log('🔌 PART 2 - Socket Configuration:');
-console.log('  - Environment:', __DEV__ ? 'development' : 'production');
-console.log('  - Socket URL:', SOCKET_URL);
-console.log('  - Raw apiUrlDevelopment:', Constants.expoConfig?.extra?.apiUrlDevelopment);
 
 // Static mock data for demonstration
 const MOCK_ORDERS = [
@@ -161,12 +151,7 @@ export default function OrderManagementScreen() {
         console.log('  - Connecting to:', SOCKET_URL);
 
         // Create socket connection
-        socketRef.current = io(SOCKET_URL, {
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-        });
+        socketRef.current = io(SOCKET_URL, SOCKET_OPTIONS);
 
         const socket = socketRef.current;
 
@@ -274,8 +259,8 @@ export default function OrderManagementScreen() {
     const filters = [
         { id: 'all', label: 'All Orders', count: orders.length },
         { id: 'pending', label: 'Pending', count: orders.filter(o => o.status === 'pending').length },
-        { id: 'confirmed', label: 'Confirmed', count: orders.filter(o => o.status === 'confirmed').length },
-        { id: 'preparing', label: 'Preparing', count: orders.filter(o => o.status === 'preparing').length },
+        { id: 'accepted', label: 'Accepted', count: orders.filter(o => o.status === 'accepted').length },
+        { id: 'assigned', label: 'Assigned', count: orders.filter(o => o.status === 'assigned').length },
         { id: 'out_for_delivery', label: 'Delivery', count: orders.filter(o => o.status === 'out_for_delivery').length },
         { id: 'delivered', label: 'Delivered', count: orders.filter(o => o.status === 'delivered').length },
     ];
@@ -284,12 +269,10 @@ export default function OrderManagementScreen() {
         switch (status) {
             case 'pending':
                 return { label: 'Pending', color: '#FF9800', bgColor: '#FFF3E0', icon: 'schedule' };
-            case 'confirmed':
-                return { label: 'Confirmed', color: '#2196F3', bgColor: '#E3F2FD', icon: 'check-circle' };
-            case 'preparing':
-                return { label: 'Preparing', color: '#2196F3', bgColor: '#E3F2FD', icon: 'restaurant' };
-            case 'ready':
-                return { label: 'Ready', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'check-circle' };
+            case 'accepted':
+                return { label: 'Accepted', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'check-circle' };
+            case 'assigned':
+                return { label: 'Assigned', color: '#2196F3', bgColor: '#E3F2FD', icon: 'person' };
             case 'out_for_delivery':
                 return { label: 'Out for Delivery', color: '#9C27B0', bgColor: '#F3E5F5', icon: 'delivery-dining' };
             case 'delivered':
@@ -584,7 +567,7 @@ export default function OrderManagementScreen() {
                                                 style={styles.assignButton}
                                                 onPress={() => {
                                                     // @ts-ignore - Navigation to parent stack screen
-                                                    navigation.navigate('AssignDeliveryAgent', {
+                                                    navigation.navigate('AssignDelivery', {
                                                         orderId: order.orderNumber || order._id || order.id,
                                                         orderDetails: order
                                                     });

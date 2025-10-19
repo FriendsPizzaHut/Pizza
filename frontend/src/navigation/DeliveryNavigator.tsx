@@ -70,7 +70,7 @@ function DeliveryTabs() {
 export default function DeliveryNavigator() {
     return (
         <>
-            <NotificationInitializer role="delivery" />
+            <NotificationInitializer />
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,

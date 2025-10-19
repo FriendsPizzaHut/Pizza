@@ -17,6 +17,8 @@ export default function PizzaDetailsScreen() {
     const dispatch = useDispatch<AppDispatch>();
     const { pizzaId } = route.params;
 
+    console.log('🍕 PizzaDetailsScreen mounted with pizzaId:', pizzaId);
+
     const [selectedSize, setSelectedSize] = useState(0);
     const [selectedToppings, setSelectedToppings] = useState<number[]>([]);
     const [quantity, setQuantity] = useState(1);
@@ -24,28 +26,59 @@ export default function PizzaDetailsScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-    // Get product from Redux store
+    // Get product from Redux store (check both products array and selectedProduct)
     const product = useSelector((state: RootState) =>
         state.product.products.find(p => p._id === pizzaId)
     );
 
+    const selectedProduct = useSelector((state: RootState) => state.product.selectedProduct);
+    const totalProductsInStore = useSelector((state: RootState) => state.product.products.length);
+    const allProductIds = useSelector((state: RootState) =>
+        state.product.products.map(p => p._id).slice(0, 5)
+    );
+
+    // Use product from products array, or fallback to selectedProduct if ID matches
+    const displayProduct = product || (selectedProduct?._id === pizzaId ? selectedProduct : null);
+
+    console.log('🔍 Product lookup in Redux store:', {
+        pizzaId,
+        productFound: !!product,
+        selectedProductId: selectedProduct?._id,
+        selectedProductMatches: selectedProduct?._id === pizzaId,
+        displayProductFound: !!displayProduct,
+        productId: displayProduct?._id,
+        productName: displayProduct?.name,
+        totalProductsInStore,
+        firstFiveProductIds: allProductIds
+    });
+
     // Fetch product data
     useEffect(() => {
+        console.log('🔄 useEffect triggered - pizzaId:', pizzaId, 'displayProduct exists:', !!displayProduct);
+
         const fetchProduct = async () => {
+            console.log('📡 Starting fetchProductByIdThunk for pizzaId:', pizzaId);
             setIsLoading(true);
             try {
-                await dispatch(fetchProductByIdThunk(pizzaId));
+                const result = await dispatch(fetchProductByIdThunk(pizzaId));
+                console.log('✅ fetchProductByIdThunk completed:', {
+                    success: !!result,
+                    data: result
+                });
             } catch (error) {
-                console.error('Error fetching product:', error);
+                console.error('❌ Error fetching product:', error);
                 Alert.alert('Error', 'Failed to load product details');
             } finally {
+                console.log('🏁 Setting isLoading to false');
                 setIsLoading(false);
             }
         };
 
-        if (!product) {
+        if (!displayProduct) {
+            console.log('⚠️ Product not in store, fetching from API...');
             fetchProduct();
         } else {
+            console.log('✅ Product found in store, using cached data');
             setIsLoading(false);
         }
     }, [pizzaId]);
@@ -60,29 +93,29 @@ export default function PizzaDetailsScreen() {
 
     // Parse sizes from product.pricing
     const getSizes = () => {
-        if (!product || typeof product.pricing === 'number') {
+        if (!displayProduct || typeof displayProduct.pricing === 'number') {
             return [{ name: 'Regular', price: 0, servings: '1-2 people' }];
         }
 
         const sizes = [];
-        if (product.pricing.small !== undefined) {
-            sizes.push({ name: 'Small', price: product.pricing.small, servings: '1-2 people' });
+        if (displayProduct.pricing.small !== undefined) {
+            sizes.push({ name: 'Small', price: displayProduct.pricing.small, servings: '1-2 people' });
         }
-        if (product.pricing.medium !== undefined) {
-            sizes.push({ name: 'Medium', price: product.pricing.medium, servings: '2-3 people' });
+        if (displayProduct.pricing.medium !== undefined) {
+            sizes.push({ name: 'Medium', price: displayProduct.pricing.medium, servings: '2-3 people' });
         }
-        if (product.pricing.large !== undefined) {
-            sizes.push({ name: 'Large', price: product.pricing.large, servings: '3-4 people' });
+        if (displayProduct.pricing.large !== undefined) {
+            sizes.push({ name: 'Large', price: displayProduct.pricing.large, servings: '3-4 people' });
         }
 
-        return sizes.length > 0 ? sizes : [{ name: 'Regular', price: product.basePrice, servings: '1-2 people' }];
+        return sizes.length > 0 ? sizes : [{ name: 'Regular', price: displayProduct.basePrice, servings: '1-2 people' }];
     };
 
     // Get toppings with prices
     const getToppings = () => {
-        if (!product || !product.toppings) return [];
+        if (!displayProduct || !displayProduct.toppings) return [];
 
-        return product.toppings.map((topping, index) => ({
+        return displayProduct.toppings.map((topping, index) => ({
             name: topping.name,
             price: 1.99, // Default topping price (static)
             category: topping.category || 'Other',
@@ -94,7 +127,7 @@ export default function PizzaDetailsScreen() {
     const toppings = getToppings();
 
     const calculateTotalPrice = () => {
-        if (!product) return 0;
+        if (!displayProduct) return 0;
 
         const sizePrice = sizes[selectedSize]?.price || 0;
         const toppingsPrice = selectedToppings.reduce((sum, index) => {
@@ -106,7 +139,7 @@ export default function PizzaDetailsScreen() {
     };
 
     const addToCart = async () => {
-        if (!product || isAddingToCart) return;
+        if (!displayProduct || isAddingToCart) return;
 
         setIsAddingToCart(true);
 
@@ -120,7 +153,7 @@ export default function PizzaDetailsScreen() {
             }));
 
             await dispatch(addToCartThunk({
-                productId: product._id,
+                productId: displayProduct._id,
                 quantity,
                 size: sizeName?.toLowerCase() as 'small' | 'medium' | 'large' | undefined,
                 customToppings: customToppings.length > 0 ? customToppings : undefined,
@@ -128,7 +161,7 @@ export default function PizzaDetailsScreen() {
 
             Alert.alert(
                 'Added to Cart!',
-                `${quantity}x ${product.name}${sizeName ? ` (${sizeName})` : ''} has been added to your cart.`,
+                `${quantity}x ${displayProduct.name}${sizeName ? ` (${sizeName})` : ''} has been added to your cart.`,
                 [
                     { text: 'Continue Shopping', onPress: () => navigation.goBack(), style: 'cancel' },
                     { text: 'View Cart', onPress: () => (navigation as any).navigate('Cart') },
@@ -163,7 +196,8 @@ export default function PizzaDetailsScreen() {
         }
     };
 
-    if (isLoading || !product) {
+    if (isLoading || !displayProduct) {
+        console.log('⏳ Showing loading screen - isLoading:', isLoading, 'displayProduct exists:', !!displayProduct);
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator size="large" color="#cb202d" />
@@ -171,6 +205,8 @@ export default function PizzaDetailsScreen() {
             </View>
         );
     }
+
+    console.log('✅ Rendering full pizza details for:', displayProduct.name);
 
     const toppingsByCategory = toppings.reduce((acc, topping) => {
         const category = topping.category;
@@ -206,7 +242,7 @@ export default function PizzaDetailsScreen() {
                 >
                     <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{product.name}</Text>
+                <Text style={styles.headerTitle} numberOfLines={1}>{displayProduct.name}</Text>
                 <View style={styles.headerPlaceholder} />
             </Animated.View>
 
@@ -223,7 +259,7 @@ export default function PizzaDetailsScreen() {
                 <Animated.View style={[styles.heroSection, { transform: [{ scale: imageScale }] }]}>
                     <View style={styles.pizzaImageContainer}>
                         <Image
-                            source={{ uri: product.imageUrl || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80' }}
+                            source={{ uri: displayProduct.imageUrl || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80' }}
                             style={styles.pizzaImage}
                             resizeMode="cover"
                         />
@@ -239,7 +275,7 @@ export default function PizzaDetailsScreen() {
 
                     {/* Badges on Image */}
                     <View style={styles.imageBadges}>
-                        {product.isVegetarian && (
+                        {displayProduct.isVegetarian && (
                             <View style={[styles.imageBadge, { backgroundColor: '#0C7C59' }]}>
                                 <View style={styles.vegIcon}>
                                     <View style={styles.vegDot} />
@@ -256,23 +292,23 @@ export default function PizzaDetailsScreen() {
                     <View style={styles.titleSection}>
                         <View style={styles.titleRow}>
                             <View style={styles.titleLeft}>
-                                <Text style={styles.pizzaName}>{product.name}</Text>
+                                <Text style={styles.pizzaName}>{displayProduct.name}</Text>
                                 <View style={styles.ratingRow}>
                                     <View style={styles.ratingBadge}>
                                         <MaterialIcons name="star" size={14} color="#fff" />
-                                        <Text style={styles.ratingText}>{product.rating.toFixed(1)}</Text>
+                                        <Text style={styles.ratingText}>{displayProduct.rating.toFixed(1)}</Text>
                                     </View>
-                                    <Text style={styles.reviewsText}>({product.salesCount || 0} orders)</Text>
+                                    <Text style={styles.reviewsText}>({displayProduct.salesCount || 0} orders)</Text>
                                 </View>
                             </View>
                         </View>
-                        <Text style={styles.description}>{product.description}</Text>
+                        <Text style={styles.description}>{displayProduct.description}</Text>
 
                         {/* Quick Info */}
                         <View style={styles.quickInfoRow}>
                             <View style={styles.quickInfoItem}>
                                 <MaterialIcons name="access-time" size={16} color="#cb202d" />
-                                <Text style={styles.quickInfoText}>{product.preparationTime || 20} mins</Text>
+                                <Text style={styles.quickInfoText}>{displayProduct.preparationTime || 20} mins</Text>
                             </View>
                         </View>
                     </View>

@@ -160,6 +160,16 @@ const productSlice = createSlice({
             state.isLoading = false;
             state.selectedProduct = action.payload;
             state.error = null;
+
+            // Add product to products array if not already present
+            const existingIndex = state.products.findIndex(p => p._id === action.payload._id);
+            if (existingIndex >= 0) {
+                // Update existing product
+                state.products[existingIndex] = action.payload;
+            } else {
+                // Add new product to array
+                state.products.push(action.payload);
+            }
         },
         fetchProductByIdFailure: (state, action: PayloadAction<string>) => {
             state.isLoading = false;

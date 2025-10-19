@@ -15,6 +15,7 @@ import {
 } from '../../../../redux/slices/addressSlice';
 import { placeOrderFromCartThunk } from '../../../../redux/thunks/orderThunks';
 import apiClient from '../../../api/apiClient';
+import { handleRazorpayPayment } from '../../../services/razorpayService';
 
 type CheckoutRouteProp = RouteProp<CustomerStackParamList, 'Checkout'>;
 
@@ -193,29 +194,126 @@ export default function CheckoutScreen() {
                 orderInstructions: orderInstructions || undefined,
             };
 
-            // Place order using thunk (automatically clears cart on backend and Redux)
+            console.log('📦 Creating order with payment method:', selectedPay?.type);
+
+            // Step 1: Place order using thunk (automatically clears cart on backend and Redux)
             const order = await dispatch(placeOrderFromCartThunk(orderData)).unwrap();
 
-            // Success! Show confirmation
-            Alert.alert(
-                'Order Placed! 🎉',
-                `Your order #${order.orderNumber} has been successfully placed.\n\nEstimated delivery: ${order.estimatedDeliveryTime} mins`,
-                [
-                    {
-                        text: 'Track Order',
-                        onPress: () => {
-                            // Navigate to order tracking screen (if available)
-                            // For now, go back to home
-                            (navigation as any).reset({
-                                index: 0,
-                                routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
-                            });
-                        }
-                    },
-                ]
-            );
+            console.log('✅ Order created:', order.orderNumber);
+
+            // Step 2: Check if online payment is required
+            const isOnlinePayment = selectedPay?.type !== 'cash';
+
+            if (isOnlinePayment) {
+                console.log('💳 Processing online payment...');
+
+                try {
+                    // Get user details for Razorpay checkout
+                    const userResponse = await apiClient.get(`/users/${userId}`);
+                    const userData = userResponse.data.data;
+
+                    // Prepare order details for Razorpay
+                    const orderDetails = {
+                        _id: order._id,
+                        orderNumber: order.orderNumber,
+                        totalAmount: order.totalAmount,
+                        user: {
+                            name: userData.name || 'Customer',
+                            email: userData.email || '',
+                            phone: contactPhone,
+                        },
+                    };
+
+                    // Open Razorpay checkout and process payment
+                    const paymentResult = await handleRazorpayPayment(orderDetails);
+
+                    console.log('✅ Payment successful:', paymentResult);
+
+                    // Payment successful! Show success message
+                    Alert.alert(
+                        'Payment Successful! 🎉',
+                        `Your payment has been received.\n\nOrder #${order.orderNumber}\nEstimated delivery: ${order.estimatedDeliveryTime} mins`,
+                        [
+                            {
+                                text: 'Track Order',
+                                onPress: () => {
+                                    (navigation as any).reset({
+                                        index: 0,
+                                        routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
+                                    });
+                                }
+                            },
+                        ]
+                    );
+                } catch (paymentError: any) {
+                    console.error('❌ Payment error:', paymentError);
+
+                    // Check if payment was cancelled
+                    if ((paymentError as any).code === 'PAYMENT_CANCELLED') {
+                        Alert.alert(
+                            'Payment Cancelled',
+                            `Your order #${order.orderNumber} is created but payment is pending.\n\nYou can complete payment from your orders page.`,
+                            [
+                                {
+                                    text: 'Go to Orders',
+                                    onPress: () => {
+                                        (navigation as any).reset({
+                                            index: 0,
+                                            routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
+                                        });
+                                    }
+                                },
+                                {
+                                    text: 'OK',
+                                    style: 'cancel'
+                                }
+                            ]
+                        );
+                    } else {
+                        // Payment failed
+                        Alert.alert(
+                            'Payment Failed',
+                            `Your order #${order.orderNumber} is created but payment failed.\n\n${paymentError.message}\n\nYou can retry payment from your orders page.`,
+                            [
+                                {
+                                    text: 'Retry Payment',
+                                    onPress: () => {
+                                        (navigation as any).reset({
+                                            index: 0,
+                                            routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
+                                        });
+                                    }
+                                },
+                                {
+                                    text: 'Cancel',
+                                    style: 'cancel'
+                                }
+                            ]
+                        );
+                    }
+                }
+            } else {
+                // COD order - Show success message directly
+                console.log('💵 Cash on Delivery order placed');
+
+                Alert.alert(
+                    'Order Placed! 🎉',
+                    `Your order #${order.orderNumber} has been successfully placed.\n\nEstimated delivery: ${order.estimatedDeliveryTime} mins\n\nPay ${order.totalAmount.toFixed(0)} cash on delivery.`,
+                    [
+                        {
+                            text: 'Track Order',
+                            onPress: () => {
+                                (navigation as any).reset({
+                                    index: 0,
+                                    routes: [{ name: 'CustomerTabs', params: { screen: 'Orders' } }],
+                                });
+                            }
+                        },
+                    ]
+                );
+            }
         } catch (error: any) {
-            console.error('Place order error:', error);
+            console.error('❌ Place order error:', error);
 
             // Handle specific error cases
             if (error?.message?.includes('Cart is empty')) {

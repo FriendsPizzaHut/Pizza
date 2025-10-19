@@ -161,8 +161,83 @@ const customerSchema = new mongoose.Schema({
     preferences: {
         favoriteCategories: [String],
         dietaryRestrictions: [String], // e.g., "vegetarian", "vegan", "gluten-free"
+        avgOrderValue: {
+            type: Number,
+            default: 0,
+        },
+        preferredOrderTime: {
+            type: String,
+            enum: ['morning', 'afternoon', 'evening', 'night'],
+            default: 'evening',
+        },
+        orderFrequency: {
+            type: Number,
+            default: 0,
+        },
+    },
+    // Enhanced ordering behavior analytics
+    orderingBehavior: {
+        totalOrders: {
+            type: Number,
+            default: 0,
+        },
+        totalSpent: {
+            type: Number,
+            default: 0,
+        },
+        averageOrderValue: {
+            type: Number,
+            default: 0,
+        },
+        mostOrderedItems: [
+            {
+                productId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Product',
+                },
+                count: {
+                    type: Number,
+                    default: 0,
+                },
+                totalSpent: {
+                    type: Number,
+                    default: 0,
+                },
+                lastOrdered: Date,
+            },
+        ],
+        favoriteCategories: [
+            {
+                category: String,
+                count: {
+                    type: Number,
+                    default: 0,
+                },
+            },
+        ],
+        lastOrderDate: Date,
+        orderFrequency: {
+            type: String,
+            enum: ['occasional', 'regular', 'frequent'],
+            default: 'occasional',
+        },
+        preferredOrderTime: {
+            type: String,
+            enum: ['morning', 'afternoon', 'evening', 'night'],
+            default: 'evening',
+        },
+        avgItemsPerOrder: {
+            type: Number,
+            default: 0,
+        },
     },
 });
+
+// Indexes for customer-specific queries
+customerSchema.index({ 'orderingBehavior.totalOrders': -1 }); // Find frequent customers
+customerSchema.index({ 'orderingBehavior.totalSpent': -1 }); // Find high-value customers
+customerSchema.index({ 'orderingBehavior.lastOrderDate': -1 }); // Find recent customers
+customerSchema.index({ 'orderingBehavior.mostOrderedItems.productId': 1 }); // Product recommendations
 
 const Customer = User.discriminator('customer', customerSchema);
 

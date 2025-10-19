@@ -48,24 +48,25 @@ export default function PaymentCollectionScreen() {
 
             console.log('✅ [PAYMENT] Payment record created:', paymentResponse.data);
 
-            // Step 2: Update order status to delivered
+            // Step 2: Update order payment status to completed (but keep order status as out_for_delivery)
             await axiosInstance.patch(`/orders/${params.orderId}/status`, {
-                status: 'delivered'
+                status: 'out_for_delivery', // Keep same status
+                paymentStatus: 'completed'   // Mark payment as collected
             });
 
-            console.log('✅ [PAYMENT] Order marked as delivered');
+            console.log('✅ [PAYMENT] Payment marked as collected');
 
             setPaymentCompleted(true);
             setIsCollecting(false);
 
             Alert.alert(
                 'Payment Collected! 🎉',
-                `${method === 'cash' ? 'Cash' : 'UPI'} payment of ₹${params.totalAmount.toFixed(2)} has been collected successfully!`,
+                `${method === 'cash' ? 'Cash' : 'UPI'} payment of ₹${params.totalAmount.toFixed(2)} has been collected successfully!\n\nNow swipe to complete the delivery.`,
                 [
                     {
                         text: 'OK',
                         onPress: () => {
-                            // Navigate back to active orders (order will be removed by auto-cleanup)
+                            // Navigate back to active orders - agent will see "Slide to Complete" button
                             navigation.goBack();
                         }
                     }

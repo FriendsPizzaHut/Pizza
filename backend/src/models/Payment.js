@@ -26,7 +26,7 @@ const paymentSchema = new mongoose.Schema(
         },
         paymentMethod: {
             type: String,
-            enum: ['card', 'upi', 'cod', 'cash'],
+            enum: ['card', 'upi', 'cod', 'cash', 'wallet'],
             required: [true, 'Payment method is required'],
         },
         // For COD orders, track how payment was actually collected
@@ -46,6 +46,59 @@ const paymentSchema = new mongoose.Schema(
             sparse: true, // Allows multiple null values for COD orders
             trim: true,
         },
+
+        // ==================== RAZORPAY FIELDS ====================
+        // Razorpay order ID (created before payment)
+        razorpayOrderId: {
+            type: String,
+            sparse: true,
+            trim: true,
+        },
+        // Razorpay payment ID (after successful payment)
+        razorpayPaymentId: {
+            type: String,
+            sparse: true,
+            trim: true,
+        },
+        // Payment signature for verification
+        razorpaySignature: {
+            type: String,
+            trim: true,
+        },
+        // Payment gateway used
+        paymentGateway: {
+            type: String,
+            enum: ['razorpay', 'cash', 'manual'],
+            default: 'cash',
+        },
+        // Payment metadata (optional - stores additional payment details)
+        paymentMetadata: {
+            method: String,        // card, netbanking, upi, wallet
+            bank: String,          // HDFC, SBI, etc.
+            wallet: String,        // paytm, phonepe, googlepay, etc.
+            vpa: String,           // UPI ID (if UPI payment)
+            card_id: String,       // Razorpay card ID
+            email: String,         // Customer email
+            contact: String,       // Customer phone
+            acquirer_data: {       // Bank reference number
+                rrn: String,
+                upi_transaction_id: String,
+            },
+        },
+        // Refund tracking (optional)
+        refundStatus: {
+            type: String,
+            enum: ['none', 'pending', 'processed', 'failed'],
+            default: 'none',
+        },
+        refundId: {
+            type: String,
+            sparse: true,
+        },
+        refundAmount: {
+            type: Number,
+            default: 0,
+        },
     },
     {
         timestamps: true, // Adds createdAt and updatedAt
@@ -56,6 +109,9 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ order: 1 });
 paymentSchema.index({ user: 1 });
 paymentSchema.index({ paymentStatus: 1 });
+paymentSchema.index({ razorpayOrderId: 1 });
+paymentSchema.index({ razorpayPaymentId: 1 });
+paymentSchema.index({ paymentGateway: 1 });
 
 const Payment = mongoose.model('Payment', paymentSchema);
 

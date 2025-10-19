@@ -96,7 +96,7 @@ export const emitNewOrder = (orderData) => {
  * 
  * @param {Object} orderData - Updated order data
  * 
- * Status flow: pending → confirmed → preparing → out_for_delivery → delivered
+ * Status flow: pending → accepted → assigned → out_for_delivery → delivered
  */
 export const emitOrderStatusUpdate = (orderData) => {
     try {
@@ -107,8 +107,8 @@ export const emitOrderStatusUpdate = (orderData) => {
 
         const statusMessages = {
             pending: '⏳ Order is pending confirmation',
-            confirmed: '✅ Order confirmed! Preparing your food...',
-            preparing: '👨‍🍳 Your order is being prepared',
+            accepted: '✅ Order accepted! Assigning delivery agent...',
+            assigned: '� Delivery agent assigned to your order',
             out_for_delivery: '🚴 Order is out for delivery',
             delivered: '🎉 Order delivered successfully!',
             cancelled: '❌ Order has been cancelled'
@@ -122,6 +122,7 @@ export const emitOrderStatusUpdate = (orderData) => {
             message: statusMessages[orderData.status] || 'Order status updated',
             estimatedDeliveryTime: orderData.estimatedDeliveryTime,
             deliveryBoy: orderData.deliveryBoy,
+            deliveryAgentDetails: orderData.deliveryAgentDetails, // Include agent details for 'assigned' status
         };
 
         // Emit to customer
@@ -186,6 +187,76 @@ export const emitDeliveryStatusUpdate = (deliveryData) => {
         console.log(`🚴 Delivery status update sent - ${payload.deliveryBoyName}: ${payload.status}`);
     } catch (error) {
         console.error('❌ Error emitting delivery status:', error.message);
+    }
+};
+
+/**
+ * Emit delivery agent online/offline status change
+ * Event: delivery:agent:status:update
+ * 
+ * @param {Object} agentData - Delivery agent status data
+ * 
+ * Usage in controller:
+ * emitDeliveryAgentStatusChange({ 
+ *   deliveryAgentId, name, isOnline, state, vehicleInfo, rating 
+ * })
+ */
+export const emitDeliveryAgentStatusChange = (agentData) => {
+    try {
+        console.log('🔔 ========================================');
+        console.log('🔔 emitDeliveryAgentStatusChange CALLED');
+        console.log('🔔 ========================================');
+        console.log('📥 Received agent data:', JSON.stringify(agentData, null, 2));
+
+        if (!global.socketEmit) {
+            console.log('⚠️  Socket not initialized - ABORTING!');
+            return;
+        }
+
+        console.log('✅ global.socketEmit exists');
+        console.log('✅ Checking emitToRole function...');
+        console.log('  - Type:', typeof global.socketEmit.emitToRole);
+        console.log('  - Available methods:', Object.keys(global.socketEmit));
+
+        const statusEmojis = {
+            online: '🟢',
+            free: '🟢',
+            busy: '🟡',
+            offline: '🔴'
+        };
+
+        const payload = {
+            deliveryAgentId: agentData.deliveryAgentId || agentData._id,
+            name: agentData.name,
+            email: agentData.email,
+            phone: agentData.phone,
+            isOnline: agentData.isOnline,
+            state: agentData.state, // 'free', 'busy', 'offline'
+            lastOnline: agentData.lastOnline,
+            vehicleInfo: agentData.vehicleInfo,
+            rating: agentData.rating,
+            message: `${statusEmojis[agentData.state]} ${agentData.name} is now ${agentData.isOnline ? 'online' : 'offline'}`,
+            timestamp: new Date()
+        };
+
+        console.log('📤 Prepared payload:', JSON.stringify(payload, null, 2));
+        console.log('🎯 Broadcasting to ADMIN role...');
+
+        // Broadcast to admin role for instant UI updates
+        global.socketEmit.emitToRole('admin', 'delivery:agent:status:update', payload);
+
+        console.log('✅ Broadcasted to admin role');
+        console.log('🎯 Broadcasting to DELIVERY role...');
+
+        // Also broadcast to all delivery agents (for coordination)
+        global.socketEmit.emitToRole('delivery', 'delivery:agent:status:update', payload);
+
+        console.log('✅ Broadcasted to delivery role');
+        console.log(`🚴 Agent status change broadcasted - ${agentData.name}: ${agentData.state}`);
+        console.log('🔔 ========================================');
+    } catch (error) {
+        console.error('❌ Error emitting agent status change:', error.message);
+        console.error('❌ Stack:', error.stack);
     }
 };
 

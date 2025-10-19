@@ -115,12 +115,16 @@ import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import cartRoutes from './routes/cart.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import razorpayRoutes from './routes/razorpayRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import deviceTokenRoutes from './routes/deviceTokenRoutes.js';
+import recommendationRoutes from './routes/recommendationRoutes.js';
+import deliveryAgentRoutes from './routes/deliveryAgentRoutes.js';
 
 // Mount routes with /api/v1 prefix
 // Auth routes have stricter rate limiting
@@ -129,6 +133,9 @@ app.use('/api/v1/auth', authLimiter, authRoutes);
 // Payment routes have payment-specific rate limiting
 app.use('/api/v1/payments', paymentLimiter, paymentRoutes);
 
+// Razorpay routes (nested under payments)
+app.use('/api/v1/payments/razorpay', paymentLimiter, razorpayRoutes);
+
 // Other routes use standard API rate limiting
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/business', businessRoutes);
@@ -136,11 +143,14 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/coupons', couponRoutes);
+app.use('/api/v1/offers', offerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/activity', activityRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/device-tokens', deviceTokenRoutes);
+app.use('/api/v1/recommendations', recommendationRoutes);
+app.use('/api/v1/delivery-agent', deliveryAgentRoutes);
 
 /**
  * ROOT ENDPOINT

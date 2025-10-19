@@ -26,6 +26,7 @@ import { setSearchQuery, setCategory } from '../../../../redux/slices/productSli
 import { addToCartThunk } from '../../../../redux/thunks/cartThunks';
 import { selectCartItemCount } from '../../../../redux/slices/cartSlice';
 import { Product } from '../../../services/productService';
+import axiosInstance from '../../../api/axiosInstance';
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList>;
 
@@ -73,12 +74,93 @@ export default function MenuScreen() {
         searchQuery: reduxSearchQuery
     } = useSelector((state: RootState) => state.product);
 
+    // Auth state for user ID
+    const { userId } = useSelector((state: RootState) => state.auth);
+
     // Cart state
     const cartItemCount = useSelector(selectCartItemCount);
 
     // Local search state for immediate UI update
     const [localSearchQuery, setLocalSearchQuery] = useState('');
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // State for favorite items from user profile
+    const [favoriteItems, setFavoriteItems] = useState<Array<{
+        id: string;
+        name: string;
+        image: string;
+        lastOrdered: string;
+        orderCount: number;
+        productId: string;
+        category: string;
+    }>>([]);
+    const [loadingFavorites, setLoadingFavorites] = useState(false);
+
+    // Fetch user's favorite items from profile
+    useEffect(() => {
+        const fetchFavorites = async () => {
+            if (!userId) return;
+
+            try {
+                setLoadingFavorites(true);
+                console.log('📊 Fetching user favorites for userId:', userId);
+
+                const response = await axiosInstance.get(`/users/${userId}`);
+                console.log('✅ User profile fetched:', response.data);
+
+                if (response.data.success && response.data.data) {
+                    const userData = response.data.data;
+                    const mostOrdered = userData.orderingBehavior?.mostOrderedItems || [];
+
+                    console.log('📦 Most ordered items:', mostOrdered);
+
+                    // Transform to favorite items format
+                    const favorites = mostOrdered
+                        .slice(0, 4) // Take top 4
+                        .map((item: any) => {
+                            // Find the full product data from Redux store
+                            const productData = products.find(p => p._id === item.productId?._id || p._id === item.productId);
+
+                            return {
+                                id: item.productId?._id || item.productId || '',
+                                name: item.productId?.name || productData?.name || 'Unknown',
+                                image: item.productId?.imageUrl || productData?.imageUrl || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150&h=150&fit=crop',
+                                lastOrdered: item.lastOrdered ? formatLastOrdered(item.lastOrdered) : 'Recently',
+                                orderCount: item.count || 0,
+                                productId: item.productId?._id || item.productId || '',
+                                category: item.productId?.category || productData?.category || 'pizza',
+                            };
+                        })
+                        .filter((item: any) => item.productId); // Only include valid items
+
+                    console.log('✅ Transformed favorites:', favorites);
+                    setFavoriteItems(favorites);
+                }
+            } catch (error: any) {
+                console.error('❌ Error fetching favorites:', error);
+                // Fallback to empty array on error
+                setFavoriteItems([]);
+            } finally {
+                setLoadingFavorites(false);
+            }
+        };
+
+        fetchFavorites();
+    }, [userId, products]);
+
+    // Helper to format last ordered date
+    const formatLastOrdered = (dateString: string): string => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+        return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+    };
 
     // Fetch products on mount and when filters change
     useFocusEffect(
@@ -155,52 +237,19 @@ export default function MenuScreen() {
         if (product.category === 'pizza') {
             navigation.navigate('PizzaDetails', { pizzaId: product._id });
         } else {
-            // Add directly to cart for single-price items (drinks, sides, desserts)
-            dispatch(addToCartThunk({
-                productId: product._id,
-                quantity: 1
-            }))
-                .unwrap()
-                .then(() => {
-                    Alert.alert('Success', `${product.name} added to cart!`);
-                })
-                .catch((error) => {
-                    Alert.alert('Error', error || 'Failed to add item to cart');
-                });
+            // For other items (sides, beverages, desserts), navigate to ItemDetails
+            navigation.navigate('ItemDetails', { itemId: product._id });
         }
     };
 
-    // Static fallback data for favorites (these can be recently ordered items from user's history in future)
-    const favoriteItems = [
-        {
-            id: 'fav1',
-            name: 'Margherita',
-            image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150&h=150&fit=crop',
-            lastOrdered: '2 days ago',
-            orderCount: 8
-        },
-        {
-            id: 'fav2',
-            name: 'Pepperoni',
-            image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=150&h=150&fit=crop',
-            lastOrdered: '5 days ago',
-            orderCount: 6
-        },
-        {
-            id: 'fav3',
-            name: 'Veggie Supreme',
-            image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=150&h=150&fit=crop',
-            lastOrdered: '1 week ago',
-            orderCount: 4
-        },
-        {
-            id: 'fav4',
-            name: 'BBQ Chicken',
-            image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=150&h=150&fit=crop',
-            lastOrdered: '1 week ago',
-            orderCount: 3
+    // Handler for favorite item click
+    const handleFavoriteClick = (favoriteItem: typeof favoriteItems[0]) => {
+        if (favoriteItem.category === 'pizza') {
+            navigation.navigate('PizzaDetails', { pizzaId: favoriteItem.productId });
+        } else {
+            navigation.navigate('ItemDetails', { itemId: favoriteItem.productId });
         }
-    ];
+    };
 
     const renderStars = (rating: number) => {
         const stars = [];
@@ -305,57 +354,64 @@ export default function MenuScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.favoritesContainer}
                     >
-                        {favoriteItems.map((favorite) => (
-                            <TouchableOpacity
-                                key={favorite.id}
-                                style={styles.favoriteCard}
-                                activeOpacity={0.8}
-                                onPress={() => {
-                                    // Find the corresponding menu item and navigate
-                                    const menuItem = products.find(item =>
-                                        item.name.toLowerCase().includes(favorite.name.toLowerCase())
-                                    );
-                                    if (menuItem) {
-                                        navigation.navigate('PizzaDetails', { pizzaId: menuItem._id });
-                                    }
-                                }}
-                            >
-                                <View style={styles.favoriteImageContainer}>
-                                    <Image
-                                        source={{ uri: favorite.image }}
-                                        style={styles.favoriteImage}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.favoriteOrderBadge}>
-                                        <Text style={styles.favoriteOrderBadgeText}>{favorite.orderCount}</Text>
+                        {loadingFavorites ? (
+                            <View style={{ paddingVertical: 20, paddingHorizontal: 60 }}>
+                                <ActivityIndicator size="small" color={Colors.primary} />
+                                <Text style={{ ...Typography.regular.text200, color: Colors.text.secondary, marginTop: 8 }}>
+                                    Loading favorites...
+                                </Text>
+                            </View>
+                        ) : favoriteItems.length === 0 ? (
+                            <View style={{ paddingVertical: 20, paddingHorizontal: 20 }}>
+                                <Text style={{ ...Typography.regular.text300, color: Colors.text.secondary }}>
+                                    No favorites yet. Start ordering to see your most ordered items here!
+                                </Text>
+                            </View>
+                        ) : (
+                            favoriteItems.map((favorite) => (
+                                <TouchableOpacity
+                                    key={favorite.id}
+                                    style={styles.favoriteCard}
+                                    activeOpacity={0.8}
+                                    onPress={() => handleFavoriteClick(favorite)}
+                                >
+                                    <View style={styles.favoriteImageContainer}>
+                                        <Image
+                                            source={{ uri: favorite.image }}
+                                            style={styles.favoriteImage}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.favoriteOrderBadge}>
+                                            <Text style={styles.favoriteOrderBadgeText}>{favorite.orderCount}x</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.favoriteAddButton}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                handleFavoriteClick(favorite);
+                                            }}
+                                        >
+                                            <Text style={styles.favoriteAddText}>+</Text>
+                                        </TouchableOpacity>
                                     </View>
-                                    <TouchableOpacity
-                                        style={styles.favoriteAddButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            console.log(`Added ${favorite.name} to cart`);
-                                        }}
-                                    >
-                                        <Text style={styles.favoriteAddText}>+</Text>
-                                    </TouchableOpacity>
-                                </View>
 
-                                <View style={styles.favoriteInfo}>
-                                    <Text style={styles.favoriteName} numberOfLines={1}>
-                                        {favorite.name}
-                                    </Text>
-                                    <View style={styles.favoriteStatsRow}>
-                                        <Text style={styles.favoriteDetails}>
-                                            {favorite.orderCount}x ordered
+                                    <View style={styles.favoriteInfo}>
+                                        <Text style={styles.favoriteName} numberOfLines={1}>
+                                            {favorite.name}
                                         </Text>
-                                        <Text style={styles.favoriteDot}>•</Text>
-                                        <Text style={styles.favoriteLastOrder}>
-                                            {favorite.lastOrdered}
-                                        </Text>
+                                        <View style={styles.favoriteStatsRow}>
+                                            <Text style={styles.favoriteDetails}>
+                                                {favorite.orderCount}x ordered
+                                            </Text>
+                                            <Text style={styles.favoriteDot}>•</Text>
+                                            <Text style={styles.favoriteLastOrder}>
+                                                {favorite.lastOrdered}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            ))
+                        )}
                     </ScrollView>
                 </View>
 
@@ -407,13 +463,14 @@ export default function MenuScreen() {
                                 key={item._id}
                                 style={styles.menuItem}
                                 onPress={() => {
-                                    // Only navigate to PizzaDetails for pizza items
+                                    // Navigate to appropriate details screen based on category
                                     if (item.category === 'pizza') {
                                         navigation.navigate('PizzaDetails', { pizzaId: item._id });
+                                    } else {
+                                        navigation.navigate('ItemDetails', { itemId: item._id });
                                     }
-                                    // For other items, do nothing on card press - they use ADD button
                                 }}
-                                activeOpacity={item.category === 'pizza' ? 0.95 : 1}
+                                activeOpacity={0.95}
                             >
                                 {/* Image Section at Top */}
                                 <View style={styles.imageSection}>

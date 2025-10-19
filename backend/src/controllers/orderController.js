@@ -132,6 +132,17 @@ export const updateOrderStatus = async (req, res, next) => {
         // Emit real-time update to customer, admin, and delivery agent
         emitOrderStatusUpdate(order);
 
+        // Auto-update user preferences when order is delivered
+        if (order.status === 'delivered' && order.user) {
+            // Import and call preference service asynchronously (don't wait)
+            import('../services/userPreferenceService.js')
+                .then(({ updateUserPreferences }) => {
+                    updateUserPreferences(order.user._id || order.user, order._id)
+                        .catch(err => console.error('Failed to update user preferences:', err));
+                })
+                .catch(err => console.error('Failed to import preference service:', err));
+        }
+
         sendResponse(res, 200, 'Order status updated successfully', order);
     } catch (error) {
         next(error);
@@ -205,7 +216,7 @@ export const getOrderById = async (req, res, next) => {
 };
 
 /**
- * Accept order (change status from pending to confirmed)
+ * Accept order (change status from pending to accepted)
  * POST /api/v1/orders/:id/accept
  * @access Private (Admin only)
  */

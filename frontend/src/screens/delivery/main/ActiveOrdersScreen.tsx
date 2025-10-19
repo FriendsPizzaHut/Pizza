@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Dimensions, Image, Animated, PanResponder, Easing, ActivityIndicator, RefreshControl } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -286,9 +286,19 @@ export default function ActiveOrdersScreen() {
         removeOrder,
     } = useDeliveryOrders();
 
+    // 🔄 Refresh orders when screen comes into focus (e.g., returning from PaymentCollectionScreen)
+    useFocusEffect(
+        React.useCallback(() => {
+            console.log('🔄 [FOCUS] ActiveOrdersScreen focused - Refreshing orders');
+            onRefresh();
+        }, [onRefresh])
+    );
+
     const handlePickup = async (orderId: string) => {
         try {
             console.log('📦 [PICKUP] Marking order as picked up:', orderId);
+
+            // Update status to out_for_delivery
             await updateOrderStatus(orderId, 'out_for_delivery');
         } catch (error: any) {
             console.error('❌ [PICKUP] Error:', error.message);
@@ -298,11 +308,14 @@ export default function ActiveOrdersScreen() {
 
     const handleDelivery = async (orderId: string) => {
         try {
-            console.log('✅ [DELIVERY] Marking order as delivered:', orderId);
+            console.log('✅ [DELIVERY] Processing delivery completion:', orderId);
 
             const order = orders.find(o => o._id === orderId);
-            if (order?.paymentMethod === 'cod') {
+
+            // Check if this is COD and payment not yet collected
+            if (order?.paymentMethod === 'cod' && order.paymentStatus !== 'completed') {
                 // COD: Navigate to payment collection screen
+                console.log('💰 [DELIVERY] COD order - Navigating to payment collection');
                 navigation.navigate('PaymentCollection', {
                     orderId: order._id,
                     orderNumber: order.id,
@@ -317,7 +330,8 @@ export default function ActiveOrdersScreen() {
                     deliveryAddress: order.deliveryAddress,
                 });
             } else {
-                // Online payment: Mark as delivered
+                // Either online payment OR COD payment already collected - Mark as delivered
+                console.log('✅ [DELIVERY] Marking order as delivered');
                 await updateOrderStatus(orderId, 'delivered');
 
                 // Remove from list after 3 seconds
@@ -353,8 +367,8 @@ export default function ActiveOrdersScreen() {
     // Get color based on order status
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'ready':
-                return '#FF9800'; // Orange for pickup (assigned, needs pickup)
+            case 'assigned':
+                return '#2196F3'; // Blue for assigned (needs pickup)
             case 'out_for_delivery':
                 return '#0C7C59'; // Green for delivery (in transit)
             case 'awaiting_payment':
@@ -477,7 +491,7 @@ export default function ActiveOrdersScreen() {
                                     <View style={styles.statusBadge}>
                                         <View style={styles.statusDot} />
                                         <Text style={styles.statusText}>
-                                            {order.status === 'out_for_delivery' ? 'On the way to customer' : 'Ready for pickup'}
+                                            {order.status === 'out_for_delivery' ? 'On the way to customer' : 'Assigned - Ready for pickup'}
                                         </Text>
                                     </View>
                                     <Text style={styles.orderTime}>{new Date(order.orderTime).toLocaleTimeString()}</Text>
@@ -556,7 +570,7 @@ export default function ActiveOrdersScreen() {
 
                             {/* Swipe Slider */}
                             <View style={styles.actionsSection}>
-                                {order.status === 'ready' ? (
+                                {order.status === 'assigned' ? (
                                     <SwipeToConfirm
                                         key={`${order.id}-${order.status}`}
                                         onConfirm={() => handlePickup(order._id)}
@@ -567,12 +581,20 @@ export default function ActiveOrdersScreen() {
                                     />
                                 ) : order.status === 'out_for_delivery' ? (
                                     <SwipeToConfirm
-                                        key={`${order.id}-${order.status}`}
+                                        key={`${order.id}-${order.status}-${order.paymentStatus}`}
                                         onConfirm={() => handleDelivery(order._id)}
                                         status={order.status}
-                                        buttonText="Slide to Complete"
+                                        buttonText={
+                                            order.paymentMethod === 'cod' && order.paymentStatus !== 'completed'
+                                                ? 'Slide to Collect Payment'
+                                                : 'Slide to Complete'
+                                        }
                                         buttonColor={getStatusColor(order.status)}
-                                        icon="check"
+                                        icon={
+                                            order.paymentMethod === 'cod' && order.paymentStatus !== 'completed'
+                                                ? 'money'
+                                                : 'check'
+                                        }
                                     />
                                 ) : order.status === 'awaiting_payment' ? (
                                     <View style={styles.paymentCollectionContainer}>

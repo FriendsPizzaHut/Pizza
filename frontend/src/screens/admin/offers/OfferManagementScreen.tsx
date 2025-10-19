@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,14 @@ import {
     StatusBar,
     Alert,
     Dimensions,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import axiosInstance from '../../../api/axiosInstance';
 
 const { width } = Dimensions.get('window');
 
@@ -30,61 +33,58 @@ interface Offer {
 export default function OfferManagementScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
-    // Mock data - Replace with API call or storage
-    const [offers, setOffers] = useState<Offer[]>([
-        {
-            id: '1',
-            badge: '50% OFF',
-            title: 'Mega Pizza Sale',
-            subtitle: 'Get 50% off on all large pizzas Min order: ₹299',
-            code: 'PIZZA50',
-            bgColor: '#FF5722',
-            gradientColors: ['#FF9800', '#FF5722'] as const,
-            isActive: true,
-        },
-        {
-            id: '2',
-            badge: '₹100 OFF',
-            title: 'Combo Special',
-            subtitle: 'Save ₹100 on combo meals Min order: ₹499',
-            code: 'COMBO100',
-            bgColor: '#2196F3',
-            gradientColors: ['#03A9F4', '#1976D2'] as const,
-            isActive: true,
-        },
-        {
-            id: '3',
-            badge: '₹150 OFF',
-            title: 'First Order Treat',
-            subtitle: 'New customers get ₹150 off Min order: ₹399',
-            code: 'FIRST150',
-            bgColor: '#4CAF50',
-            gradientColors: ['#8BC34A', '#388E3C'] as const,
-            isActive: false,
-        },
-        {
-            id: '4',
-            badge: '30% OFF',
-            title: 'Weekend Bonanza',
-            subtitle: '30% discount on all orders Min order: ₹349',
-            code: 'WEEKEND30',
-            bgColor: '#9C27B0',
-            gradientColors: ['#BA68C8', '#7B1FA2'] as const,
-            isActive: true,
-        },
-        {
-            id: '5',
-            badge: 'BUY 1 GET 1',
-            title: 'Double Delight',
-            subtitle: 'Buy one pizza, get one free Min order: ₹399',
-            code: 'BOGO',
-            bgColor: '#F44336',
-            gradientColors: ['#FF5252', '#D32F2F'] as const,
-            isActive: false,
-        },
-    ]);
-
+    const [offers, setOffers] = useState<Offer[]>([]);
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Fetch offers from API
+    const fetchOffers = async () => {
+        try {
+            console.log('🔄 Fetching offers from API...');
+            const response = await axiosInstance.get('/offers/admin');
+
+            if (response.data.success) {
+                console.log(`✅ Loaded ${response.data.count} offers`);
+                // Transform backend data to frontend format
+                const transformedOffers = response.data.data.map((offer: any) => ({
+                    id: offer._id,
+                    badge: offer.badge,
+                    title: offer.title,
+                    subtitle: offer.description || '',
+                    code: offer.code,
+                    bgColor: offer.bgColor,
+                    gradientColors: offer.gradientColors as readonly [string, string],
+                    isActive: offer.isActive,
+                    // Keep full data for editing
+                    ...offer,
+                }));
+                setOffers(transformedOffers);
+            }
+        } catch (error: any) {
+            console.error('❌ Failed to fetch offers:', error);
+            Alert.alert(
+                'Error',
+                error.response?.data?.message || 'Failed to load offers. Please try again.'
+            );
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    // Load offers when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            console.log('🔄 OfferManagementScreen focused - Refreshing offers');
+            fetchOffers();
+        }, [])
+    );
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchOffers();
+    };
 
     const filteredOffers = offers.filter((offer) => {
         if (filterStatus === 'all') return true;
@@ -93,15 +93,34 @@ export default function OfferManagementScreen() {
         return true;
     });
 
-    const handleToggleStatus = (id: string) => {
-        setOffers((prev) =>
-            prev.map((offer) =>
-                offer.id === id ? { ...offer, isActive: !offer.isActive } : offer
-            )
-        );
+    const handleToggleStatus = async (id: string) => {
+        try {
+            console.log(`🔄 Toggling offer status: ${id}`);
+            const response = await axiosInstance.patch(`/offers/admin/${id}/toggle`);
+
+            if (response.data.success) {
+                console.log('✅ Offer status toggled');
+                // Update local state
+                setOffers((prev) =>
+                    prev.map((offer) =>
+                        offer.id === id ? { ...offer, isActive: response.data.data.isActive } : offer
+                    )
+                );
+                Alert.alert(
+                    'Success',
+                    response.data.data.isActive ? 'Offer activated' : 'Offer deactivated'
+                );
+            }
+        } catch (error: any) {
+            console.error('❌ Failed to toggle offer:', error);
+            Alert.alert(
+                'Error',
+                error.response?.data?.message || 'Failed to toggle offer status'
+            );
+        }
     };
 
-    const handleDeleteOffer = (id: string, title: string) => {
+    const handleDeleteOffer = async (id: string, title: string) => {
         Alert.alert(
             'Delete Offer',
             `Are you sure you want to delete "${title}"?`,
@@ -110,9 +129,23 @@ export default function OfferManagementScreen() {
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {
-                        setOffers((prev) => prev.filter((offer) => offer.id !== id));
-                        Alert.alert('Success', 'Offer deleted successfully');
+                    onPress: async () => {
+                        try {
+                            console.log(`🗑️ Deleting offer: ${id}`);
+                            const response = await axiosInstance.delete(`/offers/admin/${id}`);
+
+                            if (response.data.success) {
+                                console.log('✅ Offer deleted');
+                                setOffers((prev) => prev.filter((offer) => offer.id !== id));
+                                Alert.alert('Success', 'Offer deleted successfully');
+                            }
+                        } catch (error: any) {
+                            console.error('❌ Failed to delete offer:', error);
+                            Alert.alert(
+                                'Error',
+                                error.response?.data?.message || 'Failed to delete offer'
+                            );
+                        }
                     },
                 },
             ]
@@ -233,8 +266,21 @@ export default function OfferManagementScreen() {
                 style={styles.listContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#cb202d']}
+                        tintColor="#cb202d"
+                    />
+                }
             >
-                {filteredOffers.length === 0 ? (
+                {loading && !refreshing ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#cb202d" />
+                        <Text style={styles.loadingText}>Loading offers...</Text>
+                    </View>
+                ) : filteredOffers.length === 0 ? (
                     <View style={styles.emptyState}>
                         <MaterialIcons name="local-offer" size={64} color="#D0D0D0" />
                         <Text style={styles.emptyTitle}>No Offers Found</Text>
@@ -656,6 +702,20 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '700',
         color: '#fff',
+    },
+
+    // Loading State
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#8E8E93',
+        marginTop: 16,
+        fontWeight: '600',
     },
 
     bottomSpacing: {

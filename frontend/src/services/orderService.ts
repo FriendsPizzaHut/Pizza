@@ -125,6 +125,11 @@ export interface MyOrder {
     date: string;
     time: string;
     estimatedTime: string | null;
+    deliveryAgent?: {
+        name: string;
+        phone: string;
+        vehicleNumber: string;
+    } | null;
 }
 
 export interface MyOrdersResponse {

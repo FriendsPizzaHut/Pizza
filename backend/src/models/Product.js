@@ -223,10 +223,13 @@ productSchema.methods.incrementSales = async function (amount) {
 };
 
 // Indexes for efficient queries
-productSchema.index({ category: 1, isAvailable: 1 });
-productSchema.index({ basePrice: 1 });
-productSchema.index({ rating: -1 });
-productSchema.index({ salesCount: -1 });
+productSchema.index({ category: 1, isAvailable: 1 }); // Category filtering with availability
+productSchema.index({ basePrice: 1 }); // Price-based sorting
+productSchema.index({ rating: -1 }); // Rating-based sorting
+productSchema.index({ salesCount: -1 }); // Popularity-based sorting
+productSchema.index({ createdAt: -1 }); // New items sorting
+productSchema.index({ category: 1, rating: -1, salesCount: -1 }); // Compound index for recommendations
+productSchema.index({ isAvailable: 1, salesCount: -1 }); // Available + popular items
 
 const Product = mongoose.model('Product', productSchema);
 

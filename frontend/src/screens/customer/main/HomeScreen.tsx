@@ -29,6 +29,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import axiosInstance from '../../../api/axiosInstance';
 
 const { width, height } = Dimensions.get('window');
 
@@ -85,11 +86,15 @@ interface MenuItem {
     _id: string;
     name: string;
     description: string;
-    price: number;
-    image: string;
+    pricing: number | { small?: number; medium?: number; large?: number };
+    basePrice: number;
+    imageUrl: string;
     category: string;
-    isVeg: boolean;
+    isVegetarian: boolean;
     isAvailable: boolean;
+    salesCount: number;
+    rating: number;
+    discountPercent: number;
 }
 
 interface BusinessProfile {
@@ -259,132 +264,91 @@ export default function CustomerHomeScreen() {
         loadBusinessProfile();
     }, []);
 
-    // Load static offers
+    // Load active offers from API
     useEffect(() => {
-        const loadOffers = () => {
-            const staticOffers: HomeOfferItem[] = [
-                {
-                    id: '1',
-                    badge: '50% OFF',
-                    title: 'Mega Pizza Sale',
-                    subtitle: 'Get 50% off on all large pizzas Min order: ₹299',
-                    code: 'PIZZA50',
-                    bgColor: '#FF5722',
-                    gradientColors: ['#FF9800', '#FF5722'] as const,
-                },
-                {
-                    id: '2',
-                    badge: '₹100 OFF',
-                    title: 'Combo Special',
-                    subtitle: 'Save ₹100 on combo meals Min order: ₹499',
-                    code: 'COMBO100',
-                    bgColor: '#2196F3',
-                    gradientColors: ['#03A9F4', '#1976D2'] as const,
-                },
-                {
-                    id: '3',
-                    badge: '₹150 OFF',
-                    title: 'First Order Treat',
-                    subtitle: 'New customers get ₹150 off Min order: ₹399',
-                    code: 'FIRST150',
-                    bgColor: '#4CAF50',
-                    gradientColors: ['#8BC34A', '#388E3C'] as const,
-                },
-                {
-                    id: '4',
-                    badge: '30% OFF',
-                    title: 'Weekend Bonanza',
-                    subtitle: '30% discount on all orders Min order: ₹349',
-                    code: 'WEEKEND30',
-                    bgColor: '#9C27B0',
-                    gradientColors: ['#BA68C8', '#7B1FA2'] as const,
-                },
-                {
-                    id: '5',
-                    badge: 'BUY 1 GET 1',
-                    title: 'Double Delight',
-                    subtitle: 'Buy one pizza, get one free Min order: ₹399',
-                    code: 'BOGO',
-                    bgColor: '#F44336',
-                    gradientColors: ['#FF5252', '#D32F2F'] as const,
-                }
-            ];
+        const loadOffers = async () => {
+            try {
+                console.log('🔄 Loading active offers from API...');
+                setLoadingOffers(true);
+                setOfferError(null);
 
-            setOffers(staticOffers);
-            setLoadingOffers(false);
+                const response = await axiosInstance.get('/offers/active');
+
+                if (response.data.success) {
+                    console.log(`✅ Loaded ${response.data.count} active offers`);
+                    // Transform backend data to HomeOfferItem format
+                    const transformedOffers: HomeOfferItem[] = response.data.data.map((offer: any) => ({
+                        id: offer._id,
+                        badge: offer.badge,
+                        title: offer.title,
+                        subtitle: offer.description,
+                        code: offer.code,
+                        bgColor: offer.bgColor,
+                        gradientColors: offer.gradientColors as readonly [string, string],
+                    }));
+
+                    setOffers(transformedOffers);
+                } else {
+                    throw new Error('Failed to load offers');
+                }
+            } catch (error: any) {
+                console.error('❌ Failed to load offers:', error);
+                setOfferError(error.message || 'Failed to load offers');
+
+                // Fallback to empty array instead of static data
+                setOffers([]);
+            } finally {
+                setLoadingOffers(false);
+            }
         };
 
         loadOffers();
     }, []);
 
-    // Load static popular items
+    // Load popular items from API (top 6 by salesCount)
     useEffect(() => {
-        const loadPopularItems = () => {
-            const staticItems: MenuItem[] = [
-                {
-                    _id: '1',
-                    name: 'Margherita Pizza',
-                    description: 'Classic delight with 100% real mozzarella cheese',
-                    price: 199,
-                    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400',
-                    category: 'Pizza',
-                    isVeg: true,
-                    isAvailable: true
-                },
-                {
-                    _id: '2',
-                    name: 'Pepperoni Paradise',
-                    description: 'American classic with spicy pepperoni & cheese',
-                    price: 299,
-                    image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400',
-                    category: 'Pizza',
-                    isVeg: false,
-                    isAvailable: true
-                },
-                {
-                    _id: '3',
-                    name: 'Veggie Supreme',
-                    description: 'Loaded with fresh vegetables & herbs',
-                    price: 249,
-                    image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?w=400',
-                    category: 'Pizza',
-                    isVeg: true,
-                    isAvailable: true
-                },
-                {
-                    _id: '4',
-                    name: 'Chicken BBQ',
-                    description: 'Smoky BBQ chicken with onions & peppers',
-                    price: 329,
-                    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400',
-                    category: 'Pizza',
-                    isVeg: false,
-                    isAvailable: true
-                },
-                {
-                    _id: '5',
-                    name: 'Cheese Burst',
-                    description: 'Extra cheese in every bite with liquid cheese filling',
-                    price: 279,
-                    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400',
-                    category: 'Pizza',
-                    isVeg: true,
-                    isAvailable: true
-                },
-                {
-                    _id: '6',
-                    name: 'Mexican Fiesta',
-                    description: 'Spicy jalapeños, corn & red paprika',
-                    price: 259,
-                    image: 'https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=400',
-                    category: 'Pizza',
-                    isVeg: true,
-                    isAvailable: true
-                }
-            ];
+        const loadPopularItems = async () => {
+            try {
+                console.log('🔄 Loading popular items from API...');
+                setLoadingPopularItems(true);
+                setPopularItemsError(null);
 
-            setPopularItems(staticItems);
-            setLoadingPopularItems(false);
+                const response = await axiosInstance.get('/products', {
+                    params: {
+                        limit: 6,
+                        sortBy: 'popular',
+                        sortOrder: 'desc',
+                        isAvailable: true
+                    }
+                });
+
+                console.log('📦 Popular items API response:', {
+                    success: response.data.success,
+                    dataCount: response.data.data?.length || 0,
+                    total: response.data.total
+                });
+
+                if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
+                    console.log(`✅ Loaded ${response.data.data.length} popular items`);
+                    console.log('📝 First item sample:', {
+                        id: response.data.data[0]?._id,
+                        name: response.data.data[0]?.name,
+                        category: response.data.data[0]?.category,
+                        hasBasePrice: !!response.data.data[0]?.basePrice,
+                        hasPricing: !!response.data.data[0]?.pricing
+                    });
+                    setPopularItems(response.data.data);
+                } else {
+                    console.error('❌ Invalid response structure:', response.data);
+                    throw new Error('Failed to load popular items');
+                }
+            } catch (error) {
+                console.error('❌ Error loading popular items:', error);
+                setPopularItemsError('Failed to load popular items');
+                setPopularItems([]);
+            } finally {
+                setLoadingPopularItems(false);
+            }
         };
 
         loadPopularItems();
@@ -396,7 +360,29 @@ export default function CustomerHomeScreen() {
     }, [navigation]);
 
     const navigateToItem = useCallback((item: MenuItem) => {
-        navigation.navigate('PizzaDetails', { pizzaId: item._id });
+        console.log('🔍 Navigating to item:', {
+            id: item._id,
+            name: item.name,
+            category: item.category,
+            hasAllFields: {
+                _id: !!item._id,
+                name: !!item.name,
+                category: !!item.category,
+                pricing: !!item.pricing,
+                basePrice: !!item.basePrice,
+                imageUrl: !!item.imageUrl,
+            }
+        });
+
+        // For pizzas, navigate to PizzaDetailsScreen for full customization
+        if (item.category === 'pizza') {
+            console.log('→ Navigating to PizzaDetails with pizzaId:', item._id);
+            navigation.navigate('PizzaDetails', { pizzaId: item._id });
+        } else {
+            // For other items (sides, beverages, desserts), navigate to ItemDetails
+            console.log('→ Navigating to ItemDetails with itemId:', item._id);
+            navigation.navigate('ItemDetails', { itemId: item._id });
+        }
     }, [navigation]);
 
     const navigateToMenu = useCallback(() => {
@@ -688,52 +674,69 @@ export default function CustomerHomeScreen() {
                             </View>
                         ) : (
                             <View style={styles.modernGrid}>
-                                {popularItems.map((item) => (
-                                    <TouchableOpacity
-                                        key={item._id}
-                                        style={styles.modernItemCard}
-                                        onPress={() => navigateToItem(item)}
-                                        activeOpacity={0.8}
-                                    >
-                                        {/* Image with badge */}
-                                        <View style={styles.modernItemImageContainer}>
-                                            <Image
-                                                source={{ uri: item.image || 'https://via.placeholder.com/150' }}
-                                                style={styles.modernItemImage}
-                                            />
+                                {popularItems.map((item, index) => {
+                                    // Get display price (for multi-size pricing, use base price)
+                                    const displayPrice = item.basePrice || 0;
 
-                                            {/* Veg/Non-veg indicator */}
-                                            <View style={styles.vegBadge}>
-                                                <View style={[styles.vegBadgeInner, !item.isVeg && styles.nonVegBadgeInner]}>
-                                                    <View style={[styles.vegIndicatorDot, !item.isVeg && styles.nonVegIndicatorDot]} />
+                                    // Check if item is bestseller (top item by salesCount)
+                                    const isBestseller = index === 0 && item.salesCount > 0;
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={item._id}
+                                            style={styles.modernItemCard}
+                                            onPress={() => navigateToItem(item)}
+                                            activeOpacity={0.7}
+                                        >
+                                            {/* Image with badge */}
+                                            <View style={styles.modernItemImageContainer}>
+                                                <Image
+                                                    source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }}
+                                                    style={styles.modernItemImage}
+                                                />
+
+                                                {/* Veg/Non-veg indicator */}
+                                                <View style={styles.vegBadge}>
+                                                    <View style={[styles.vegBadgeInner, !item.isVegetarian && styles.nonVegBadgeInner]}>
+                                                        <View style={[styles.vegIndicatorDot, !item.isVegetarian && styles.nonVegIndicatorDot]} />
+                                                    </View>
+                                                </View>
+
+                                                {/* Bestseller tag - only show for top item with sales */}
+                                                {isBestseller && (
+                                                    <View style={styles.bestsellerTag}>
+                                                        <Text style={styles.bestsellerText}>⭐ BESTSELLER</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Item details */}
+                                            <View style={styles.modernItemDetails}>
+                                                <Text style={styles.modernItemName} numberOfLines={1}>
+                                                    {item.name}
+                                                </Text>
+                                                <Text style={styles.modernItemDesc} numberOfLines={2}>
+                                                    {item.description}
+                                                </Text>
+
+                                                {/* Price and Add button */}
+                                                <View style={styles.modernItemFooter}>
+                                                    <Text style={styles.modernItemPrice}>₹{displayPrice.toFixed(0)}</Text>
+                                                    <TouchableOpacity
+                                                        style={styles.addButton}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            // Navigate to item details to add
+                                                            navigateToItem(item);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.addButtonText}>ADD +</Text>
+                                                    </TouchableOpacity>
                                                 </View>
                                             </View>
-
-                                            {/* Bestseller tag */}
-                                            <View style={styles.bestsellerTag}>
-                                                <Text style={styles.bestsellerText}>⭐ BESTSELLER</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Item details */}
-                                        <View style={styles.modernItemDetails}>
-                                            <Text style={styles.modernItemName} numberOfLines={1}>
-                                                {item.name}
-                                            </Text>
-                                            <Text style={styles.modernItemDesc} numberOfLines={2}>
-                                                {item.description}
-                                            </Text>
-
-                                            {/* Price and Add button */}
-                                            <View style={styles.modernItemFooter}>
-                                                <Text style={styles.modernItemPrice}>₹{item.price}</Text>
-                                                <TouchableOpacity style={styles.addButton}>
-                                                    <Text style={styles.addButtonText}>ADD +</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
                         )}
                     </View>

@@ -118,12 +118,10 @@ export default function OrderDetailsScreen() {
         switch (status) {
             case 'pending':
                 return { label: 'Pending', color: '#FF9800', bgColor: '#FFF3E0', icon: 'schedule' };
-            case 'confirmed':
-                return { label: 'Confirmed', color: '#2196F3', bgColor: '#E3F2FD', icon: 'check-circle' };
-            case 'preparing':
-                return { label: 'Preparing', color: '#2196F3', bgColor: '#E3F2FD', icon: 'restaurant' };
-            case 'ready':
-                return { label: 'Ready', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'check-circle' };
+            case 'accepted':
+                return { label: 'Accepted', color: '#4CAF50', bgColor: '#E8F5E9', icon: 'check-circle' };
+            case 'assigned':
+                return { label: 'Assigned', color: '#2196F3', bgColor: '#E3F2FD', icon: 'person' };
             case 'out_for_delivery':
                 return { label: 'Out for Delivery', color: '#9C27B0', bgColor: '#F3E5F5', icon: 'delivery-dining' };
             case 'delivered':
@@ -556,6 +554,7 @@ export default function OrderDetailsScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.actionsSection}>
+                    {/* Pending orders: Show Accept & Reject buttons */}
                     {orderDetails.status === 'pending' && (
                         <>
                             <TouchableOpacity
@@ -588,26 +587,11 @@ export default function OrderDetailsScreen() {
                             </TouchableOpacity>
                         </>
                     )}
-                    {(orderDetails.status === 'confirmed' || orderDetails.status === 'preparing') && (
-                        <TouchableOpacity
-                            style={[styles.readyButton, actionLoading && styles.buttonDisabled]}
-                            onPress={handleMarkReady}
-                            disabled={actionLoading}
-                        >
-                            {actionLoading ? (
-                                <ActivityIndicator size="small" color="#fff" />
-                            ) : (
-                                <>
-                                    <MaterialIcons name="done-all" size={20} color="#fff" />
-                                    <Text style={styles.readyButtonText}>Mark as Ready</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    )}
-                    {orderDetails.status === 'ready' && (
+                    {/* Accepted orders: Show Assign to Delivery button */}
+                    {orderDetails.status === 'accepted' && (
                         <TouchableOpacity
                             style={styles.assignButton}
-                            onPress={() => navigation.navigate('AssignDeliveryAgent', {
+                            onPress={() => navigation.navigate('AssignDelivery', {
                                 orderId: orderDetails.orderNumber || orderDetails._id || orderDetails.id,
                                 orderDetails: orderDetails
                             })}
@@ -615,6 +599,15 @@ export default function OrderDetailsScreen() {
                             <MaterialIcons name="delivery-dining" size={20} color="#fff" />
                             <Text style={styles.assignButtonText}>Assign to Delivery</Text>
                         </TouchableOpacity>
+                    )}
+                    {/* Assigned orders: Show delivery agent info (read-only) */}
+                    {orderDetails.status === 'assigned' && (
+                        <View style={styles.assignedInfo}>
+                            <MaterialIcons name="check-circle" size={20} color="#4CAF50" />
+                            <Text style={styles.assignedInfoText}>
+                                Assigned to delivery agent
+                            </Text>
+                        </View>
                     )}
 
                     {/* 🔥 PART 1.9: WhatsApp Share Button */}
@@ -1146,6 +1139,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    assignedInfo: {
+        backgroundColor: '#E8F5E9',
+        borderRadius: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    assignedInfoText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2E7D32',
     },
     printButton: {
         backgroundColor: '#F0F0F0',

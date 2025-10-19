@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axiosInstance from '../../../api/axiosInstance';
+import { io, Socket } from 'socket.io-client';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../../redux/store';
+import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
 
 // Define the route params type
 type AssignDeliveryRouteProp = RouteProp<
@@ -44,11 +48,14 @@ export default function AssignDeliveryAgentScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
     const route = useRoute<AssignDeliveryRouteProp>();
     const { orderId, orderDetails } = route.params;
+    const { userId } = useSelector((state: RootState) => state.auth);
 
     const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
     const [deliveryAgents, setDeliveryAgents] = useState<DeliveryAgent[]>([]);
     const [loading, setLoading] = useState(true);
     const [assigning, setAssigning] = useState(false);
+
+    const socketRef = useRef<Socket | null>(null);
 
     // Format address object to string
     const formatAddress = (address: any): string => {
@@ -81,6 +88,107 @@ export default function AssignDeliveryAgentScreen() {
     useEffect(() => {
         fetchDeliveryAgents();
     }, []);
+
+    // ✅ Socket connection for real-time agent status updates
+    useEffect(() => {
+        if (!userId) {
+            console.log('⚠️ [ADMIN] No userId, skipping socket');
+            return;
+        }
+
+        console.log('🔌 [ADMIN] Connecting socket for agent updates...');
+
+        socketRef.current = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+        });
+
+        const socket = socketRef.current;
+
+        socket.on('connect', () => {
+            console.log('✅ [ADMIN-ASSIGN] Socket connected:', socket.id);
+            console.log('  - Transport:', socket.io.engine.transport.name);
+            console.log('  - URL:', SOCKET_URL);
+
+            // Register as admin to join admin room
+            socket.emit('register', {
+                userId: userId,
+                role: 'admin'
+            });
+            console.log('  - Registered as admin with userId:', userId);
+        });
+
+        socket.on('registered', (data) => {
+            console.log('✅ [ADMIN-ASSIGN] Registration confirmed!');
+            console.log('  - Response:', JSON.stringify(data, null, 2));
+            console.log('  - Now listening for: delivery:agent:status:update');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('❌ [ADMIN-ASSIGN] Socket disconnected');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('❌ [ADMIN-ASSIGN] Connection error:', error.message);
+        });
+
+        // ✅ Listen for delivery agent status changes
+        socket.on('delivery:agent:status:update', (data: any) => {
+            console.log('🎯 [ADMIN-ASSIGN] ========================================');
+            console.log('🎯 [ADMIN-ASSIGN] RECEIVED STATUS UPDATE EVENT!');
+            console.log('🎯 [ADMIN-ASSIGN] ========================================');
+            console.log('📡 [ADMIN-ASSIGN] Status update:', {
+                agentId: data.deliveryAgentId,
+                name: data.name,
+                isOnline: data.isOnline,
+                state: data.state,
+                timestamp: data.timestamp
+            });
+            console.log('📋 [ADMIN-ASSIGN] Current agents count:', deliveryAgents.length);
+
+            setDeliveryAgents(prevAgents => {
+                console.log('🔍 [ADMIN-ASSIGN] Updating agents state...');
+                console.log('  - Previous agents:', prevAgents.map(a => ({ id: a.id, name: a.name, status: a.status })));
+                console.log('  - Looking for agent ID:', data.deliveryAgentId);
+
+                const updated = prevAgents.map(agent => {
+                    if (agent.id === data.deliveryAgentId) {
+                        const newStatus: 'online' | 'busy' | 'offline' =
+                            data.state === 'free' ? 'online' :
+                                data.state === 'busy' ? 'busy' : 'offline';
+
+                        console.log(`🔄 [ADMIN-ASSIGN] FOUND MATCH! ${agent.name}: ${agent.status} → ${newStatus}`);
+                        console.log('  - Old isOnline:', agent.isOnline, '→ New isOnline:', data.isOnline);
+                        console.log('  - Old status:', agent.status, '→ New status:', newStatus);
+
+                        return {
+                            ...agent,
+                            isOnline: data.isOnline,
+                            status: newStatus
+                        };
+                    }
+                    return agent;
+                });
+
+                console.log('✅ [ADMIN-ASSIGN] Updated agents:', updated.map(a => ({ id: a.id, name: a.name, status: a.status })));
+                return updated;
+            });
+
+            console.log('🎯 [ADMIN-ASSIGN] State update complete!');
+            console.log('🎯 [ADMIN-ASSIGN] ========================================');
+        });
+
+        return () => {
+            console.log('🔌 [ADMIN] Disconnecting socket...');
+            socket.off('connect');
+            socket.off('registered');
+            socket.off('disconnect');
+            socket.off('delivery:agent:status:update');
+            socket.disconnect();
+        };
+    }, [userId]);
 
     const fetchDeliveryAgents = async () => {
         try {

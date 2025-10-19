@@ -14,6 +14,7 @@ import {
     removeCouponThunk
 } from '../../../../redux/thunks/cartThunks';
 import { selectCartItems, selectCartTotals, selectCartLoading, selectAppliedCoupon } from '../../../../redux/slices/cartSlice';
+import axiosInstance from '../../../api/axiosInstance';
 
 export default function CartScreen() {
     const navigation = useNavigation();
@@ -26,6 +27,10 @@ export default function CartScreen() {
     const appliedCoupon = useSelector(selectAppliedCoupon);
 
     const [promoCode, setPromoCode] = useState('');
+    const [offerCode, setOfferCode] = useState('');
+    const [appliedOffer, setAppliedOffer] = useState<any>(null);
+    const [offerDiscount, setOfferDiscount] = useState(0);
+    const [validatingOffer, setValidatingOffer] = useState(false);
 
     // Fetch cart on mount and when screen comes into focus
     useFocusEffect(
@@ -91,14 +96,68 @@ export default function CartScreen() {
         }
     };
 
+    const applyOfferCode = async () => {
+        if (!offerCode.trim()) {
+            Alert.alert('Error', 'Please enter an offer code');
+            return;
+        }
+
+        if (appliedCoupon) {
+            Alert.alert('Notice', 'You can only use either a coupon or an offer code, not both');
+            return;
+        }
+
+        try {
+            setValidatingOffer(true);
+            console.log(`🔄 Validating offer code: ${offerCode.toUpperCase()}`);
+
+            const response = await axiosInstance.post('/offers/validate', {
+                code: offerCode.toUpperCase(),
+                cartValue: totals.subtotal
+            });
+
+            if (response.data.success) {
+                console.log('✅ Offer validated:', response.data.offer);
+                setAppliedOffer(response.data.offer);
+                setOfferDiscount(response.data.discount);
+                setOfferCode('');
+                Alert.alert(
+                    'Success!',
+                    response.data.message || `Offer applied! You saved ₹${response.data.discount}`
+                );
+            }
+        } catch (error: any) {
+            console.error('❌ Offer validation failed:', error);
+            const errorMessage = error.response?.data?.message ||
+                error.message ||
+                'Invalid offer code';
+            Alert.alert('Invalid Offer', errorMessage);
+        } finally {
+            setValidatingOffer(false);
+        }
+    };
+
+    const removeOfferCode = () => {
+        setAppliedOffer(null);
+        setOfferDiscount(0);
+        Alert.alert('Success', 'Offer code removed');
+    };
+
     const proceedToCheckout = () => {
         if (cartItems.length === 0) {
             Alert.alert('Empty Cart', 'Please add items to your cart before proceeding.');
             return;
         }
-        // Navigate to checkout screen with cart total
+
+        // Calculate final total including offer discount
+        const finalTotal = offerDiscount > 0
+            ? totals.total - offerDiscount
+            : totals.total;
+
+        // Navigate to checkout screen with cart total and applied offer
         (navigation as any).navigate('Checkout', {
-            cartTotal: totals.total
+            cartTotal: finalTotal,
+            appliedOffer: appliedOffer || undefined
         });
     };
 
@@ -239,6 +298,63 @@ export default function CartScreen() {
                             )}
                         </View>
 
+                        {/* Offer Code Section */}
+                        <View style={styles.promoSection}>
+                            <View style={styles.promoHeader}>
+                                <MaterialIcons name="card-giftcard" size={20} color="#cb202d" />
+                                <Text style={styles.sectionTitle}>Apply Offer Code</Text>
+                            </View>
+                            {appliedOffer ? (
+                                <View style={styles.appliedPromo}>
+                                    <View style={styles.appliedPromoContent}>
+                                        <MaterialIcons name="check-circle" size={16} color="#0C7C59" />
+                                        <Text style={styles.appliedPromoText}>
+                                            {appliedOffer.code} applied
+                                        </Text>
+                                        <Text style={styles.appliedPromoSavings}>
+                                            You saved ₹{offerDiscount.toFixed(0)}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity onPress={removeOfferCode} style={styles.removeButton}>
+                                        <MaterialIcons name="close" size={16} color="#666" />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : !appliedCoupon ? (
+                                <View style={styles.promoInput}>
+                                    <View style={styles.promoInputWrapper}>
+                                        <MaterialIcons name="card-giftcard" size={16} color="#999" />
+                                        <TextInput
+                                            style={styles.promoCodeInput}
+                                            value={offerCode}
+                                            onChangeText={(text) => setOfferCode(text.toUpperCase())}
+                                            placeholder="Enter offer code"
+                                            placeholderTextColor="#999"
+                                            autoCapitalize="characters"
+                                            editable={!validatingOffer}
+                                        />
+                                    </View>
+                                    <TouchableOpacity
+                                        style={[styles.applyButton, offerCode.trim() && !validatingOffer ? styles.applyButtonActive : styles.applyButtonInactive]}
+                                        onPress={applyOfferCode}
+                                        disabled={!offerCode.trim() || validatingOffer}
+                                    >
+                                        {validatingOffer ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Text style={[styles.applyButtonText, offerCode.trim() ? styles.applyButtonTextActive : styles.applyButtonTextInactive]}>Apply</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View style={styles.disabledPromo}>
+                                    <MaterialIcons name="info-outline" size={16} color="#999" />
+                                    <Text style={styles.disabledPromoText}>
+                                        Remove coupon to apply an offer code
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
                         <View style={styles.orderSummary}>
                             <View style={styles.summaryHeader}>
                                 <MaterialIcons name="receipt" size={20} color="#cb202d" />
@@ -275,6 +391,17 @@ export default function CartScreen() {
                                     </View>
                                 )}
 
+                                {appliedOffer && offerDiscount > 0 && (
+                                    <View style={styles.summaryRow}>
+                                        <Text style={[styles.summaryLabel, styles.discountLabel]}>
+                                            Offer discount ({appliedOffer.code})
+                                        </Text>
+                                        <Text style={[styles.summaryValue, styles.discountValue]}>
+                                            -₹{offerDiscount.toFixed(0)}
+                                        </Text>
+                                    </View>
+                                )}
+
                                 <View style={styles.divider} />
 
                                 <LinearGradient
@@ -285,7 +412,9 @@ export default function CartScreen() {
                                 >
                                     <View style={styles.totalRowContent}>
                                         <Text style={styles.totalLabel}>Grand Total</Text>
-                                        <Text style={styles.totalValue}>₹{totals.total.toFixed(0)}</Text>
+                                        <Text style={styles.totalValue}>
+                                            ₹{(totals.total - offerDiscount).toFixed(0)}
+                                        </Text>
                                     </View>
                                 </LinearGradient>
                             </View>
@@ -628,6 +757,21 @@ const styles = StyleSheet.create({
     },
     applyButtonTextInactive: {
         color: '#999',
+    },
+    disabledPromo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8f9fa',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    disabledPromoText: {
+        fontSize: 13,
+        color: '#999',
+        marginLeft: 8,
+        fontStyle: 'italic',
     },
     orderSummary: {
         marginHorizontal: 16,

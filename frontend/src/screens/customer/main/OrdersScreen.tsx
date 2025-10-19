@@ -270,6 +270,33 @@ export default function OrdersScreen() {
                                                 )}
                                             </View>
 
+                                            {/* Delivery Agent Card (shown when assigned) */}
+                                            {order.deliveryAgent && (
+                                                <View style={styles.deliveryAgentSection}>
+                                                    <View style={styles.divider} />
+                                                    <View style={styles.deliveryAgentCard}>
+                                                        <View style={styles.deliveryAgentIcon}>
+                                                            <MaterialIcons name="delivery-dining" size={20} color="#cb202d" />
+                                                        </View>
+                                                        <View style={styles.deliveryAgentInfo}>
+                                                            <Text style={styles.deliveryAgentLabel}>Delivery Agent</Text>
+                                                            <Text style={styles.deliveryAgentName}>{order.deliveryAgent.name}</Text>
+                                                            <View style={styles.deliveryAgentDetails}>
+                                                                <MaterialIcons name="phone" size={14} color="#8E8E93" />
+                                                                <Text style={styles.deliveryAgentPhone}>{order.deliveryAgent.phone}</Text>
+                                                                {order.deliveryAgent.vehicleNumber && order.deliveryAgent.vehicleNumber !== 'N/A' && (
+                                                                    <>
+                                                                        <Text style={styles.deliveryAgentSeparator}>•</Text>
+                                                                        <MaterialIcons name="two-wheeler" size={14} color="#8E8E93" />
+                                                                        <Text style={styles.deliveryAgentVehicle}>{order.deliveryAgent.vehicleNumber}</Text>
+                                                                    </>
+                                                                )}
+                                                            </View>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )}
+
                                             {/* Bottom Section with Date, Status and Total */}
                                             <View style={styles.bottomSection}>
                                                 <View style={styles.divider} />
@@ -553,6 +580,56 @@ const styles = StyleSheet.create({
     orderTotal: {
         ...Typography.semibold.text500,
         color: Colors.text.primary,
+    },
+
+    // Delivery Agent Card
+    deliveryAgentSection: {
+        marginTop: 8,
+    },
+    deliveryAgentCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        gap: 12,
+    },
+    deliveryAgentIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFF3F4',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    deliveryAgentInfo: {
+        flex: 1,
+    },
+    deliveryAgentLabel: {
+        ...Typography.regular.text200,
+        color: Colors.text.tertiary,
+        marginBottom: 2,
+    },
+    deliveryAgentName: {
+        ...Typography.semibold.text400,
+        color: Colors.text.primary,
+        marginBottom: 4,
+    },
+    deliveryAgentDetails: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    deliveryAgentPhone: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
+    },
+    deliveryAgentSeparator: {
+        ...Typography.regular.text300,
+        color: Colors.text.tertiary,
+        marginHorizontal: 4,
+    },
+    deliveryAgentVehicle: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
     },
 
     historyButton: {

@@ -39,6 +39,7 @@ export type CustomerStackParamList = {
     DrinksMenu: undefined;
     DealsMenu: undefined;
     PizzaDetails: { pizzaId: string };
+    ItemDetails: { itemId: string }; // For non-pizza items (sides, beverages, desserts)
     SideDetails: { sideId: string };
     DrinkDetails: { drinkId: string };
     Cart: undefined;

@@ -51,7 +51,7 @@ router.get('/:id', protect, getOrderById);
 // Get orders by user (authenticated users - own orders)
 router.get('/user/:userId', protect, getOrdersByUser);
 
-// Accept order (admin only) - pending → confirmed
+// Accept order (admin only) - pending → accepted
 router.post('/:id/accept', protect, adminOnly, acceptOrder);
 
 // Reject/cancel order (admin only)

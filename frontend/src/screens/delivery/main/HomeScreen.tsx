@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Modal, Dimensions, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -10,6 +10,9 @@ import { DeliveryStackParamList, DeliveryTabParamList } from '../../../types/nav
 import { RootState } from '../../../../redux/store';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { io, Socket } from 'socket.io-client';
+import axiosInstance from '../../../api/axiosInstance';
+import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
 
 const { width } = Dimensions.get('window');
 
@@ -33,13 +36,16 @@ interface Order {
 }
 
 export default function DeliveryHomeScreen() {
-    const { name } = useSelector((state: RootState) => state.auth);
+    const { name, userId } = useSelector((state: RootState) => state.auth);
     const navigation = useNavigation<NavigationProp>();
 
-    const [isOnline, setIsOnline] = useState(true);
+    const [isOnline, setIsOnline] = useState(false);
     const [showOrderModal, setShowOrderModal] = useState(false);
     const [acceptTimer, setAcceptTimer] = useState(30);
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+    const socketRef = useRef<Socket | null>(null);
 
     // Mock order assignment
     const mockOrder = {
@@ -63,6 +69,73 @@ export default function DeliveryHomeScreen() {
         hoursOnline: 4.2,
         acceptance: 95
     };
+
+    // ✅ Fetch initial online status from backend
+    useEffect(() => {
+        const fetchAgentStatus = async () => {
+            try {
+                const response = await axiosInstance.get('/delivery-agent/status');
+                if (response.data.success) {
+                    setIsOnline(response.data.data.status?.isOnline || false);
+                    console.log('✅ Agent status loaded:', response.data.data.status);
+                }
+            } catch (error: any) {
+                console.error('❌ Error fetching agent status:', error.message);
+            }
+        };
+
+        fetchAgentStatus();
+    }, []);
+
+    // ✅ Socket connection for real-time status updates
+    useEffect(() => {
+        if (!userId) return;
+
+        console.log('🔌 Connecting delivery agent socket...');
+
+        socketRef.current = io(SOCKET_URL, SOCKET_OPTIONS);
+
+        const socket = socketRef.current;
+
+        socket.on('connect', () => {
+            console.log('✅ Socket connected:', socket.id);
+            console.log('  - Transport:', socket.io.engine.transport.name);
+
+            // Register as delivery agent
+            socket.emit('register', {
+                userId: userId,
+                role: 'delivery'
+            });
+            console.log('  - Registered as delivery agent with userId:', userId);
+        });
+
+        socket.on('registered', (data) => {
+            console.log('✅ Delivery agent registration confirmed!');
+            console.log('  - Response:', data);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('❌ Socket disconnected');
+        });
+
+        // Listen for status confirmation from server
+        socket.on('delivery:agent:status:update', (data: any) => {
+            console.log('📡 Status update received:', data);
+            if (data.deliveryAgentId === userId) {
+                setIsOnline(data.isOnline);
+                console.log(`🚴 Status synced: ${data.isOnline ? 'ONLINE' : 'OFFLINE'}`);
+            }
+        });
+
+        return () => {
+            console.log('🔌 Disconnecting socket...');
+            socket.off('connect');
+            socket.off('registered');
+            socket.off('disconnect');
+            socket.off('delivery:agent:status:update');
+            socket.disconnect();
+        };
+    }, [userId]);
 
     // Simulate new order assignment - DISABLED
     // useEffect(() => {
@@ -123,13 +196,60 @@ export default function DeliveryHomeScreen() {
         Alert.alert('Order Rejected', 'Looking for more orders...');
     };
 
-    const toggleOnlineStatus = () => {
-        setIsOnline(!isOnline);
-        if (!isOnline) {
-            Alert.alert('You\'re Online!', 'You will start receiving order requests.');
-        } else {
-            Alert.alert('You\'re Offline', 'You won\'t receive any order requests.');
-            setShowOrderModal(false);
+    // ✅ Toggle Online/Offline Status with Backend API Call
+    const toggleOnlineStatus = async () => {
+        if (isUpdatingStatus) return;
+
+        const newStatus = !isOnline;
+
+        try {
+            setIsUpdatingStatus(true);
+            console.log(`🚴 Updating status to: ${newStatus ? 'ONLINE' : 'OFFLINE'}`);
+
+            const response = await axiosInstance.patch('/delivery-agent/status', {
+                isOnline: newStatus
+            });
+
+            if (response.data.success) {
+                setIsOnline(newStatus);
+
+                Alert.alert(
+                    newStatus ? 'You\'re Online! 🟢' : 'You\'re Offline 🔴',
+                    response.data.message,
+                    [{ text: 'OK' }]
+                );
+
+                // Socket will broadcast automatically from backend
+                console.log('✅ Status updated successfully');
+
+                if (!newStatus) {
+                    // Going offline - close any open modals
+                    setShowOrderModal(false);
+                }
+            }
+        } catch (error: any) {
+            console.error('❌ Error updating status:', error.message);
+
+            const errorMessage = error.response?.data?.message ||
+                'Failed to update status. Please try again.';
+
+            Alert.alert(
+                'Status Update Failed',
+                errorMessage,
+                [{ text: 'OK' }]
+            );
+
+            // If error due to active orders, show specific message
+            if (error.response?.data?.activeOrders) {
+                const activeCount = error.response.data.activeOrders.length;
+                Alert.alert(
+                    'Cannot Go Offline',
+                    `You have ${activeCount} active delivery(ies) in progress. Complete them first.`,
+                    [{ text: 'OK' }]
+                );
+            }
+        } finally {
+            setIsUpdatingStatus(false);
         }
     };
 
@@ -227,7 +347,7 @@ export default function DeliveryHomeScreen() {
 
                     <TouchableOpacity
                         style={styles.quickActionCard}
-                        onPress={() => navigation.navigate('PaymentCollection')}
+                        onPress={() => navigation.navigate('ActiveOrders')}
                     >
                         <LinearGradient
                             colors={['#E8F5E9', '#C8E6C9']}

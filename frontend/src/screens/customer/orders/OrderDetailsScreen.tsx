@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 
 interface OrderDetails {
     orderId: string;
-    status: 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
+    status: 'pending' | 'accepted' | 'assigned' | 'out_for_delivery' | 'delivered' | 'cancelled';
     orderType: 'delivery' | 'pickup';
     placedAt: string;
     deliveredAt?: string;
@@ -104,14 +104,14 @@ export default function OrderDetailsScreen() {
 
     const getStatusInfo = (status: string) => {
         switch (status) {
-            case 'confirmed':
-                return { emoji: '✅', title: 'Confirmed', color: '#4CAF50' };
-            case 'preparing':
-                return { emoji: '👨‍🍳', title: 'Preparing', color: '#FF9800' };
-            case 'ready':
-                return { emoji: '🍕', title: 'Ready', color: '#2196F3' };
+            case 'pending':
+                return { emoji: '⏳', title: 'Order Placed', color: '#FF9800' };
+            case 'accepted':
+                return { emoji: '✅', title: 'Accepted', color: '#4CAF50' };
+            case 'assigned':
+                return { emoji: '🚗', title: 'Agent Assigned', color: '#2196F3' };
             case 'out_for_delivery':
-                return { emoji: '🚗', title: 'Out for Delivery', color: '#9C27B0' };
+                return { emoji: '�', title: 'Out for Delivery', color: '#9C27B0' };
             case 'delivered':
                 return { emoji: '🎉', title: 'Delivered', color: '#4CAF50' };
             case 'cancelled':

@@ -10,11 +10,13 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import axiosInstance from '../../../api/axiosInstance';
 
 export default function AddOfferScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -22,12 +24,21 @@ export default function AddOfferScreen() {
     const params = route.params as { offer?: any } | undefined;
     const editingOffer = params?.offer;
 
-    // Form state based on HomeOfferItem structure
-    const [badge, setBadge] = useState(''); // e.g., "50% OFF", "₹100 OFF"
-    const [title, setTitle] = useState(''); // e.g., "Mega Pizza Sale"
-    const [subtitle, setSubtitle] = useState(''); // e.g., "Get 50% off on all large pizzas Min order: ₹299"
-    const [code, setCode] = useState(''); // e.g., "PIZZA50"
+    // Form state - mapping to backend Offer model
+    const [badge, setBadge] = useState(''); // Maps to badge field
+    const [title, setTitle] = useState(''); // Maps to title field
+    const [description, setDescription] = useState(''); // Maps to description field (was subtitle)
+    const [code, setCode] = useState(''); // Maps to code field
+    const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+    const [discountValue, setDiscountValue] = useState('');
+    const [maxDiscount, setMaxDiscount] = useState('');
+    const [minOrderValue, setMinOrderValue] = useState('');
+    const [validFrom, setValidFrom] = useState('');
+    const [validUntil, setValidUntil] = useState('');
+    const [usageLimit, setUsageLimit] = useState('');
     const [selectedTheme, setSelectedTheme] = useState(0);
+    const [isActive, setIsActive] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     // Color themes matching HomeScreen
     const offerThemes = [
@@ -63,8 +74,24 @@ export default function AddOfferScreen() {
         if (editingOffer) {
             setBadge(editingOffer.badge || '');
             setTitle(editingOffer.title || '');
-            setSubtitle(editingOffer.subtitle || '');
+            setDescription(editingOffer.description || editingOffer.subtitle || '');
             setCode(editingOffer.code || '');
+            setDiscountType(editingOffer.discountType || 'percentage');
+            setDiscountValue(editingOffer.discountValue?.toString() || '');
+            setMaxDiscount(editingOffer.maxDiscount?.toString() || '');
+            setMinOrderValue(editingOffer.minOrderValue?.toString() || '');
+            setUsageLimit(editingOffer.usageLimit?.toString() || '');
+            setIsActive(editingOffer.isActive !== false);
+
+            // Parse dates if available
+            if (editingOffer.validFrom) {
+                const date = new Date(editingOffer.validFrom);
+                setValidFrom(date.toISOString().split('T')[0]);
+            }
+            if (editingOffer.validUntil) {
+                const date = new Date(editingOffer.validUntil);
+                setValidUntil(date.toISOString().split('T')[0]);
+            }
 
             // Find theme index based on bgColor
             const themeIndex = offerThemes.findIndex(
@@ -73,6 +100,14 @@ export default function AddOfferScreen() {
             if (themeIndex !== -1) {
                 setSelectedTheme(themeIndex);
             }
+        } else {
+            // Set default dates for new offer
+            const today = new Date();
+            const nextMonth = new Date(today);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+            setValidFrom(today.toISOString().split('T')[0]);
+            setValidUntil(nextMonth.toISOString().split('T')[0]);
         }
     }, [editingOffer]);
 
@@ -85,43 +120,94 @@ export default function AddOfferScreen() {
             Alert.alert('Validation Error', 'Please enter an offer title');
             return false;
         }
-        if (!subtitle.trim()) {
-            Alert.alert('Validation Error', 'Please enter offer description/subtitle');
+        if (!description.trim()) {
+            Alert.alert('Validation Error', 'Please enter offer description');
             return false;
         }
         if (!code.trim()) {
             Alert.alert('Validation Error', 'Please enter an offer code');
             return false;
         }
+        if (!discountValue || parseFloat(discountValue) <= 0) {
+            Alert.alert('Validation Error', 'Please enter a valid discount value');
+            return false;
+        }
+        if (discountType === 'percentage' && parseFloat(discountValue) > 100) {
+            Alert.alert('Validation Error', 'Percentage discount cannot exceed 100%');
+            return false;
+        }
+        if (!minOrderValue || parseFloat(minOrderValue) < 0) {
+            Alert.alert('Validation Error', 'Please enter a valid minimum order value');
+            return false;
+        }
+        if (!validFrom || !validUntil) {
+            Alert.alert('Validation Error', 'Please select validity dates');
+            return false;
+        }
+        if (new Date(validUntil) <= new Date(validFrom)) {
+            Alert.alert('Validation Error', 'End date must be after start date');
+            return false;
+        }
         return true;
     };
 
-    const handleSaveOffer = () => {
+    const handleSaveOffer = async () => {
         if (!validateForm()) return;
 
-        const offerData = {
-            id: editingOffer?.id || Date.now().toString(),
-            badge: badge.trim(),
-            title: title.trim(),
-            subtitle: subtitle.trim(),
-            code: code.trim().toUpperCase(),
-            bgColor: offerThemes[selectedTheme].bgColor,
-            gradientColors: offerThemes[selectedTheme].gradientColors,
-        };
+        setLoading(true);
 
-        // TODO: Save to API or storage
-        console.log(editingOffer ? 'Updated Offer:' : 'New Offer:', offerData);
+        try {
+            // Prepare data for backend API
+            const offerData = {
+                title: title.trim(),
+                description: description.trim(),
+                code: code.trim().toUpperCase(),
+                badge: badge.trim(),
+                discountType,
+                discountValue: parseFloat(discountValue),
+                maxDiscount: maxDiscount ? parseFloat(maxDiscount) : undefined,
+                minOrderValue: parseFloat(minOrderValue),
+                validFrom,
+                validUntil,
+                usageLimit: usageLimit ? parseInt(usageLimit) : undefined,
+                gradientColors: offerThemes[selectedTheme].gradientColors,
+                bgColor: offerThemes[selectedTheme].bgColor,
+                isActive,
+            };
 
-        Alert.alert(
-            'Success',
-            editingOffer ? 'Offer updated successfully!' : 'Offer created successfully!',
-            [
-                {
-                    text: 'OK',
-                    onPress: () => navigation.goBack(),
-                },
-            ]
-        );
+            let response;
+            if (editingOffer && editingOffer._id) {
+                // Update existing offer
+                response = await axiosInstance.patch(
+                    `/offers/admin/${editingOffer._id}`,
+                    offerData
+                );
+            } else {
+                // Create new offer
+                response = await axiosInstance.post('/offers/admin', offerData);
+            }
+
+            if (response.data.success) {
+                Alert.alert(
+                    'Success',
+                    editingOffer ? 'Offer updated successfully!' : 'Offer created successfully!',
+                    [
+                        {
+                            text: 'OK',
+                            onPress: () => navigation.goBack(),
+                        },
+                    ]
+                );
+            }
+        } catch (error: any) {
+            console.error('Save offer error:', error);
+            const errorMessage = error.response?.data?.message ||
+                error.message ||
+                'Failed to save offer. Please try again.';
+            Alert.alert('Error', errorMessage);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -175,7 +261,7 @@ export default function AddOfferScreen() {
                                         {title || 'Offer Title'}
                                     </Text>
                                     <Text style={styles.previewSubtitle}>
-                                        {subtitle || 'Offer description goes here'}
+                                        {description || 'Offer description goes here'}
                                     </Text>
                                 </View>
 
@@ -225,7 +311,7 @@ export default function AddOfferScreen() {
                             />
                         </View>
 
-                        {/* Subtitle Input */}
+                        {/* Description Input */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>Description *</Text>
                             <Text style={styles.inputHint}>Include minimum order value and terms</Text>
@@ -233,8 +319,8 @@ export default function AddOfferScreen() {
                                 style={[styles.input, styles.textArea]}
                                 placeholder="e.g., Get 50% off on all large pizzas Min order: ₹299"
                                 placeholderTextColor="#999"
-                                value={subtitle}
-                                onChangeText={setSubtitle}
+                                value={description}
+                                onChangeText={setDescription}
                                 multiline
                                 numberOfLines={3}
                             />
@@ -252,6 +338,165 @@ export default function AddOfferScreen() {
                                 onChangeText={(text) => setCode(text.toUpperCase())}
                                 autoCapitalize="characters"
                             />
+                        </View>
+
+                        {/* Discount Type */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Discount Type *</Text>
+                            <View style={styles.discountTypeContainer}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.discountTypeButton,
+                                        discountType === 'percentage' && styles.discountTypeButtonActive,
+                                    ]}
+                                    onPress={() => setDiscountType('percentage')}
+                                    activeOpacity={0.8}
+                                >
+                                    <MaterialIcons
+                                        name="percent"
+                                        size={20}
+                                        color={discountType === 'percentage' ? '#fff' : '#666'}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.discountTypeText,
+                                            discountType === 'percentage' && styles.discountTypeTextActive,
+                                        ]}
+                                    >
+                                        Percentage
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.discountTypeButton,
+                                        discountType === 'fixed' && styles.discountTypeButtonActive,
+                                    ]}
+                                    onPress={() => setDiscountType('fixed')}
+                                    activeOpacity={0.8}
+                                >
+                                    <MaterialIcons
+                                        name="currency-rupee"
+                                        size={20}
+                                        color={discountType === 'fixed' ? '#fff' : '#666'}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.discountTypeText,
+                                            discountType === 'fixed' && styles.discountTypeTextActive,
+                                        ]}
+                                    >
+                                        Fixed Amount
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Discount Value */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>
+                                {discountType === 'percentage' ? 'Discount Percentage *' : 'Discount Amount *'}
+                            </Text>
+                            <Text style={styles.inputHint}>
+                                {discountType === 'percentage'
+                                    ? 'Enter value between 1-100'
+                                    : 'Fixed amount in ₹'}
+                            </Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={discountType === 'percentage' ? 'e.g., 50' : 'e.g., 100'}
+                                placeholderTextColor="#999"
+                                value={discountValue}
+                                onChangeText={setDiscountValue}
+                                keyboardType="numeric"
+                            />
+                        </View>
+
+                        {/* Max Discount (only for percentage) */}
+                        {discountType === 'percentage' && (
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Maximum Discount Cap (Optional)</Text>
+                                <Text style={styles.inputHint}>Maximum discount amount in ₹</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g., 200"
+                                    placeholderTextColor="#999"
+                                    value={maxDiscount}
+                                    onChangeText={setMaxDiscount}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                        )}
+
+                        {/* Min Order Value */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Minimum Order Value *</Text>
+                            <Text style={styles.inputHint}>Minimum cart value required in ₹</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g., 299"
+                                placeholderTextColor="#999"
+                                value={minOrderValue}
+                                onChangeText={setMinOrderValue}
+                                keyboardType="numeric"
+                            />
+                        </View>
+
+                        {/* Valid From */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Valid From *</Text>
+                            <Text style={styles.inputHint}>Start date (YYYY-MM-DD)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="2025-10-19"
+                                placeholderTextColor="#999"
+                                value={validFrom}
+                                onChangeText={setValidFrom}
+                            />
+                        </View>
+
+                        {/* Valid Until */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Valid Until *</Text>
+                            <Text style={styles.inputHint}>End date (YYYY-MM-DD)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="2025-12-31"
+                                placeholderTextColor="#999"
+                                value={validUntil}
+                                onChangeText={setValidUntil}
+                            />
+                        </View>
+
+                        {/* Usage Limit */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Usage Limit (Optional)</Text>
+                            <Text style={styles.inputHint}>Maximum number of times this offer can be used</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g., 100"
+                                placeholderTextColor="#999"
+                                value={usageLimit}
+                                onChangeText={setUsageLimit}
+                                keyboardType="numeric"
+                            />
+                        </View>
+
+                        {/* Active Toggle */}
+                        <View style={styles.inputGroup}>
+                            <View style={styles.toggleRow}>
+                                <View>
+                                    <Text style={styles.inputLabel}>Active Status</Text>
+                                    <Text style={styles.inputHint}>Make this offer immediately available</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.toggle, isActive && styles.toggleActive]}
+                                    onPress={() => setIsActive(!isActive)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={[styles.toggleThumb, isActive && styles.toggleThumbActive]} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Theme Selection */}
@@ -289,24 +534,32 @@ export default function AddOfferScreen() {
                     {/* Save Button */}
                     <View style={styles.buttonSection}>
                         <TouchableOpacity
-                            style={styles.saveButton}
+                            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
                             onPress={handleSaveOffer}
                             activeOpacity={0.8}
+                            disabled={loading}
                         >
-                            <MaterialIcons
-                                name={editingOffer ? "save" : "add-circle"}
-                                size={20}
-                                color="#fff"
-                            />
-                            <Text style={styles.saveButtonText}>
-                                {editingOffer ? 'Update Offer' : 'Create Offer'}
-                            </Text>
+                            {loading ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <>
+                                    <MaterialIcons
+                                        name={editingOffer ? "save" : "add-circle"}
+                                        size={20}
+                                        color="#fff"
+                                    />
+                                    <Text style={styles.saveButtonText}>
+                                        {editingOffer ? 'Update Offer' : 'Create Offer'}
+                                    </Text>
+                                </>
+                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.cancelButton}
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.8}
+                            disabled={loading}
                         >
                             <Text style={styles.cancelButtonText}>Cancel</Text>
                         </TouchableOpacity>
@@ -496,6 +749,69 @@ const styles = StyleSheet.create({
         letterSpacing: 1,
     },
 
+    // Discount Type
+    discountTypeContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
+    },
+    discountTypeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+    },
+    discountTypeButtonActive: {
+        backgroundColor: '#cb202d',
+        borderColor: '#cb202d',
+    },
+    discountTypeText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#666',
+    },
+    discountTypeTextActive: {
+        color: '#fff',
+    },
+
+    // Toggle
+    toggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    toggle: {
+        width: 56,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#E0E0E0',
+        padding: 2,
+        justifyContent: 'center',
+    },
+    toggleActive: {
+        backgroundColor: '#4CAF50',
+    },
+    toggleThumb: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    toggleThumbActive: {
+        transform: [{ translateX: 24 }],
+    },
+
     // Theme Selection
     themeGrid: {
         flexDirection: 'row',
@@ -550,6 +866,9 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 6,
         marginBottom: 12,
+    },
+    saveButtonDisabled: {
+        opacity: 0.6,
     },
     saveButtonText: {
         color: '#fff',

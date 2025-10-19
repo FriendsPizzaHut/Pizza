@@ -14,7 +14,6 @@ import ProfileScreen from '../screens/admin/main/ProfileScreen';
 // Sub-screens
 import NotificationsScreen from '../screens/admin/notifications/NotificationsScreen';
 import AdminOrderDetailsScreen from '../screens/admin/orders/OrderDetailsScreen';
-import AssignDeliveryScreen from '../screens/admin/orders/AssignDeliveryScreen';
 import AssignDeliveryAgentScreen from '../screens/admin/orders/AssignDeliveryAgentScreen';
 import AddMenuItemScreen from '../screens/admin/menu/AddMenuItemScreen';
 import EditMenuItemScreen from '../screens/admin/menu/EditMenuItemScreen';
@@ -106,8 +105,7 @@ export default function AdminNavigator() {
 
                 {/* Order Management Sub-screens */}
                 <Stack.Screen name="OrderDetails" component={AdminOrderDetailsScreen} />
-                <Stack.Screen name="AssignDelivery" component={AssignDeliveryScreen} />
-                <Stack.Screen name="AssignDeliveryAgent" component={AssignDeliveryAgentScreen} />
+                <Stack.Screen name="AssignDelivery" component={AssignDeliveryAgentScreen} />
 
                 {/* Menu Management Sub-screens */}
                 <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} />
