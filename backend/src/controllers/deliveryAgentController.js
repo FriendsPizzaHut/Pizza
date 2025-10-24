@@ -188,7 +188,131 @@ export const getAgentStatus = async (req, res) => {
     }
 };
 
+/**
+ * Get delivery agent dashboard stats
+ *
+ * @route GET /api/v1/delivery-agent/stats
+ * @access Private (Delivery agents only)
+ */
+export const getDeliveryStats = async (req, res) => {
+    try {
+        const deliveryAgentId = req.user.id || req.user._id;
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        // Get today's delivered orders for this agent
+        const todayOrders = await Order.find({
+            deliveryBoy: deliveryAgentId,
+            status: 'delivered',
+            deliveredAt: { $gte: todayStart }
+        }).select('totalAmount deliveredAt orderNumber rating');
+
+        // Count active orders (out_for_delivery)
+        const activeOrders = await Order.countDocuments({
+            deliveryBoy: deliveryAgentId,
+            status: 'out_for_delivery'
+        });
+
+        // Sum today's earnings (sum of totalAmount)
+        const todayEarnings = todayOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+        // Fetch agent overall stats
+        const agent = await User.findById(deliveryAgentId).select('rating totalDeliveries totalEarnings');
+
+        // Placeholder: hoursOnline and acceptance may require status logs/tracking
+        const hoursOnline = 0; // TODO: compute from status logs
+        const acceptance = 0; // TODO: compute from offers/acceptance tracking
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                today: {
+                    ordersCompleted: todayOrders.length,
+                    activeOrders,
+                    earnings: todayEarnings,
+                    hoursOnline,
+                    acceptance
+                },
+                overall: {
+                    totalDeliveries: agent?.totalDeliveries || 0,
+                    rating: agent?.rating || 0,
+                    totalEarnings: agent?.totalEarnings || 0
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching delivery stats:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch delivery stats.',
+            error: error.message
+        });
+    }
+};
+
+
+/**
+ * Get recent delivered orders for delivery agent
+ *
+ * @route GET /api/v1/delivery-agent/recent-deliveries
+ * @access Private (Delivery agents only)
+ */
+export const getRecentDeliveries = async (req, res) => {
+    try {
+        const deliveryAgentId = req.user.id || req.user._id;
+        const limit = parseInt(req.query.limit, 10) || 10;
+
+        const recentDeliveries = await Order.find({
+            deliveryBoy: deliveryAgentId,
+            status: 'delivered'
+        })
+            .populate({ path: 'items.product', select: 'name images price' })
+            .select('orderNumber items deliveryAddress deliveredAt totalAmount rating status')
+            .sort({ deliveredAt: -1 })
+            .limit(limit);
+
+        const formatted = recentDeliveries.map(order => ({
+            _id: order._id,
+            orderNumber: order.orderNumber,
+            items: order.items.map(i => ({
+                product: {
+                    name: i.product?.name || 'Item',
+                    image: (i.product?.images && i.product.images[0]) || ''
+                },
+                quantity: i.quantity
+            })),
+            deliveryAddress: {
+                street: order.deliveryAddress?.street || '',
+                city: order.deliveryAddress?.city || '',
+                formatted: order.deliveryAddress ? `${order.deliveryAddress.street}, ${order.deliveryAddress.city}` : ''
+            },
+            deliveredAt: order.deliveredAt,
+            totalAmount: order.totalAmount,
+            rating: order.rating,
+            status: order.status
+        }));
+
+        return res.status(200).json({
+            success: true,
+            count: formatted.length,
+            data: formatted
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching recent deliveries:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch recent deliveries.',
+            error: error.message
+        });
+    }
+};
+
 export default {
     updateOnlineStatus,
-    getAgentStatus
+    getAgentStatus,
+    getDeliveryStats,
+    getRecentDeliveries
 };

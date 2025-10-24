@@ -280,6 +280,43 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
     }
 
     /**
+     * Deactivate device token on logout
+     * Removes the token from backend to stop receiving notifications
+     */
+    async deactivateDeviceToken(userId: string): Promise<boolean> {
+        try {
+            const token = this.expoPushToken;
+            if (!token) {
+                console.warn('⚠️ [NOTIFICATIONS] No token to deactivate');
+                return true; // Not an error, just no token registered
+            }
+
+            console.log('🔕 [NOTIFICATIONS] Deactivating device token...');
+            console.log('  - User ID:', userId);
+            console.log('  - Token length:', token.length);
+
+            // Call backend to deactivate the token
+            const response = await apiClient.delete(
+                `/device-tokens/${encodeURIComponent(token)}`
+            );
+
+            if (response.data.success) {
+                console.log('✅ [NOTIFICATIONS] Token deactivated successfully');
+                this.expoPushToken = null; // Clear local reference
+                return true;
+            } else {
+                console.error('❌ [NOTIFICATIONS] Failed to deactivate token:', response.data);
+                return false;
+            }
+        } catch (error: any) {
+            console.error('❌ [NOTIFICATIONS] Error deactivating token:', error.message);
+            // Don't fail logout even if token deactivation fails
+            // The backend will also deactivate tokens as a fallback
+            return false;
+        }
+    }
+
+    /**
      * Clean up listeners
      */
     cleanup(): void {

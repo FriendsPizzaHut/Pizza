@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Modal, Dimensions, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, Modal, Dimensions, Platform, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { io, Socket } from 'socket.io-client';
 import axiosInstance from '../../../api/axiosInstance';
 import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
+import { getDeliveryStats, getRecentDeliveries, DeliveryStats, RecentDelivery } from '../../../api/deliveryAgentService';
 
 const { width } = Dimensions.get('window');
 
@@ -45,30 +46,78 @@ export default function DeliveryHomeScreen() {
     const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+    // Dashboard data state
+    const [todayStats, setTodayStats] = useState({
+        activeOrders: 0,
+        ordersCompleted: 0,
+        earnings: 0,
+        hoursOnline: 0,
+        acceptance: 0
+    });
+    const [recentDeliveries, setRecentDeliveries] = useState<RecentDelivery[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
     const socketRef = useRef<Socket | null>(null);
 
-    // Mock order assignment
-    const mockOrder = {
-        id: '#ORD-2024-001',
-        restaurant: 'Pizza Palace',
-        restaurantAddress: '123 Restaurant St.',
-        customer: 'Sarah Johnson',
-        deliveryAddress: '456 Oak Avenue, Apt 2B',
-        distance: '2.3 km',
-        estimatedEarnings: 8.50,
-        estimatedTime: '25 mins',
-        items: ['Large Margherita Pizza', 'Garlic Bread', 'Coke'],
-        total: 28.99,
-        preparationTime: '12 mins'
+    // ==================== DATA FETCHING ====================
+
+    /**
+     * Fetch dashboard data (stats + recent deliveries)
+     */
+    const fetchDashboardData = async () => {
+        try {
+            if (!userId) {
+                console.log('⏭️ Skipping dashboard fetch - no userId');
+                return;
+            }
+
+            console.log('📊 Fetching dashboard data...');
+
+            // Fetch stats and recent deliveries in parallel
+            const [statsData, deliveriesData] = await Promise.all([
+                getDeliveryStats(),
+                getRecentDeliveries(5) // Show 5 most recent deliveries
+            ]);
+
+            setTodayStats(statsData.today);
+            setRecentDeliveries(deliveriesData);
+
+            console.log('✅ Dashboard data loaded:', {
+                ordersCompleted: statsData.today.ordersCompleted,
+                activeOrders: statsData.today.activeOrders,
+                deliveriesCount: deliveriesData.length
+            });
+
+        } catch (error: any) {
+            console.error('❌ Error fetching dashboard data:', error.message);
+            Alert.alert(
+                'Error',
+                'Failed to load dashboard data. Please pull down to refresh.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const todayStats = {
-        activeOrders: 2,
-        ordersCompleted: 8,
-        earnings: 87.50,
-        hoursOnline: 4.2,
-        acceptance: 95
+    /**
+     * Handle pull-to-refresh
+     */
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchDashboardData();
+        setRefreshing(false);
     };
+
+    // ==================== EFFECTS ====================
+
+    // ✅ Fetch initial data on mount
+    useEffect(() => {
+        if (userId) {
+            fetchDashboardData();
+        }
+    }, [userId]);
 
     // ✅ Fetch initial online status from backend
     useEffect(() => {
@@ -127,12 +176,28 @@ export default function DeliveryHomeScreen() {
             }
         });
 
+        // ✅ Listen for order assignment
+        socket.on('order:assigned', (data: any) => {
+            console.log('📦 New order assigned:', data);
+            // Refresh dashboard to update active orders count
+            fetchDashboardData();
+        });
+
+        // ✅ Listen for order delivery completion
+        socket.on('order:delivered', (data: any) => {
+            console.log('✅ Order delivered:', data);
+            // Refresh dashboard to show in recent deliveries
+            fetchDashboardData();
+        });
+
         return () => {
             console.log('🔌 Disconnecting socket...');
             socket.off('connect');
             socket.off('registered');
             socket.off('disconnect');
             socket.off('delivery:agent:status:update');
+            socket.off('order:assigned');
+            socket.off('order:delivered');
             socket.disconnect();
         };
     }, [userId]);
@@ -288,7 +353,18 @@ export default function DeliveryHomeScreen() {
                 </View>
             </SafeAreaView>
 
-            <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FF6B35']} // Android
+                        tintColor="#FF6B35" // iOS
+                    />
+                }
+            >
                 {/* Hero Banner */}
                 <View style={styles.heroBanner}>
                     <LinearGradient
@@ -325,58 +401,6 @@ export default function DeliveryHomeScreen() {
                         <View style={styles.heroDecor2} />
                         <Text style={styles.heroBgEmoji}>🚀</Text>
                     </LinearGradient>
-                </View>
-
-                {/* Quick Actions */}
-                <View style={styles.quickActions}>
-                    <TouchableOpacity
-                        style={styles.quickActionCard}
-                        onPress={() => navigation.navigate('ActiveOrders')}
-                    >
-                        <LinearGradient
-                            colors={['#FFF3E0', '#FFE0B2']}
-                            style={styles.quickActionGradient}
-                        >
-                            <Text style={styles.quickActionEmoji}>🚚</Text>
-                            <Text style={styles.quickActionText}>Active Orders</Text>
-                            <View style={styles.quickActionBadge}>
-                                <Text style={styles.badgeText}>2</Text>
-                            </View>
-                        </LinearGradient>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.quickActionCard}
-                        onPress={() => navigation.navigate('ActiveOrders')}
-                    >
-                        <LinearGradient
-                            colors={['#E8F5E9', '#C8E6C9']}
-                            style={styles.quickActionGradient}
-                        >
-                            <Text style={styles.quickActionEmoji}>�</Text>
-                            <Text style={styles.quickActionText}>Payments</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.quickActionCard}>
-                        <LinearGradient
-                            colors={['#E3F2FD', '#BBDEFB']}
-                            style={styles.quickActionGradient}
-                        >
-                            <Text style={styles.quickActionEmoji}>🎧</Text>
-                            <Text style={styles.quickActionText}>Support</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.quickActionCard}>
-                        <LinearGradient
-                            colors={['#FCE4EC', '#F8BBD0']}
-                            style={styles.quickActionGradient}
-                        >
-                            <Text style={styles.quickActionEmoji}>�</Text>
-                            <Text style={styles.quickActionText}>Analytics</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.mainContent}>
@@ -427,91 +451,98 @@ export default function DeliveryHomeScreen() {
                             </View>
                         </View>
 
-                        {[
-                            {
-                                orderId: 'ORD-158',
-                                items: ['2x Margherita Pizza', '1x Pepperoni Pizza'],
-                                deliveredAt: '2:30 PM',
-                                location: 'Oak Avenue, Sector 15',
-                                rating: 4.8,
-                                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=400'
-                            },
-                            {
-                                orderId: 'ORD-159',
-                                items: ['1x Supreme Pizza', '1x Garlic Bread'],
-                                deliveredAt: '2:31 PM',
-                                location: 'Oak Avenue, Sector 16',
-                                rating: 4.9,
-                                image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=400'
-                            },
-                            {
-                                orderId: 'ORD-160',
-                                items: ['1x Vegetarian Supreme'],
-                                deliveredAt: '2:32 PM',
-                                location: 'Oak Avenue, Sector 17',
-                                rating: 5.0,
-                                image: 'https://images.unsplash.com/photo-1511689660979-10d2b1aada49?q=80&w=400'
-                            }
-                        ].map((delivery, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.deliveryOrderCard}
-                                activeOpacity={0.8}
-                            >
-                                {/* Top Section with Image and Order Details */}
-                                <View style={styles.deliveryTopSection}>
-                                    <Image
-                                        source={{ uri: delivery.image }}
-                                        style={styles.deliveryItemImage}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.deliveryItemDetails}>
-                                        <Text style={styles.deliveryFirstItemName}>
-                                            {delivery.items[0]}
-                                        </Text>
-                                        <Text style={styles.deliveryOrderNumber}>Order #{delivery.orderId}</Text>
+                        {loading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color="#FF6B35" />
+                                <Text style={styles.loadingText}>Loading deliveries...</Text>
+                            </View>
+                        ) : recentDeliveries.length === 0 ? (
+                            <View style={styles.emptyStateContainer}>
+                                <Text style={styles.emptyStateEmoji}>📦</Text>
+                                <Text style={styles.emptyStateTitle}>No Deliveries Yet</Text>
+                                <Text style={styles.emptyStateText}>
+                                    Complete your first delivery to see it here!
+                                </Text>
+                            </View>
+                        ) : (
+                            recentDeliveries.map((delivery) => (
+                                <TouchableOpacity
+                                    key={delivery._id}
+                                    style={styles.deliveryOrderCard}
+                                    onPress={() => navigation.navigate('OrderDetails', {
+                                        orderId: delivery._id
+                                    })}
+                                    activeOpacity={0.8}
+                                >
+                                    {/* Top Section with Image and Order Details */}
+                                    <View style={styles.deliveryTopSection}>
+                                        <Image
+                                            source={{
+                                                uri: delivery.items[0]?.product?.image ||
+                                                    'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=400'
+                                            }}
+                                            style={styles.deliveryItemImage}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.deliveryItemDetails}>
+                                            <Text style={styles.deliveryFirstItemName}>
+                                                {delivery.items[0]?.quantity}x {delivery.items[0]?.product?.name}
+                                            </Text>
+                                            <Text style={styles.deliveryOrderNumber}>
+                                                Order #{delivery.orderNumber}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
 
-                                {/* Additional Items (if more than 1) */}
-                                {delivery.items.length > 1 && (
-                                    <View style={styles.deliveryAdditionalItemsSection}>
+                                    {/* Additional Items (if more than 1) */}
+                                    {delivery.items.length > 1 && (
+                                        <View style={styles.deliveryAdditionalItemsSection}>
+                                            <View style={styles.deliveryDivider} />
+                                            {delivery.items.slice(1).map((item, itemIndex) => (
+                                                <Text key={itemIndex} style={styles.deliveryAdditionalItem}>
+                                                    {item.quantity}x {item.product.name}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+
+                                    {/* Bottom Section with Location, Time and Rating */}
+                                    <View style={styles.deliveryBottomSection}>
                                         <View style={styles.deliveryDivider} />
-                                        {delivery.items.slice(1).map((item, itemIndex) => (
-                                            <Text key={itemIndex} style={styles.deliveryAdditionalItem}>
-                                                {item}
-                                            </Text>
-                                        ))}
-                                    </View>
-                                )}
-
-                                {/* Bottom Section with Location, Time and Rating */}
-                                <View style={styles.deliveryBottomSection}>
-                                    <View style={styles.deliveryDivider} />
-                                    <View style={styles.deliveryMetaRow}>
-                                        <View style={styles.deliveryLocationRow}>
-                                            <MaterialIcons name="location-on" size={14} color="#8E8E93" />
-                                            <Text style={styles.deliveryLocationText}>
-                                                {delivery.location}
+                                        <View style={styles.deliveryMetaRow}>
+                                            <View style={styles.deliveryLocationRow}>
+                                                <MaterialIcons name="location-on" size={14} color="#8E8E93" />
+                                                <Text style={styles.deliveryLocationText}>
+                                                    {delivery.deliveryAddress.formatted ||
+                                                        `${delivery.deliveryAddress.street}, ${delivery.deliveryAddress.city}`}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.deliveryTimeText}>
+                                                Delivered at {new Date(delivery.deliveredAt).toLocaleTimeString('en-US', {
+                                                    hour: 'numeric',
+                                                    minute: '2-digit',
+                                                    hour12: true
+                                                })}
                                             </Text>
                                         </View>
-                                        <Text style={styles.deliveryTimeText}>
-                                            Delivered at {delivery.deliveredAt}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.deliveryStatusRow}>
-                                        <View style={styles.deliveryStatusBadge}>
-                                            <MaterialIcons name="check-circle" size={14} color="#22A447" />
-                                            <Text style={styles.deliveryStatusText}>Delivered</Text>
+                                        <View style={styles.deliveryStatusRow}>
+                                            <View style={styles.deliveryStatusBadge}>
+                                                <MaterialIcons name="check-circle" size={14} color="#22A447" />
+                                                <Text style={styles.deliveryStatusText}>Delivered</Text>
+                                            </View>
+                                            {delivery.rating && (
+                                                <View style={styles.deliveryRatingSection}>
+                                                    <MaterialIcons name="star" size={16} color="#FFB800" />
+                                                    <Text style={styles.deliveryRatingText}>
+                                                        {delivery.rating.toFixed(1)}
+                                                    </Text>
+                                                </View>
+                                            )}
                                         </View>
-                                        <View style={styles.deliveryRatingSection}>
-                                            <MaterialIcons name="star" size={16} color="#FFB800" />
-                                            <Text style={styles.deliveryRatingText}>{delivery.rating}</Text>
-                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            ))
+                        )}
                     </View>
 
                     {!isOnline && (
@@ -816,51 +847,6 @@ const styles = StyleSheet.create({
         right: -20,
         top: 20,
         color: '#fff',
-    },
-
-    // Quick Actions
-    quickActions: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingVertical: 20,
-        gap: 12,
-    },
-    quickActionCard: {
-        flex: 1,
-        borderRadius: 16,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    quickActionGradient: {
-        paddingVertical: 16,
-        paddingHorizontal: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 80,
-    },
-    quickActionText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#333',
-        textAlign: 'center',
-        marginTop: 8,
-    },
-    quickActionBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: '#FF4444',
-        borderRadius: 10,
-        minWidth: 18,
-        height: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 4,
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: '700',
     },
 
     // Main Content
@@ -1312,5 +1298,42 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    // Loading and Empty States
+    loadingContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#8E8E93',
+        fontWeight: '500',
+    },
+    emptyStateContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
+        marginTop: 8,
+    },
+    emptyStateEmoji: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    emptyStateTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1C1C1E',
+        marginBottom: 8,
+    },
+    emptyStateText: {
+        fontSize: 14,
+        color: '#8E8E93',
+        textAlign: 'center',
+        paddingHorizontal: 40,
+        lineHeight: 20,
     },
 });

@@ -7,6 +7,7 @@
  */
 
 import User from '../models/User.js';
+import DeviceToken from '../models/DeviceToken.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/token.js';
 
 /**
@@ -198,6 +199,18 @@ export const logoutUser = async (userId) => {
                 await user.save();
             }
 
+            // ✅ NEW: Deactivate all device tokens for this user to stop notifications
+            console.log(`[LOGOUT] Deactivating device tokens for user ${userId}`);
+            const tokenResult = await DeviceToken.updateMany(
+                { userId: userId, isActive: true },
+                {
+                    isActive: false,
+                    lastUsed: new Date()
+                }
+            );
+
+            console.log(`[LOGOUT] Deactivated ${tokenResult.modifiedCount} device token(s) for user ${user.email}`);
+
             // In a production app, you might want to:
             // 1. Add the token to a blacklist in Redis
             // 2. Clear any active sessions
@@ -209,6 +222,7 @@ export const logoutUser = async (userId) => {
         return {
             message: 'Logged out successfully',
             success: true,
+            tokensDeactivated: tokenResult?.modifiedCount || 0,
         };
     } catch (error) {
         console.error('Logout error:', error);

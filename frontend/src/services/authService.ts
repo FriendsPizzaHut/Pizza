@@ -13,6 +13,7 @@ import apiClient from '../api/apiClient';
 import { AUTH_ENDPOINTS } from '../api/endpoints';
 import { errorLogger } from './errorLogger';
 import { checkInternetConnection } from '../utils/healthCheck';
+import NotificationService from './notifications/NotificationService';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -249,6 +250,26 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
  */
 export const logout = async (): Promise<void> => {
     try {
+        // Get user data before clearing storage (need userId for token deactivation)
+        const userData = await getStoredUser();
+        const userId = userData?.id;
+
+        // ✅ NEW: Deactivate device token first to stop receiving notifications
+        if (userId) {
+            console.log('🔕 [LOGOUT] Deactivating device token for user:', userId);
+            try {
+                await NotificationService.deactivateDeviceToken(userId);
+                console.log('✅ [LOGOUT] Device token deactivated');
+            } catch (error) {
+                console.warn('⚠️ [LOGOUT] Failed to deactivate device token:', error);
+                // Continue with logout anyway
+            }
+        }
+
+        // ✅ NEW: Cleanup notification listeners
+        console.log('🧹 [LOGOUT] Cleaning up notification listeners...');
+        NotificationService.cleanup();
+
         // Try to notify backend (best effort, don't fail if offline)
         const token = await getStoredToken();
         if (token) {
@@ -256,10 +277,11 @@ export const logout = async (): Promise<void> => {
                 await apiClient.post(AUTH_ENDPOINTS.LOGOUT, {}, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
+                console.log('✅ [LOGOUT] Backend logout successful');
             } catch (error) {
                 // Silently fail - logout locally even if backend call fails
                 if (__DEV__) {
-                    console.warn('Backend logout failed, clearing local data:', error);
+                    console.warn('⚠️ [LOGOUT] Backend logout failed, clearing local data:', error);
                 }
             }
         }
@@ -268,7 +290,7 @@ export const logout = async (): Promise<void> => {
         await clearAuthData();
 
         if (__DEV__) {
-            console.log('✅ Logout successful');
+            console.log('✅ Logout successful - All data cleared');
         }
 
     } catch (error) {
