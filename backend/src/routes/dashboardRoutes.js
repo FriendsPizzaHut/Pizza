@@ -11,6 +11,9 @@ import {
     getTopProducts,
     getRecentActivities,
     getRevenueChart,
+    getHourlySales,
+    getSystemStatus,
+    getDashboardOverview,
 } from '../controllers/dashboardController.js';
 import { protect, adminOnly } from '../middlewares/authMiddleware.js';
 
@@ -18,6 +21,13 @@ const router = express.Router();
 
 // All dashboard routes require admin authentication
 router.use(protect, adminOnly);
+
+/**
+ * GET /api/v1/dashboard/overview
+ * Get complete dashboard overview (RECOMMENDED - single API call)
+ * Returns: stats, weeklyChart, hourlySales, topProducts, activities, systemStatus
+ */
+router.get('/overview', getDashboardOverview);
 
 /**
  * GET /api/v1/dashboard/stats
@@ -45,5 +55,17 @@ router.get('/activities', getRecentActivities);
  * Query params: days (default: 7)
  */
 router.get('/revenue-chart', getRevenueChart);
+
+/**
+ * GET /api/v1/dashboard/hourly-sales
+ * Get hourly sales data for today (9 AM - 9 PM)
+ */
+router.get('/hourly-sales', getHourlySales);
+
+/**
+ * GET /api/v1/dashboard/system-status
+ * Get real-time system status (database, cache, socket)
+ */
+router.get('/system-status', getSystemStatus);
 
 export default router;

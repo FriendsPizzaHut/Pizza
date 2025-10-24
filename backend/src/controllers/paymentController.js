@@ -14,6 +14,8 @@
 import * as paymentService from '../services/paymentService.js';
 import { sendResponse } from '../utils/response.js';
 import { emitPaymentReceived } from '../socket/events.js';
+import * as notificationService from '../services/notificationService.js';
+import User from '../models/User.js';
 
 /**
  * Record payment
@@ -26,6 +28,29 @@ export const createPayment = async (req, res, next) => {
 
         // Emit real-time payment notification to admin
         emitPaymentReceived(payment);
+
+        // Create in-app notification for all admins
+        const priority = payment.status === 'failed' ? 'high' : 'medium';
+        const title = payment.status === 'failed' ? 'Payment Failed' : 'Payment Received';
+        const message = payment.status === 'failed'
+            ? `Payment of ₹${payment.amount} failed for Order #${payment.order?.orderNumber || payment.order}`
+            : `Payment of ₹${payment.amount} received for Order #${payment.order?.orderNumber || payment.order}`;
+
+        User.find({ role: 'admin' }).then(admins => {
+            admins.forEach(admin => {
+                notificationService.createNotification({
+                    user: admin._id,
+                    type: 'payment',
+                    title: title,
+                    message: message,
+                    priority: priority,
+                    relatedEntity: {
+                        entityType: 'payment',
+                        entityId: payment._id
+                    }
+                }).catch(err => console.error('[NOTIFICATION] Failed to create notification:', err));
+            });
+        }).catch(err => console.error('[NOTIFICATION] Failed to fetch admins:', err));
 
         sendResponse(res, 201, 'Payment recorded successfully', payment);
     } catch (error) {
@@ -75,9 +100,39 @@ export const deletePayment = async (req, res, next) => {
     }
 };
 
+/**
+ * Get cash collections grouped by delivery agent
+ * GET /api/v1/payments/cash-collections-by-agent
+ * @access Private/Admin
+ */
+export const getCashCollectionsByAgent = async (req, res, next) => {
+    try {
+        const result = await paymentService.getCashCollectionsByAgent();
+        sendResponse(res, 200, 'Cash collections by agent retrieved successfully', result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get payment statistics
+ * GET /api/v1/payments/stats
+ * @access Private/Admin
+ */
+export const getPaymentStats = async (req, res, next) => {
+    try {
+        const stats = await paymentService.getPaymentStats();
+        sendResponse(res, 200, 'Payment statistics retrieved successfully', stats);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export default {
     createPayment,
     getPaymentById,
     getAllPayments,
     deletePayment,
+    getCashCollectionsByAgent,
+    getPaymentStats,
 };

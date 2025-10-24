@@ -39,7 +39,9 @@ export const getDashboardStats = async () => {
         // Parallel queries for better performance
         const [
             todayRevenue,
+            totalRevenue,
             todayOrders,
+            totalOrders,
             totalUsers,
             activeOrders,
             completedOrders,
@@ -61,17 +63,35 @@ export const getDashboardStats = async () => {
                 },
             ]),
 
+            // Total revenue (all time)
+            Payment.aggregate([
+                {
+                    $match: {
+                        paymentStatus: 'completed',
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$amount' },
+                    },
+                },
+            ]),
+
             // Today's orders count
             Order.countDocuments({
                 createdAt: { $gte: startOfDay, $lte: endOfDay },
             }),
 
-            // Total users count
-            User.countDocuments({ isActive: true }),
+            // Total orders count (all time)
+            Order.countDocuments(),
 
-            // Active orders (pending, preparing, out-for-delivery)
+            // Total users count (customers only)
+            User.countDocuments({ role: 'customer', isActive: true }),
+
+            // Active deliveries (out-for-delivery status)
             Order.countDocuments({
-                status: { $in: ['pending', 'preparing', 'out-for-delivery'] },
+                status: 'out-for-delivery',
             }),
 
             // Completed orders today
@@ -88,10 +108,12 @@ export const getDashboardStats = async () => {
         ]);
 
         const stats = {
-            todayRevenue: todayRevenue[0]?.total || 0,
             todayOrders,
-            totalUsers,
-            activeOrders,
+            totalOrders,
+            todayRevenue: todayRevenue[0]?.total || 0,
+            totalRevenue: totalRevenue[0]?.total || 0,
+            activeDeliveries: activeOrders,
+            totalCustomers: totalUsers,
             completedOrders,
             cancelledOrders,
             lastUpdated: new Date().toISOString(),
@@ -195,7 +217,7 @@ export const getRecentActivities = async (limit = 20) => {
 };
 
 /**
- * Get revenue chart data (last 7 days)
+ * Get revenue chart data (last 7 days) in IST
  * Cached for 5 minutes
  */
 export const getRevenueChart = async (days = 7) => {
@@ -210,6 +232,7 @@ export const getRevenueChart = async (days = 7) => {
         startDate.setDate(startDate.getDate() - days);
         startDate.setHours(0, 0, 0, 0);
 
+        // Get revenue data with order counts using IST timezone
         const revenueData = await Payment.aggregate([
             {
                 $match: {
@@ -218,9 +241,17 @@ export const getRevenueChart = async (days = 7) => {
                 },
             },
             {
+                $addFields: {
+                    // Convert UTC to IST (UTC+5:30)
+                    istDate: {
+                        $add: ['$createdAt', 330 * 60 * 1000]
+                    }
+                }
+            },
+            {
                 $group: {
                     _id: {
-                        $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+                        $dateToString: { format: '%Y-%m-%d', date: '$istDate' },
                     },
                     revenue: { $sum: '$amount' },
                     count: { $sum: 1 },
@@ -229,13 +260,243 @@ export const getRevenueChart = async (days = 7) => {
             { $sort: { _id: 1 } },
         ]);
 
-        // Cache for 5 minutes (300 seconds)
-        await setCache(cacheKey, revenueData, 300);
+        // Get order counts for the same period using IST
+        const orderData = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: startDate },
+                },
+            },
+            {
+                $addFields: {
+                    // Convert UTC to IST (UTC+5:30)
+                    istDate: {
+                        $add: ['$createdAt', 330 * 60 * 1000]
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: '%Y-%m-%d', date: '$istDate' },
+                    },
+                    orders: { $sum: 1 },
+                },
+            },
+            { $sort: { _id: 1 } },
+        ]);
 
-        return { chart: revenueData };
+        // Merge revenue and order data
+        const orderMap = new Map(orderData.map(d => [d._id, d.orders]));
+        const chartData = revenueData.map(d => ({
+            date: d._id,
+            revenue: d.revenue,
+            orders: orderMap.get(d._id) || 0,
+        }));
+
+        // Cache for 5 minutes (300 seconds)
+        await setCache(cacheKey, chartData, 300);
+
+        return { chart: chartData };
     } catch (error) {
         console.error('Get revenue chart error:', error);
         const err = new Error('Failed to fetch revenue chart');
+        err.statusCode = 500;
+        throw err;
+    }
+};
+
+/**
+ * Get hourly sales data for today (9 AM - 9 PM) in IST
+ * Cached for 5 minutes
+ */
+export const getHourlySales = async () => {
+    try {
+        const cacheKey = 'dashboard:hourly-sales:today';
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return { hourlySales: cached, fromCache: true };
+        }
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Aggregate orders by hour with IST timezone conversion
+        const hourlyData = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: startOfDay, $lte: endOfDay },
+                    status: { $nin: ['cancelled'] },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'payments',
+                    localField: '_id',
+                    foreignField: 'order',
+                    as: 'payment',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$payment',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $addFields: {
+                    // Convert UTC to IST (UTC+5:30) by adding 330 minutes (5 hours 30 minutes)
+                    istDate: {
+                        $add: ['$createdAt', 330 * 60 * 1000] // 330 minutes in milliseconds
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: { $hour: '$istDate' }, // Extract hour from IST date
+                    orders: { $sum: 1 },
+                    revenue: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$payment.paymentStatus', 'completed'] },
+                                '$payment.amount',
+                                0,
+                            ],
+                        },
+                    },
+                },
+            },
+            { $sort: { _id: 1 } },
+        ]);
+
+        // Format hours as "9AM", "10AM", etc.
+        const formatHour = (hour) => {
+            if (hour === 0) return '12AM';
+            if (hour === 12) return '12PM';
+            if (hour < 12) return `${hour}AM`;
+            return `${hour - 12}PM`;
+        };
+
+        const formattedData = hourlyData.map(d => ({
+            hour: formatHour(d._id),
+            hourValue: d._id,
+            orders: d.orders,
+            revenue: d.revenue,
+        }));
+
+        // Filter for business hours (9 AM - 9 PM)
+        const businessHoursData = formattedData.filter(
+            d => d.hourValue >= 9 && d.hourValue <= 21
+        );
+
+        // Cache for 5 minutes (300 seconds)
+        await setCache(cacheKey, businessHoursData, 300);
+
+        return { hourlySales: businessHoursData };
+    } catch (error) {
+        console.error('Get hourly sales error:', error);
+        const err = new Error('Failed to fetch hourly sales');
+        err.statusCode = 500;
+        throw err;
+    }
+};
+
+/**
+ * Get system status (database, cache, socket connections)
+ * Not cached - real-time check
+ */
+export const getSystemStatus = async () => {
+    try {
+        const status = {
+            database: 'inactive',
+            cache: 'inactive',
+            socket: 'inactive',
+            lastChecked: new Date().toISOString(),
+        };
+
+        // Check MongoDB connection
+        try {
+            await Order.findOne().limit(1);
+            status.database = 'active';
+        } catch (error) {
+            console.error('Database check failed:', error);
+        }
+
+        // Check Redis cache
+        try {
+            await setCache('health-check', { status: 'ok' }, 10);
+            const cacheTest = await getCache('health-check');
+            if (cacheTest) {
+                status.cache = 'active';
+            }
+        } catch (error) {
+            console.error('Cache check failed:', error);
+        }
+
+        // Check Socket.IO
+        try {
+            if (global.socketEmit && typeof global.socketEmit.emitToAll === 'function') {
+                status.socket = 'active';
+            }
+        } catch (error) {
+            console.error('Socket check failed:', error);
+        }
+
+        return status;
+    } catch (error) {
+        console.error('Get system status error:', error);
+        const err = new Error('Failed to fetch system status');
+        err.statusCode = 500;
+        throw err;
+    }
+};
+
+/**
+ * Get combined dashboard overview (all data in one call)
+ * Cached for 2 minutes - optimized for single API call
+ */
+export const getDashboardOverview = async () => {
+    try {
+        const cacheKey = 'dashboard:overview:combined';
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            return { ...cached, fromCache: true };
+        }
+
+        console.log('📊 Fetching complete dashboard overview...');
+
+        // Execute all queries in parallel for maximum performance
+        const [stats, weeklyChart, hourlySales, topProducts, activities, systemStatus] = await Promise.all([
+            getDashboardStats(),
+            getRevenueChart(7),
+            getHourlySales(),
+            getTopProducts(6),
+            getRecentActivities(5),
+            getSystemStatus(),
+        ]);
+
+        const overview = {
+            stats: stats,
+            weeklyChart: weeklyChart.chart || [],
+            hourlySales: hourlySales.hourlySales || [],
+            topProducts: topProducts.products || [],
+            recentActivities: activities.activities || [],
+            systemStatus,
+            lastUpdated: new Date().toISOString(),
+        };
+
+        // Cache for 2 minutes (120 seconds)
+        await setCache(cacheKey, overview, 120);
+
+        console.log('✅ Dashboard overview fetched and cached');
+
+        return overview;
+    } catch (error) {
+        console.error('Get dashboard overview error:', error);
+        const err = new Error('Failed to fetch dashboard overview');
         err.statusCode = 500;
         throw err;
     }
@@ -249,8 +510,12 @@ export const invalidateDashboardCache = async () => {
         await Promise.all([
             deleteCache('dashboard:stats:today'),
             deleteCache('dashboard:top-products:5'),
+            deleteCache('dashboard:top-products:6'),
             deleteCache('dashboard:recent-activities:20'),
+            deleteCache('dashboard:recent-activities:5'),
             deleteCache('dashboard:revenue-chart:7'),
+            deleteCache('dashboard:hourly-sales:today'),
+            deleteCache('dashboard:overview:combined'),
         ]);
         console.log('✅ Dashboard cache invalidated');
     } catch (error) {
@@ -264,5 +529,8 @@ export default {
     getTopProducts,
     getRecentActivities,
     getRevenueChart,
+    getHourlySales,
+    getSystemStatus,
+    getDashboardOverview,
     invalidateDashboardCache,
 };

@@ -112,4 +112,5 @@ export type AdminStackParamList = {
     DeliveryAgentApprovals: undefined;
     OfferManagement: undefined;
     AddOffer: { offer?: any } | undefined;
+    PaymentHistory: undefined;
 };

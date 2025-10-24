@@ -215,6 +215,38 @@ export const rejectOrder = async (orderId, reason) => {
 };
 
 /**
+ * Mark order as ready (accepted → ready)
+ * @param {String} orderId - Order ID
+ * @returns {Object} - Updated order
+ */
+export const markOrderReady = async (orderId) => {
+    const order = await Order.findById(orderId)
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name imageUrl');
+
+    if (!order) {
+        const error = new Error('Order not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (order.status !== 'accepted') {
+        const error = new Error(`Cannot mark order as ready with status: ${order.status}. Order must be accepted first.`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    order.status = 'ready';
+    order.readyAt = new Date();
+    await order.save();
+
+    // Invalidate dashboard cache
+    await invalidateDashboardCache();
+
+    return order;
+};
+
+/**
  * Get orders for OrdersScreen (optimized for mobile)
  * Returns minimal data for list view with proper formatting
  * @param {String} userId - User ID

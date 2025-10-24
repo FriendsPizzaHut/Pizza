@@ -448,14 +448,14 @@ export default function AddMenuItemScreen() {
                         ) : (
                             // Single price for other items
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Price ($) <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.label}>Price (₹) <Text style={styles.required}>*</Text></Text>
                                 <View style={styles.inputWithIcon}>
-                                    <MaterialIcons name="attach-money" size={20} color="#8E8E93" style={styles.inputIcon} />
+                                    <MaterialIcons name="currency-rupee" size={20} color="#8E8E93" style={styles.inputIcon} />
                                     <TextInput
                                         style={[styles.input, styles.inputWithPadding]}
                                         value={itemData.price}
                                         onChangeText={(text) => setItemData({ ...itemData, price: text })}
-                                        placeholder="0.00"
+                                        placeholder="0"
                                         placeholderTextColor="#999"
                                         keyboardType="decimal-pad"
                                     />
@@ -689,7 +689,7 @@ export default function AddMenuItemScreen() {
                                     ) : (
                                         // Show single price for other items
                                         <Text style={styles.previewPrice}>
-                                            ${itemData.price || '0.00'}
+                                            ₹{itemData.price || '0'}
                                         </Text>
                                     )}
                                 </View>

@@ -112,9 +112,9 @@ export default function PizzaMenuScreen() {
 
                             <View style={styles.priceSection}>
                                 <View style={styles.priceOptions}>
-                                    <Text style={styles.priceText}>Small: ${pizza.prices.small}</Text>
-                                    <Text style={styles.priceText}>Medium: ${pizza.prices.medium}</Text>
-                                    <Text style={styles.priceText}>Large: ${pizza.prices.large}</Text>
+                                    <Text style={styles.priceText}>Small: ₹{pizza.prices.small}</Text>
+                                    <Text style={styles.priceText}>Medium: ₹{pizza.prices.medium}</Text>
+                                    <Text style={styles.priceText}>Large: ₹{pizza.prices.large}</Text>
                                 </View>
                                 <TouchableOpacity style={styles.addButton}>
                                     <Text style={styles.addButtonText}>Add +</Text>

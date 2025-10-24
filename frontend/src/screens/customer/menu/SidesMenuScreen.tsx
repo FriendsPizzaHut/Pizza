@@ -115,7 +115,7 @@ export default function SidesMenuScreen() {
                                 <Text style={styles.sideDescription}>{side.description}</Text>
 
                                 <View style={styles.priceSection}>
-                                    <Text style={styles.priceText}>${side.price}</Text>
+                                    <Text style={styles.priceText}>₹{side.price}</Text>
                                     <TouchableOpacity style={styles.addButton}>
                                         <Text style={styles.addButtonText}>+</Text>
                                     </TouchableOpacity>

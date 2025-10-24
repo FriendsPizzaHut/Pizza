@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     StatusBar,
     Platform,
+    RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -14,120 +16,118 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AdminStackParamList } from '../../../types/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../../redux/store';
+import {
+    fetchNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+} from '../../../../redux/thunks/notificationThunks';
+import { setFilter, addNewNotification } from '../../../../redux/slices/notificationSlice';
+import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
+import { format, formatDistanceToNow } from 'date-fns';
+import io, { Socket } from 'socket.io-client';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 
-interface Notification {
-    id: string;
-    type: 'order' | 'delivery' | 'payment' | 'customer' | 'system' | 'staff';
-    title: string;
-    message: string;
-    time: string;
-    isRead: boolean;
-    priority: 'high' | 'medium' | 'low';
-}
-
 export default function NotificationsScreen() {
     const navigation = useNavigation<NavigationProp>();
+    const dispatch = useDispatch<AppDispatch>();
 
-    const [notifications, setNotifications] = useState<Notification[]>([
-        {
-            id: '1',
-            type: 'order',
-            title: 'New Order Received',
-            message: 'Order #ORD-161 has been placed. 2x Margherita Pizza, 1x Garlic Bread',
-            time: '2 mins ago',
-            isRead: false,
-            priority: 'high',
-        },
-        {
-            id: '2',
-            type: 'delivery',
-            title: 'Delivery Completed',
-            message: 'Order #ORD-158 has been successfully delivered by Mike Chen',
-            time: '5 mins ago',
-            isRead: false,
-            priority: 'medium',
-        },
-        {
-            id: '3',
-            type: 'payment',
-            title: 'Payment Received',
-            message: 'Payment of ₹850.00 received for Order #ORD-159',
-            time: '8 mins ago',
-            isRead: false,
-            priority: 'medium',
-        },
-        {
-            id: '4',
-            type: 'customer',
-            title: 'New Customer Registration',
-            message: 'Sarah Johnson has registered as a new customer',
-            time: '12 mins ago',
-            isRead: true,
-            priority: 'low',
-        },
-        {
-            id: '5',
-            type: 'staff',
-            title: 'Driver Status Update',
-            message: 'Mike Chen is now online and available for deliveries',
-            time: '15 mins ago',
-            isRead: true,
-            priority: 'low',
-        },
-        {
-            id: '6',
-            type: 'order',
-            title: 'Order Cancelled',
-            message: 'Order #ORD-157 has been cancelled by the customer',
-            time: '18 mins ago',
-            isRead: true,
-            priority: 'medium',
-        },
-        {
-            id: '7',
-            type: 'payment',
-            title: 'Payment Failed',
-            message: 'Payment failed for Order #ORD-156. Please contact customer.',
-            time: '25 mins ago',
-            isRead: true,
-            priority: 'high',
-        },
-        {
-            id: '8',
-            type: 'system',
-            title: 'System Update',
-            message: 'Menu items have been successfully updated',
-            time: '1 hour ago',
-            isRead: true,
-            priority: 'low',
-        },
-        {
-            id: '9',
-            type: 'delivery',
-            title: 'Delivery Delayed',
-            message: 'Order #ORD-155 is running 10 minutes behind schedule',
-            time: '2 hours ago',
-            isRead: true,
-            priority: 'high',
-        },
-        {
-            id: '10',
-            type: 'customer',
-            title: 'Customer Feedback',
-            message: 'New 5-star rating received from John Doe',
-            time: '3 hours ago',
-            isRead: true,
-            priority: 'low',
-        },
-    ]);
+    // Redux state
+    const {
+        notifications,
+        unreadCount,
+        loading,
+        refreshing,
+        filter,
+        error,
+    } = useSelector((state: RootState) => state.notifications);
 
-    const [filter, setFilter] = useState<'all' | 'unread'>('all');
+    // Local state
+    const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
+    // Fetch notifications on mount
+    useEffect(() => {
+        dispatch(fetchNotifications({ page: 1, limit: 50 }));
+    }, [dispatch]);
 
-    const getIconName = (type: Notification['type']) => {
+    // Socket.IO listener for real-time notifications
+    useEffect(() => {
+        // Initialize socket connection
+        const socket = io(SOCKET_URL, SOCKET_OPTIONS);
+
+        const handleNewNotification = (notification: any) => {
+            console.log('🔔 New notification received:', notification);
+            dispatch(addNewNotification(notification));
+        };
+
+        // Connect event
+        socket.on('connect', () => {
+            console.log('✅ Notifications Socket connected');
+        });
+
+        // Listen for new notifications
+        socket.on('notification:new', handleNewNotification);
+
+        // Cleanup on unmount
+        return () => {
+            socket.off('notification:new', handleNewNotification);
+            socket.disconnect();
+            console.log('🔌 Notifications Socket disconnected');
+        };
+    }, [dispatch]);
+
+    // Refresh handler
+    const handleRefresh = () => {
+        dispatch(fetchNotifications({ page: 1, limit: 50, isRead: filter === 'unread' ? false : undefined }));
+    };
+
+    // Mark as read handler
+    const handleMarkAsRead = (notificationId: string) => {
+        dispatch(markNotificationAsRead(notificationId));
+    };
+
+    // Mark all as read handler
+    const handleMarkAllAsRead = async () => {
+        setIsMarkingAllRead(true);
+        await dispatch(markAllNotificationsAsRead());
+        setIsMarkingAllRead(false);
+    };
+
+    // Filter handler
+    const handleFilterChange = (newFilter: 'all' | 'unread') => {
+        dispatch(setFilter(newFilter));
+        dispatch(fetchNotifications({
+            page: 1,
+            limit: 50,
+            isRead: newFilter === 'unread' ? false : undefined
+        }));
+    };
+
+    // Filter notifications based on filter
+    const filteredNotifications = filter === 'unread'
+        ? notifications.filter((n) => !n.isRead)
+        : notifications;
+
+    // Format time helper
+    const formatTime = (dateString: string) => {
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+            if (diffInHours < 24) {
+                return formatDistanceToNow(date, { addSuffix: true });
+            } else {
+                return format(date, 'MMM dd, yyyy');
+            }
+        } catch (error) {
+            return dateString;
+        }
+    };
+
+    const getIconName = (type: 'order' | 'delivery' | 'payment' | 'customer' | 'system' | 'staff') => {
         switch (type) {
             case 'order':
                 return 'shopping-cart';
@@ -146,7 +146,7 @@ export default function NotificationsScreen() {
         }
     };
 
-    const getIconColor = (type: Notification['type']) => {
+    const getIconColor = (type: 'order' | 'delivery' | 'payment' | 'customer' | 'system' | 'staff') => {
         switch (type) {
             case 'order':
                 return '#cb202d';
@@ -165,7 +165,7 @@ export default function NotificationsScreen() {
         }
     };
 
-    const getIconGradient = (type: Notification['type']): [string, string] => {
+    const getIconGradient = (type: 'order' | 'delivery' | 'payment' | 'customer' | 'system' | 'staff'): [string, string] => {
         switch (type) {
             case 'order':
                 return ['#FFEBEE', '#FFCDD2'];
@@ -183,19 +183,6 @@ export default function NotificationsScreen() {
                 return ['#F5F5F5', '#EEEEEE'];
         }
     };
-
-    const markAsRead = (id: string) => {
-        setNotifications(
-            notifications.map((notif) =>
-                notif.id === id ? { ...notif, isRead: true } : notif
-            )
-        );
-    };
-
-    const filteredNotifications =
-        filter === 'unread'
-            ? notifications.filter((n) => !n.isRead)
-            : notifications;
 
     return (
         <View style={styles.container}>
@@ -215,14 +202,28 @@ export default function NotificationsScreen() {
                             Notifications {unreadCount > 0 && `(${unreadCount})`}
                         </Text>
                     </View>
-                    <View style={styles.headerRight} />
+                    <View style={styles.headerRight}>
+                        {unreadCount > 0 && (
+                            <TouchableOpacity
+                                style={styles.markAllButton}
+                                onPress={handleMarkAllAsRead}
+                                disabled={isMarkingAllRead}
+                            >
+                                {isMarkingAllRead ? (
+                                    <ActivityIndicator size="small" color="#cb202d" />
+                                ) : (
+                                    <MaterialIcons name="done-all" size={20} color="#cb202d" />
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
 
                 {/* Filter Tabs */}
                 <View style={styles.filterContainer}>
                     <TouchableOpacity
                         style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
-                        onPress={() => setFilter('all')}
+                        onPress={() => handleFilterChange('all')}
                     >
                         <Text
                             style={[
@@ -238,7 +239,7 @@ export default function NotificationsScreen() {
                             styles.filterTab,
                             filter === 'unread' && styles.filterTabActive,
                         ]}
-                        onPress={() => setFilter('unread')}
+                        onPress={() => handleFilterChange('unread')}
                     >
                         <Text
                             style={[
@@ -257,8 +258,21 @@ export default function NotificationsScreen() {
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#cb202d']}
+                        tintColor="#cb202d"
+                    />
+                }
             >
-                {filteredNotifications.length === 0 ? (
+                {loading && notifications.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#cb202d" />
+                        <Text style={styles.loadingText}>Loading notifications...</Text>
+                    </View>
+                ) : filteredNotifications.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconContainer}>
                             <MaterialIcons
@@ -278,12 +292,12 @@ export default function NotificationsScreen() {
                     <View style={styles.notificationsList}>
                         {filteredNotifications.map((notification, index) => (
                             <TouchableOpacity
-                                key={notification.id}
+                                key={notification._id}
                                 style={[
                                     styles.notificationItem,
                                     !notification.isRead && styles.notificationItemUnread,
                                 ]}
-                                onPress={() => markAsRead(notification.id)}
+                                onPress={() => handleMarkAsRead(notification._id)}
                                 activeOpacity={0.7}
                             >
                                 <View style={styles.notificationContent}>
@@ -327,7 +341,7 @@ export default function NotificationsScreen() {
                                             {notification.message}
                                         </Text>
                                         <Text style={styles.notificationTime}>
-                                            {notification.time}
+                                            {formatTime(notification.createdAt)}
                                         </Text>
                                     </View>
 
@@ -393,6 +407,28 @@ const styles = StyleSheet.create({
     },
     headerRight: {
         width: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    markAllButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFEBEE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 100,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 14,
+        color: '#8E8E93',
+        fontWeight: '600',
     },
     filterContainer: {
         flexDirection: 'row',

@@ -19,6 +19,7 @@ import {
     getMyOrders,
     acceptOrder,
     rejectOrder,
+    markOrderReady,
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,
@@ -56,6 +57,9 @@ router.post('/:id/accept', protect, adminOnly, acceptOrder);
 
 // Reject/cancel order (admin only)
 router.post('/:id/reject', protect, adminOnly, rejectOrder);
+
+// Mark order as ready (admin only) - accepted → ready
+router.post('/:id/mark-ready', protect, adminOnly, markOrderReady);
 
 // Update order status (admin or delivery agents, with validation)
 router.patch('/:id/status', protect, deliveryOnly, validate(updateOrderStatusValidator), updateOrderStatus);

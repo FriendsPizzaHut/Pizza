@@ -92,10 +92,17 @@ export const authLimiter = rateLimit({
 /**
  * Payment Route Rate Limiter
  * Protects payment endpoints from abuse
+ * More lenient for GET requests (viewing history)
  */
 export const paymentLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // Limit each IP to 10 payment requests per hour
+    max: (req) => {
+        // Allow more requests for GET (viewing) vs POST (creating)
+        if (req.method === 'GET') {
+            return 100; // 100 GET requests per hour for viewing history
+        }
+        return 10; // 10 POST requests per hour for creating payments
+    },
     message: {
         status: 'fail',
         code: 'TOO_MANY_REQUESTS',
@@ -106,6 +113,7 @@ export const paymentLimiter = rateLimit({
             ip: req.ip,
             userId: req.user?.id,
             path: req.path,
+            method: req.method,
         });
         res.status(429).json({
             status: 'fail',

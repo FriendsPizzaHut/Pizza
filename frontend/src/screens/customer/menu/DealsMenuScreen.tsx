@@ -115,12 +115,12 @@ export default function DealsMenuScreen() {
 
                             <View style={styles.priceSection}>
                                 <View style={styles.priceInfo}>
-                                    <Text style={styles.originalPrice}>${deal.originalPrice}</Text>
-                                    <Text style={styles.dealPrice}>${deal.dealPrice}</Text>
+                                    <Text style={styles.originalPrice}>₹{deal.originalPrice}</Text>
+                                    <Text style={styles.dealPrice}>₹{deal.dealPrice}</Text>
                                 </View>
 
                                 <View style={styles.savingsInfo}>
-                                    <Text style={styles.savingsAmount}>Save ${deal.savings}</Text>
+                                    <Text style={styles.savingsAmount}>Save ₹{deal.savings}</Text>
                                     <Text style={styles.savingsPercentage}>
                                         {calculateSavingsPercentage(deal.originalPrice, deal.dealPrice)}% OFF
                                     </Text>

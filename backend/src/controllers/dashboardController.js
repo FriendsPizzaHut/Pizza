@@ -72,9 +72,63 @@ export const getRevenueChart = async (req, res, next) => {
     }
 };
 
+/**
+ * Get hourly sales data for today
+ * GET /api/v1/dashboard/hourly-sales
+ * @access Private/Admin
+ */
+export const getHourlySales = async (req, res, next) => {
+    try {
+        const result = await dashboardService.getHourlySales();
+        sendResponse(res, 200, 'Hourly sales retrieved successfully', result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get system status (database, cache, socket)
+ * GET /api/v1/dashboard/system-status
+ * @access Private/Admin
+ */
+export const getSystemStatus = async (req, res, next) => {
+    try {
+        const status = await dashboardService.getSystemStatus();
+        sendResponse(res, 200, 'System status retrieved successfully', status);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get complete dashboard overview (combined endpoint)
+ * GET /api/v1/dashboard/overview
+ * @access Private/Admin
+ * 
+ * Returns all dashboard data in a single API call for optimal performance:
+ * - Statistics (today & total)
+ * - Weekly revenue chart
+ * - Hourly sales
+ * - Top products
+ * - Recent activities
+ * - System status
+ */
+export const getDashboardOverview = async (req, res, next) => {
+    try {
+        console.log('📊 Dashboard overview requested by admin');
+        const overview = await dashboardService.getDashboardOverview();
+        sendResponse(res, 200, 'Dashboard overview retrieved successfully', overview);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export default {
     getDashboardStats,
     getTopProducts,
     getRecentActivities,
     getRevenueChart,
+    getHourlySales,
+    getSystemStatus,
+    getDashboardOverview,
 };

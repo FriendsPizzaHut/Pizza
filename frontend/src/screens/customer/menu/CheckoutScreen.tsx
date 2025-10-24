@@ -16,6 +16,7 @@ import {
 import { placeOrderFromCartThunk } from '../../../../redux/thunks/orderThunks';
 import apiClient from '../../../api/apiClient';
 import { handleRazorpayPayment } from '../../../services/razorpayService';
+import { getPublicSettings, PublicSettings } from '../../../services/restaurantSettingsService';
 
 type CheckoutRouteProp = RouteProp<CustomerStackParamList, 'Checkout'>;
 
@@ -46,6 +47,33 @@ export default function CheckoutScreen() {
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [userPhone, setUserPhone] = useState<string>(''); // Store user phone from profile
+    const [settings, setSettings] = useState<PublicSettings | null>(null);
+    const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+    // Fetch restaurant settings
+    useEffect(() => {
+        fetchSettings();
+    }, []);
+
+    const fetchSettings = async () => {
+        try {
+            setIsLoadingSettings(true);
+            const publicSettings = await getPublicSettings();
+            setSettings(publicSettings);
+            console.log('✅ Restaurant settings loaded:', publicSettings);
+        } catch (error) {
+            console.error('❌ Failed to load settings:', error);
+            // Use fallback values if settings fail to load
+            setSettings({
+                minOrderAmount: 100,
+                taxRate: 8.5,
+                deliveryFee: 40,
+                freeDeliveryThreshold: 2490,
+            });
+        } finally {
+            setIsLoadingSettings(false);
+        }
+    };
 
     // Show only 3 addresses (selected + 2 others) for performance
     const visibleAddresses = React.useMemo(() => {
@@ -135,11 +163,11 @@ export default function CheckoutScreen() {
         },
     ];
 
-    // Calculate order summary
+    // Calculate order summary using dynamic settings
     const orderSummary = {
         subtotal: cartTotal || 0,
-        tax: (cartTotal || 0) * 0.08, // 8% tax
-        deliveryFee: cartTotal > 2490 ? 0 : 40,
+        tax: settings ? (cartTotal || 0) * (settings.taxRate / 100) : 0,
+        deliveryFee: settings ? (cartTotal > settings.freeDeliveryThreshold ? 0 : settings.deliveryFee) : 0,
         discount: 0,
     };
 
@@ -158,6 +186,15 @@ export default function CheckoutScreen() {
 
         if (!selectedAddressId) {
             Alert.alert('Address Required', 'Please select a delivery address');
+            return;
+        }
+
+        // Validate minimum order using dynamic settings
+        if (settings && cartTotal < settings.minOrderAmount) {
+            Alert.alert(
+                'Minimum Order Required',
+                `Minimum order amount is ₹${settings.minOrderAmount}. Your cart total is ₹${cartTotal.toFixed(0)}. Please add more items.`
+            );
             return;
         }
 
@@ -354,12 +391,14 @@ export default function CheckoutScreen() {
     };
 
     // Loading state
-    if (isLoadingProfile) {
+    if (isLoadingProfile || isLoadingSettings) {
         return (
             <View style={[styles.container, styles.centerContent]}>
                 <StatusBar barStyle="dark-content" backgroundColor="#fff" />
                 <ActivityIndicator size="large" color="#cb202d" />
-                <Text style={styles.loadingText}>Loading your details...</Text>
+                <Text style={styles.loadingText}>
+                    {isLoadingSettings ? 'Loading settings...' : 'Loading your details...'}
+                </Text>
             </View>
         );
     }

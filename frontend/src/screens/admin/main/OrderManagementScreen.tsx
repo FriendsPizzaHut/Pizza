@@ -16,12 +16,13 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Feather from '@expo/vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../../../redux/store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '../../../../redux/store';
 import { io, Socket } from 'socket.io-client';
 import Constants from 'expo-constants';
 import axiosInstance from '../../../api/axiosInstance';
 import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
+import { fetchUnreadCount } from '../../../../redux/thunks/notificationThunks';
 
 // 🔥 PART 5.1: axiosInstance imported (not used yet)
 console.log('✅ PART 5.1 - axiosInstance imported successfully');
@@ -43,7 +44,7 @@ const MOCK_ORDERS = [
     {
         id: 'ORD002',
         customer: 'Jane Smith',
-        status: 'preparing',
+        status: 'accepted',
         time: '15 mins ago',
         deliveryAddress: '456 Oak Avenue',
         estimatedReady: '15 mins',
@@ -54,7 +55,7 @@ const MOCK_ORDERS = [
     {
         id: 'ORD003',
         customer: 'Mike Johnson',
-        status: 'ready',
+        status: 'assigned',
         time: '5 mins ago',
         deliveryAddress: '789 Pine Road',
         estimatedReady: 'Ready now',
@@ -66,11 +67,15 @@ const MOCK_ORDERS = [
 
 export default function OrderManagementScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
+    const dispatch = useDispatch<AppDispatch>();
     const [selectedFilter, setSelectedFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     // 🔥 PART 1: Get user info from Redux
     const { userId, name, email, role } = useSelector((state: RootState) => state.auth);
+
+    // Notification unread count
+    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
 
     console.log('📍 PART 1 - User Info from Redux:');
     console.log('  - userId:', userId);
@@ -134,11 +139,89 @@ export default function OrderManagementScreen() {
         console.log('✅ PART 9 - Refresh completed');
     };
 
+    // 🔥 NEW: Accept Order Handler
+    const handleAcceptOrder = async (orderId: string) => {
+        try {
+            console.log('✅ Accepting order:', orderId);
+
+            const response = await axiosInstance.post(`/orders/${orderId}/accept`);
+            console.log('✅ Order accepted successfully');
+
+            // Update order in local state
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    (order._id === orderId || order.id === orderId)
+                        ? { ...order, status: 'accepted', updatedAt: new Date().toISOString() }
+                        : order
+                )
+            );
+
+            console.log('✅ Order status updated in list');
+        } catch (err: any) {
+            console.error('❌ Error accepting order:', err.message);
+            alert(err.response?.data?.message || 'Failed to accept order');
+        }
+    };
+
+    // 🔥 NEW: Reject Order Handler
+    const handleRejectOrder = async (orderId: string) => {
+        try {
+            console.log('❌ Rejecting order:', orderId);
+
+            const response = await axiosInstance.post(`/orders/${orderId}/reject`, {
+                reason: 'Rejected by admin'
+            });
+            console.log('✅ Order rejected successfully');
+
+            // Update order in local state
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    (order._id === orderId || order.id === orderId)
+                        ? { ...order, status: 'cancelled', updatedAt: new Date().toISOString() }
+                        : order
+                )
+            );
+
+            console.log('✅ Order status updated in list');
+        } catch (err: any) {
+            console.error('❌ Error rejecting order:', err.message);
+            alert(err.response?.data?.message || 'Failed to reject order');
+        }
+    };
+
+    // 🔥 PART 5.5: Call fetchOrders on mount (FIXED - data structure handled)    // 🔥 NEW: Mark Ready Handler
+    const handleMarkReady = async (orderId: string) => {
+        try {
+            console.log('🍕 Marking order as ready:', orderId);
+
+            const response = await axiosInstance.post(`/orders/${orderId}/mark-ready`);
+            console.log('✅ Order marked as ready');
+
+            // Update order in local state with the actual response data
+            const updatedOrder = response.data.data?.order || response.data.data || response.data.order || response.data;
+
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    (order._id === orderId || order.id === orderId)
+                        ? { ...order, status: updatedOrder.status || 'ready', updatedAt: new Date().toISOString() }
+                        : order
+                )
+            );
+
+            console.log('✅ Order status updated in list');
+        } catch (err: any) {
+            console.error('❌ Error marking order ready:', err.message);
+            alert(err.response?.data?.message || 'Failed to update order status');
+        }
+    };
+
     // 🔥 PART 5.5: Call fetchOrders on mount (FIXED - data structure handled)
     useEffect(() => {
         console.log('🔄 PART 5.5 - Component mounted, calling fetchOrders...');
         fetchOrders();
-    }, []);
+        // Fetch unread notification count
+        dispatch(fetchUnreadCount());
+    }, [dispatch]);
 
     // 🔥 PART 3: Socket connection useEffect
     useEffect(() => {
@@ -231,7 +314,12 @@ export default function OrderManagementScreen() {
                         ? {
                             ...order,
                             deliveryAgent: data.deliveryAgent,
-                            status: 'out_for_delivery',
+                            deliveryAgentDetails: data.deliveryAgentDetails || {
+                                name: data.deliveryAgent?.name,
+                                phone: data.deliveryAgent?.phone,
+                                vehicleNumber: data.deliveryAgent?.vehicleNumber
+                            },
+                            status: 'assigned',
                             assignedAt: data.assignedAt
                         }
                         : order
@@ -318,15 +406,16 @@ export default function OrderManagementScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.notificationButton}
-                        onPress={() => {
-                            console.log('🧪 TEST: Manually calling fetchOrders...');
-                            fetchOrders();
-                        }}
+                        onPress={() => navigation.navigate('Notifications' as never)}
                     >
                         <MaterialIcons name="notifications-none" size={24} color="#2d2d2d" />
-                        <View style={styles.notificationBadge}>
-                            <Text style={styles.notificationBadgeText}>3</Text>
-                        </View>
+                        {unreadCount > 0 && (
+                            <View style={styles.notificationBadge}>
+                                <Text style={styles.notificationBadgeText}>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -533,36 +622,63 @@ export default function OrderManagementScreen() {
                                                         <Text style={styles.itemQuantityName}>
                                                             {quantity} × {itemName}
                                                         </Text>
-                                                        <Text style={styles.itemPrice}>${totalItemPrice.toFixed(2)}</Text>
+                                                        <Text style={styles.itemPrice}>₹{totalItemPrice.toFixed(0)}</Text>
                                                     </View>
                                                 );
                                             })}
                                         </View>
 
                                         <View style={styles.summaryDivider} />
+
+                                        {/* Payment Details */}
+                                        <View style={styles.paymentDetailsSection}>
+                                            <View style={styles.paymentDetailRow}>
+                                                <Text style={styles.paymentDetailLabel}>Subtotal</Text>
+                                                <Text style={styles.paymentDetailValue}>₹{(order.subtotal || 0).toFixed(0)}</Text>
+                                            </View>
+                                            <View style={styles.paymentDetailRow}>
+                                                <Text style={styles.paymentDetailLabel}>Delivery Fee</Text>
+                                                <Text style={styles.paymentDetailValue}>₹{(order.deliveryFee || 0).toFixed(0)}</Text>
+                                            </View>
+                                            <View style={styles.paymentDetailRow}>
+                                                <Text style={styles.paymentDetailLabel}>Tax</Text>
+                                                <Text style={styles.paymentDetailValue}>₹{(order.tax || 0).toFixed(0)}</Text>
+                                            </View>
+                                            {order.discount > 0 && (
+                                                <View style={styles.paymentDetailRow}>
+                                                    <Text style={[styles.paymentDetailLabel, { color: '#4CAF50' }]}>Discount</Text>
+                                                    <Text style={[styles.paymentDetailValue, { color: '#4CAF50' }]}>-₹{(order.discount || 0).toFixed(0)}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        <View style={styles.summaryDivider} />
                                         <View style={styles.totalRow}>
-                                            <Text style={styles.totalLabel}>Total</Text>
+                                            <Text style={styles.totalLabel}>Total Amount</Text>
                                             <Text style={styles.totalAmount}>
-                                                ${(order.totalAmount || order.total || 0).toFixed(2)}
+                                                ₹{(order.totalAmount || order.total || 0).toFixed(0)}
                                             </Text>
+                                        </View>
+
+                                        {/* Payment Method */}
+                                        <View style={styles.paymentMethodRow}>
+                                            <MaterialIcons name="credit-card" size={14} color="#8E8E93" />
+                                            <Text style={styles.paymentMethodText}>{order.paymentMethod || 'Cash'}</Text>
                                         </View>
                                     </View>
 
                                     {/* Action Buttons */}
                                     <View style={styles.actionsSection}>
                                         {order.status === 'pending' && (
-                                            <TouchableOpacity style={styles.acceptButton}>
+                                            <TouchableOpacity
+                                                style={styles.acceptButton}
+                                                onPress={() => handleAcceptOrder(order._id || order.id)}
+                                            >
                                                 <MaterialIcons name="check" size={18} color="#fff" />
                                                 <Text style={styles.acceptButtonText}>Accept Order</Text>
                                             </TouchableOpacity>
                                         )}
-                                        {order.status === 'preparing' && (
-                                            <TouchableOpacity style={styles.readyButton}>
-                                                <MaterialIcons name="done-all" size={18} color="#fff" />
-                                                <Text style={styles.readyButtonText}>Mark Ready</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                        {order.status === 'ready' && (
+                                        {order.status === 'accepted' && (
                                             <TouchableOpacity
                                                 style={styles.assignButton}
                                                 onPress={() => {
@@ -576,6 +692,14 @@ export default function OrderManagementScreen() {
                                                 <MaterialIcons name="delivery-dining" size={18} color="#fff" />
                                                 <Text style={styles.assignButtonText}>Assign Delivery</Text>
                                             </TouchableOpacity>
+                                        )}
+                                        {order.status === 'assigned' && order.deliveryAgent && (
+                                            <View style={styles.assignedInfoCard}>
+                                                <MaterialIcons name="check-circle" size={18} color="#4CAF50" />
+                                                <Text style={styles.assignedInfoText}>
+                                                    Assigned to {order.deliveryAgent.name || order.deliveryAgentDetails?.name || 'Delivery Agent'}
+                                                </Text>
+                                            </View>
                                         )}
                                         <TouchableOpacity
                                             style={styles.viewButton}
@@ -1000,6 +1124,25 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         marginVertical: 8,
     },
+    paymentDetailsSection: {
+        marginVertical: 4,
+    },
+    paymentDetailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    paymentDetailLabel: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500',
+    },
+    paymentDetailValue: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#2d2d2d',
+    },
     totalRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1014,7 +1157,19 @@ const styles = StyleSheet.create({
     totalAmount: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#2d2d2d',
+        color: '#cb202d',
+    },
+    paymentMethodRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+    paymentMethodText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#8E8E93',
+        textTransform: 'capitalize',
     },
     paymentRow: {
         flexDirection: 'row',
@@ -1048,6 +1203,21 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
     },
+    rejectButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F44336',
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 6,
+    },
+    rejectButtonText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
+    },
     readyButton: {
         flex: 1,
         flexDirection: 'row',
@@ -1077,6 +1247,25 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         color: '#fff',
+    },
+    assignedInfoCard: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#E8F5E9',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    assignedInfoText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#2E7D32',
+        flex: 1,
     },
     viewButton: {
         flexDirection: 'row',

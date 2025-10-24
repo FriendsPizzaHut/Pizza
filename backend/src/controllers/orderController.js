@@ -16,6 +16,8 @@ import * as orderService from '../services/orderService.js';
 import { sendResponse } from '../utils/response.js';
 import { emitNewOrder, emitOrderStatusUpdate, emitOrderCancelled, emitDeliveryAssignment } from '../socket/events.js';
 import { notifyAdminsNewOrder, notifyDeliveryAgentOrderAssigned } from '../services/notifications/firebaseService.js';
+import * as notificationService from '../services/notificationService.js';
+import User from '../models/User.js';
 
 /**
  * Create new order
@@ -35,6 +37,23 @@ export const createOrder = async (req, res, next) => {
             // Log error but don't fail the request
             console.error('[ORDER] Failed to send push notification:', err);
         });
+
+        // Create in-app notification for all admins
+        User.find({ role: 'admin' }).then(admins => {
+            admins.forEach(admin => {
+                notificationService.createNotification({
+                    user: admin._id,
+                    type: 'order',
+                    title: 'New Order Received',
+                    message: `Order #${order.orderNumber} has been placed. Total: ₹${order.totalAmount}`,
+                    priority: 'high',
+                    relatedEntity: {
+                        entityType: 'order',
+                        entityId: order._id
+                    }
+                }).catch(err => console.error('[NOTIFICATION] Failed to create notification:', err));
+            });
+        }).catch(err => console.error('[NOTIFICATION] Failed to fetch admins:', err));
 
         sendResponse(res, 201, 'Order created successfully', order);
     } catch (error) {
@@ -63,6 +82,23 @@ export const createOrderFromCart = async (req, res, next) => {
             // Log error but don't fail the request
             console.error('[ORDER] Failed to send push notification:', err);
         });
+
+        // Create in-app notification for all admins
+        User.find({ role: 'admin' }).then(admins => {
+            admins.forEach(admin => {
+                notificationService.createNotification({
+                    user: admin._id,
+                    type: 'order',
+                    title: 'New Order Received',
+                    message: `Order #${order.orderNumber} has been placed. Total: ₹${order.totalAmount}`,
+                    priority: 'high',
+                    relatedEntity: {
+                        entityType: 'order',
+                        entityId: order._id
+                    }
+                }).catch(err => console.error('[NOTIFICATION] Failed to create notification:', err));
+            });
+        }).catch(err => console.error('[NOTIFICATION] Failed to fetch admins:', err));
 
         sendResponse(res, 201, 'Order placed successfully', order);
     } catch (error) {
@@ -132,6 +168,37 @@ export const updateOrderStatus = async (req, res, next) => {
         // Emit real-time update to customer, admin, and delivery agent
         emitOrderStatusUpdate(order);
 
+        // Create notification based on status
+        const statusMessages = {
+            'pending': { title: 'Order Pending', message: `Order #${order.orderNumber} is pending confirmation`, priority: 'medium' },
+            'accepted': { title: 'Order Accepted', message: `Order #${order.orderNumber} has been accepted and is being prepared`, priority: 'medium' },
+            'preparing': { title: 'Order Preparing', message: `Order #${order.orderNumber} is being prepared`, priority: 'medium' },
+            'ready': { title: 'Order Ready', message: `Order #${order.orderNumber} is ready for pickup/delivery`, priority: 'medium' },
+            'out_for_delivery': { title: 'Out for Delivery', message: `Order #${order.orderNumber} is out for delivery`, priority: 'medium' },
+            'delivered': { title: 'Order Delivered', message: `Order #${order.orderNumber} has been delivered successfully`, priority: 'medium' },
+            'cancelled': { title: 'Order Cancelled', message: `Order #${order.orderNumber} has been cancelled`, priority: 'high' }
+        };
+
+        const notifData = statusMessages[order.status];
+        if (notifData) {
+            // Notify all admins
+            User.find({ role: 'admin' }).then(admins => {
+                admins.forEach(admin => {
+                    notificationService.createNotification({
+                        user: admin._id,
+                        type: 'order',
+                        title: notifData.title,
+                        message: notifData.message,
+                        priority: notifData.priority,
+                        relatedEntity: {
+                            entityType: 'order',
+                            entityId: order._id
+                        }
+                    }).catch(err => console.error('[NOTIFICATION] Failed to create notification:', err));
+                });
+            }).catch(err => console.error('[NOTIFICATION] Failed to fetch admins:', err));
+        }
+
         // Auto-update user preferences when order is delivered
         if (order.status === 'delivered' && order.user) {
             // Import and call preference service asynchronously (don't wait)
@@ -174,6 +241,23 @@ export const assignDeliveryAgent = async (req, res, next) => {
         notifyDeliveryAgentOrderAssigned(order, deliveryAgentId).catch(err => {
             console.error('[ORDER] Failed to send push notification to delivery agent:', err);
         });
+
+        // Create in-app notification for all admins
+        User.find({ role: 'admin' }).then(admins => {
+            admins.forEach(admin => {
+                notificationService.createNotification({
+                    user: admin._id,
+                    type: 'delivery',
+                    title: 'Delivery Agent Assigned',
+                    message: `Order #${order.orderNumber} has been assigned to a delivery agent`,
+                    priority: 'medium',
+                    relatedEntity: {
+                        entityType: 'order',
+                        entityId: order._id
+                    }
+                }).catch(err => console.error('[NOTIFICATION] Failed to create notification:', err));
+            });
+        }).catch(err => console.error('[NOTIFICATION] Failed to fetch admins:', err));
 
         sendResponse(res, 200, 'Delivery agent assigned successfully', order);
     } catch (error) {
@@ -267,6 +351,31 @@ export const rejectOrder = async (req, res, next) => {
 };
 
 /**
+ * Mark order as ready (change status from accepted to ready)
+ * POST /api/v1/orders/:id/mark-ready
+ * @access Private (Admin only)
+ */
+export const markOrderReady = async (req, res, next) => {
+    try {
+        const order = await orderService.markOrderReady(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        // Emit socket event for real-time update
+        emitOrderStatusUpdate(order);
+
+        sendResponse(res, 200, 'Order marked as ready successfully', { order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
  * Cancel/delete order
  * DELETE /api/v1/orders/:id
  * @access Private
@@ -318,6 +427,7 @@ export default {
     getMyOrders,
     acceptOrder,
     rejectOrder,
+    markOrderReady,
     updateOrderStatus,
     assignDeliveryAgent,
     deleteOrder,

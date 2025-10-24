@@ -85,7 +85,7 @@ export default function DrinksMenuScreen() {
     const renderSizeOptions = (sizes: any) => {
         return Object.entries(sizes).map(([size, price]) => (
             <Text key={size} style={styles.sizeText}>
-                {size.charAt(0).toUpperCase() + size.slice(1)}: ${String(price)}
+                {size.charAt(0).toUpperCase() + size.slice(1)}: ₹{String(price)}
             </Text>
         ));
     };

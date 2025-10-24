@@ -28,7 +28,7 @@ export default function AccountSettingsScreen() {
 
     const [preferences, setPreferences] = useState({
         language: 'English',
-        currency: 'USD',
+        currency: 'INR',
         theme: 'Light',
     });
 

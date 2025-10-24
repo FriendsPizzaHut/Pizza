@@ -13,16 +13,34 @@ import { sendResponse } from '../utils/response.js';
 
 /**
  * Get user notifications
- * GET /api/v1/notifications/:userId
+ * GET /api/v1/notifications (uses authenticated user)
+ * GET /api/v1/notifications/:userId (admin access)
  * @access Private
  */
 export const getUserNotifications = async (req, res, next) => {
     try {
-        const notifications = await notificationService.getUserNotifications(
-            req.params.userId,
+        // Use authenticated user's ID if no userId param provided
+        const userId = req.params.userId || req.user._id;
+
+        const result = await notificationService.getUserNotifications(
+            userId,
             req.query
         );
-        sendResponse(res, 200, 'Notifications retrieved successfully', notifications);
+        sendResponse(res, 200, 'Notifications retrieved successfully', result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get unread notification count
+ * GET /api/v1/notifications/unread-count
+ * @access Private
+ */
+export const getUnreadCount = async (req, res, next) => {
+    try {
+        const count = await notificationService.getUnreadCount(req.user._id);
+        sendResponse(res, 200, 'Unread count retrieved successfully', { count });
     } catch (error) {
         next(error);
     }
@@ -42,7 +60,41 @@ export const markAsRead = async (req, res, next) => {
     }
 };
 
+/**
+ * Mark all notifications as read
+ * PATCH /api/v1/notifications/read-all
+ * @access Private
+ */
+export const markAllAsRead = async (req, res, next) => {
+    try {
+        const result = await notificationService.markAllAsRead(req.user._id);
+        sendResponse(res, 200, result.message, result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Delete notification
+ * DELETE /api/v1/notifications/:id
+ * @access Private
+ */
+export const deleteNotification = async (req, res, next) => {
+    try {
+        const result = await notificationService.deleteNotification(
+            req.params.id,
+            req.user._id
+        );
+        sendResponse(res, 200, result.message);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export default {
     getUserNotifications,
+    getUnreadCount,
     markAsRead,
+    markAllAsRead,
+    deleteNotification,
 };

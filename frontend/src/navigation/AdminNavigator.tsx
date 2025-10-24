@@ -27,6 +27,7 @@ import UserManagementScreen from '../screens/admin/users/UserManagementScreen';
 import AddOfferScreen from '../screens/admin/offers/AddOfferScreen';
 import OfferManagementScreen from '../screens/admin/offers/OfferManagementScreen';
 import DeliveryAgentApprovalsScreen from '../screens/admin/management/DeliveryAgentApprovalsScreen';
+import PaymentHistoryScreen from '../screens/admin/payments/PaymentHistoryScreen';
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -124,6 +125,7 @@ export default function AdminNavigator() {
                 <Stack.Screen name="DeliveryAgentApprovals" component={DeliveryAgentApprovalsScreen} />
                 <Stack.Screen name="OfferManagement" component={OfferManagementScreen} />
                 <Stack.Screen name="AddOffer" component={AddOfferScreen} />
+                <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
             </Stack.Navigator>
         </>
     );

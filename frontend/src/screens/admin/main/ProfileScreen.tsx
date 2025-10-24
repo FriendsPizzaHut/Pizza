@@ -58,6 +58,14 @@ export default function ProfileScreen() {
             action: () => navigation.navigate('UserManagement'),
         },
         {
+            title: 'Payment History',
+            icon: 'payment',
+            iconType: 'MaterialIcons' as const,
+            color: '#4CAF50',
+            bgColor: '#E8F5E9',
+            action: () => navigation.navigate('PaymentHistory'),
+        },
+        {
             title: 'Delivery Agent Approvals',
             icon: 'delivery-dining',
             iconType: 'MaterialIcons' as const,

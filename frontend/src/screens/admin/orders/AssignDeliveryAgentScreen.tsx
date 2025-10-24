@@ -403,14 +403,56 @@ export default function AssignDeliveryAgentScreen() {
                     </View>
                 </View>
 
+                {/* Currently Assigned Agent Section (if order is already assigned) */}
+                {orderDetails.status === 'assigned' && orderDetails.deliveryAgent && (
+                    <View style={styles.section}>
+                        <View style={styles.currentAssignmentCard}>
+                            <View style={styles.currentAssignmentHeader}>
+                                <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
+                                <Text style={styles.currentAssignmentTitle}>Currently Assigned</Text>
+                            </View>
+                            <View style={styles.currentAssignmentBody}>
+                                <View style={styles.currentAgentInfo}>
+                                    <MaterialIcons name="person" size={20} color="#2E7D32" />
+                                    <Text style={styles.currentAgentName}>
+                                        {orderDetails.deliveryAgent.name || orderDetails.deliveryAgentDetails?.name}
+                                    </Text>
+                                </View>
+                                <View style={styles.currentAgentInfo}>
+                                    <MaterialIcons name="phone" size={20} color="#2E7D32" />
+                                    <Text style={styles.currentAgentPhone}>
+                                        {orderDetails.deliveryAgent.phone || orderDetails.deliveryAgentDetails?.phone}
+                                    </Text>
+                                </View>
+                                {orderDetails.deliveryAgentDetails?.vehicleNumber && (
+                                    <View style={styles.currentAgentInfo}>
+                                        <MaterialIcons name="two-wheeler" size={20} color="#2E7D32" />
+                                        <Text style={styles.currentAgentVehicle}>
+                                            {orderDetails.deliveryAgentDetails.vehicleNumber}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                            <View style={styles.reassignmentWarning}>
+                                <MaterialIcons name="info" size={16} color="#FF9800" />
+                                <Text style={styles.reassignmentWarningText}>
+                                    Selecting a new agent will reassign this order
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
                 {/* Available Agents Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <MaterialIcons name="delivery-dining" size={20} color="#cb202d" />
-                        <Text style={styles.sectionTitle}>Approved Delivery Agents</Text>
+                        <Text style={styles.sectionTitle}>
+                            {orderDetails.status === 'assigned' ? 'Reassign to Another Agent' : 'Approved Delivery Agents'}
+                        </Text>
                     </View>
                     <Text style={styles.sectionSubtitle}>
-                        Only approved agents are shown • Select one to assign this order
+                        Only approved agents are shown • Select one to {orderDetails.status === 'assigned' ? 'reassign' : 'assign'} this order
                     </Text>
 
                     {loading ? (
@@ -430,6 +472,10 @@ export default function AssignDeliveryAgentScreen() {
                         deliveryAgents.map((agent) => {
                             const statusConfig = getStatusConfig(agent.status);
                             const isSelected = selectedAgent === agent.id;
+                            // Check if this agent is currently assigned to this order
+                            const isCurrentlyAssigned = orderDetails.status === 'assigned' &&
+                                orderDetails.deliveryAgent &&
+                                (orderDetails.deliveryAgent._id === agent.id || orderDetails.deliveryAgent.id === agent.id);
                             // Agent can be assigned if: online AND has capacity for more deliveries
                             const isAvailable = (agent.status === 'online' || agent.status === 'busy') && agent.activeDeliveries < agent.maxDeliveries;
 
@@ -440,6 +486,7 @@ export default function AssignDeliveryAgentScreen() {
                                         styles.agentCard,
                                         isSelected && styles.agentCardSelected,
                                         !isAvailable && styles.agentCardDisabled,
+                                        isCurrentlyAssigned && styles.agentCardCurrentlyAssigned,
                                     ]}
                                     onPress={() => {
                                         if (isAvailable) {
@@ -467,7 +514,13 @@ export default function AssignDeliveryAgentScreen() {
                                         <View style={styles.agentInfo}>
                                             <View style={styles.agentNameRow}>
                                                 <Text style={styles.agentName}>{agent.name}</Text>
-                                                {isSelected && (
+                                                {isCurrentlyAssigned && (
+                                                    <View style={styles.currentlyAssignedBadge}>
+                                                        <MaterialIcons name="check-circle" size={14} color="#4CAF50" />
+                                                        <Text style={styles.currentlyAssignedText}>Current</Text>
+                                                    </View>
+                                                )}
+                                                {isSelected && !isCurrentlyAssigned && (
                                                     <View style={styles.selectedBadge}>
                                                         <MaterialIcons name="check" size={16} color="#fff" />
                                                     </View>
@@ -769,6 +822,10 @@ const styles = StyleSheet.create({
     agentCardDisabled: {
         opacity: 0.5,
     },
+    agentCardCurrentlyAssigned: {
+        borderColor: '#4CAF50',
+        backgroundColor: '#F1F8F4',
+    },
     agentTopSection: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -800,6 +857,22 @@ const styles = StyleSheet.create({
         height: 24,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    currentlyAssignedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#E8F5E9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    currentlyAssignedText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#4CAF50',
     },
     agentEmailRow: {
         flexDirection: 'row',
@@ -968,5 +1041,84 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         lineHeight: 20,
+    },
+
+    // Currently Assigned Agent Card
+    currentAssignmentCard: {
+        backgroundColor: '#E8F5E9',
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 2,
+        borderColor: '#4CAF50',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#4CAF50',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 6,
+            },
+        }),
+    },
+    currentAssignmentHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#A5D6A7',
+    },
+    currentAssignmentTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2E7D32',
+    },
+    currentAssignmentBody: {
+        gap: 12,
+        marginBottom: 16,
+    },
+    currentAgentInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#fff',
+        padding: 12,
+        borderRadius: 12,
+    },
+    currentAgentName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2E7D32',
+    },
+    currentAgentPhone: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#2E7D32',
+    },
+    currentAgentVehicle: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#2E7D32',
+    },
+    reassignmentWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#FFF3E0',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FFB74D',
+    },
+    reassignmentWarningText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#E65100',
+        flex: 1,
     },
 });

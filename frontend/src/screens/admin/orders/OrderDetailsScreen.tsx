@@ -257,34 +257,6 @@ export default function OrderDetailsScreen() {
         }
     };
 
-    // 🔥 PART 1.7: Mark Ready Handler
-    const handleMarkReady = async () => {
-        try {
-            console.log('🍕 PART 1.7 - Marking order as ready:', orderId);
-            setActionLoading(true);
-
-            const response = await axiosInstance.patch(`/orders/${orderId}/status`, {
-                status: 'ready'
-            });
-
-            console.log('✅ PART 1.7 - Order marked as ready');
-            console.log('Response structure:', JSON.stringify(response.data, null, 2));
-
-            // Update local state with the new order data
-            const updatedOrder = response.data.data?.order || response.data.data || response.data.order || response.data;
-            setOrderDetails(updatedOrder);
-
-            console.log('✅ Order status changed to:', updatedOrder.status);
-            alert('Order marked as ready for delivery!');
-        } catch (err: any) {
-            console.error('❌ PART 1.7 - Error marking order ready:', err.message);
-            console.error('Error response:', err.response?.data);
-            alert(err.response?.data?.message || 'Failed to update order status');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
     // 🔥 PART 1.9: Share to Kitchen Handler
     const handleShareToKitchen = async () => {
         try {
@@ -601,12 +573,30 @@ export default function OrderDetailsScreen() {
                         </TouchableOpacity>
                     )}
                     {/* Assigned orders: Show delivery agent info (read-only) */}
-                    {orderDetails.status === 'assigned' && (
+                    {orderDetails.status === 'assigned' && orderDetails.deliveryAgent && (
                         <View style={styles.assignedInfo}>
-                            <MaterialIcons name="check-circle" size={20} color="#4CAF50" />
-                            <Text style={styles.assignedInfoText}>
-                                Assigned to delivery agent
-                            </Text>
+                            <View style={styles.assignedInfoTop}>
+                                <MaterialIcons name="check-circle" size={20} color="#4CAF50" />
+                                <Text style={styles.assignedInfoText}>
+                                    Assigned to Delivery Agent
+                                </Text>
+                            </View>
+                            <View style={styles.agentDetailsBox}>
+                                <View style={styles.agentDetailRow}>
+                                    <MaterialIcons name="person" size={16} color="#2E7D32" />
+                                    <Text style={styles.agentDetailText}>
+                                        {orderDetails.deliveryAgent.name || orderDetails.deliveryAgentDetails?.name || 'Delivery Agent'}
+                                    </Text>
+                                </View>
+                                {(orderDetails.deliveryAgent.phone || orderDetails.deliveryAgentDetails?.phone) && (
+                                    <View style={styles.agentDetailRow}>
+                                        <MaterialIcons name="phone" size={16} color="#2E7D32" />
+                                        <Text style={styles.agentDetailText}>
+                                            {orderDetails.deliveryAgent.phone || orderDetails.deliveryAgentDetails?.phone}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     )}
 
@@ -1145,16 +1135,34 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingVertical: 16,
         paddingHorizontal: 20,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8,
         borderWidth: 1,
         borderColor: '#4CAF50',
+    },
+    assignedInfoTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
     },
     assignedInfoText: {
         fontSize: 16,
         fontWeight: '600',
+        color: '#2E7D32',
+    },
+    agentDetailsBox: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+    },
+    agentDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    agentDetailText: {
+        fontSize: 14,
+        fontWeight: '500',
         color: '#2E7D32',
     },
     printButton: {

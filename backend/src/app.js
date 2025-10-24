@@ -125,6 +125,8 @@ import uploadRoutes from './routes/uploadRoutes.js';
 import deviceTokenRoutes from './routes/deviceTokenRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import deliveryAgentRoutes from './routes/deliveryAgentRoutes.js';
+import restaurantSettingsRoutes from './routes/restaurantSettings.routes.js';
+import publicRestaurantSettingsRoutes from './routes/publicRestaurantSettings.routes.js';
 
 // Mount routes with /api/v1 prefix
 // Auth routes have stricter rate limiting
@@ -151,6 +153,8 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/device-tokens', deviceTokenRoutes);
 app.use('/api/v1/recommendations', recommendationRoutes);
 app.use('/api/v1/delivery-agent', deliveryAgentRoutes);
+app.use('/api/v1/admin/restaurant-settings', restaurantSettingsRoutes);
+app.use('/api/v1/restaurant-settings', publicRestaurantSettingsRoutes);
 
 /**
  * ROOT ENDPOINT

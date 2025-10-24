@@ -7,6 +7,7 @@
  */
 
 import mongoose from 'mongoose';
+import RestaurantSettings from './RestaurantSettings.js';
 
 const cartItemSchema = new mongoose.Schema({
     product: {
@@ -156,14 +157,14 @@ cartSchema.pre('save', async function (next) {
             return sum + itemTotal;
         }, 0);
 
-        // Calculate tax (8% of subtotal)
-        const TAX_RATE = 0.08;
-        this.tax = parseFloat((this.subtotal * TAX_RATE).toFixed(2));
+        // Get dynamic settings from database
+        const settings = await RestaurantSettings.getSingleton();
 
-        // Calculate delivery fee (free above ₹2490, otherwise ₹40)
-        const FREE_DELIVERY_THRESHOLD = 2490;
-        const DELIVERY_FEE = 40;
-        this.deliveryFee = this.subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+        // Calculate tax using dynamic tax rate
+        this.tax = parseFloat((this.subtotal * (settings.taxRate / 100)).toFixed(2));
+
+        // Calculate delivery fee using dynamic settings
+        this.deliveryFee = this.subtotal >= settings.freeDeliveryThreshold ? 0 : settings.deliveryFee;
 
         // Calculate total
         this.total = this.subtotal + this.tax + this.deliveryFee - this.discount;

@@ -14,6 +14,8 @@ import {
     getPaymentById,
     getAllPayments,
     deletePayment,
+    getCashCollectionsByAgent,
+    getPaymentStats,
 } from '../controllers/paymentController.js';
 import { protect, adminOnly } from '../middlewares/authMiddleware.js';
 import { validate } from '../middlewares/validateMiddleware.js';
@@ -23,6 +25,12 @@ const router = express.Router();
 
 // Record payment (authenticated users, with validation)
 router.post('/', protect, validate(createPaymentValidator), createPayment);
+
+// Get cash collections by agent (admin only) - MUST come before /:id
+router.get('/cash-collections-by-agent', protect, adminOnly, getCashCollectionsByAgent);
+
+// Get payment stats (admin only) - MUST come before /:id
+router.get('/stats', protect, adminOnly, getPaymentStats);
 
 // Get payment details (authenticated users)
 router.get('/:id', protect, getPaymentById);
