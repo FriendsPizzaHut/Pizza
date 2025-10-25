@@ -110,13 +110,11 @@ app.use('/api', apiLimiter);
 // Import routes
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
-import businessRoutes from './routes/businessRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import cartRoutes from './routes/cart.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import razorpayRoutes from './routes/razorpayRoutes.js';
-import couponRoutes from './routes/couponRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
@@ -140,11 +138,9 @@ app.use('/api/v1/payments/razorpay', paymentLimiter, razorpayRoutes);
 
 // Other routes use standard API rate limiting
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/business', businessRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/cart', cartRoutes);
-app.use('/api/v1/coupons', couponRoutes);
 app.use('/api/v1/offers', offerRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/activity', activityRoutes);

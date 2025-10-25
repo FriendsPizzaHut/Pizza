@@ -8,7 +8,7 @@
 
 import express from 'express';
 import { updateOnlineStatus, getAgentStatus } from '../controllers/deliveryAgentController.js';
-import { authenticate, authorize } from '../middlewares/auth.js';
+import { authenticate, authorize } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 

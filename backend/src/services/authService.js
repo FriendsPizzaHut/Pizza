@@ -189,6 +189,7 @@ export const logoutUser = async (userId) => {
     try {
         // Update user's last activity or online status if needed
         const user = await User.findById(userId);
+        let tokenResult = null;
 
         if (user) {
             // For delivery boys, set them offline
@@ -201,7 +202,7 @@ export const logoutUser = async (userId) => {
 
             // ✅ NEW: Deactivate all device tokens for this user to stop notifications
             console.log(`[LOGOUT] Deactivating device tokens for user ${userId}`);
-            const tokenResult = await DeviceToken.updateMany(
+            tokenResult = await DeviceToken.updateMany(
                 { userId: userId, isActive: true },
                 {
                     isActive: false,

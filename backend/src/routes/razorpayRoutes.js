@@ -6,7 +6,7 @@
 
 import express from 'express';
 import * as razorpayController from '../controllers/razorpayController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 

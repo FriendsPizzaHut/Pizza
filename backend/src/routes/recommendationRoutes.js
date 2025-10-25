@@ -6,7 +6,7 @@
 
 import express from 'express';
 import * as recommendationController from '../controllers/recommendationController.js';
-import { authenticate, authorize } from '../middlewares/auth.js';
+import { authenticate, authorize } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 

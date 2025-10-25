@@ -191,48 +191,6 @@ export const paymentSchemas = {
 };
 
 /**
- * Coupon schemas
- */
-export const couponSchemas = {
-    create: Joi.object({
-        code: Joi.string().uppercase().min(3).max(20).required(),
-        description: Joi.string().max(200),
-        discountType: Joi.string().valid('percentage', 'fixed').required(),
-        discountValue: Joi.number().min(0).required(),
-        minOrderValue: Joi.number().min(0).default(0),
-        maxDiscount: Joi.number().min(0),
-        validFrom: Joi.date(),
-        validUntil: Joi.date().greater(Joi.ref('validFrom')),
-        usageLimit: Joi.number().integer().min(1),
-        isActive: Joi.boolean().default(true),
-    }),
-
-    apply: Joi.object({
-        code: Joi.string().required(),
-        orderValue: Joi.number().min(0).required(),
-    }),
-};
-
-/**
- * Business schemas
- */
-export const businessSchemas = {
-    updateStatus: Joi.object({
-        isOpen: Joi.boolean().required(),
-    }),
-
-    updateInfo: Joi.object({
-        name: Joi.string().min(2).max(100),
-        phone: Joi.string().pattern(/^[0-9]{10}$/),
-        address: Joi.string().max(200),
-        openingTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-        closingTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-        deliveryRadius: Joi.number().min(0),
-        minOrderValue: Joi.number().min(0),
-    }).min(1),
-};
-
-/**
  * ID parameter validation
  */
 export const idSchema = Joi.object({
@@ -247,8 +205,6 @@ export const schemas = {
     product: productSchemas,
     order: orderSchemas,
     payment: paymentSchemas,
-    coupon: couponSchemas,
-    business: businessSchemas,
     id: idSchema,
     pagination: paginationSchema,
 };

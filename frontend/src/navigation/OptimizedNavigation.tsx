@@ -404,24 +404,6 @@ export const OptimizedCustomerStackNavigator = memo(() => (
             }}
         />
         <Stack.Screen
-            name="PizzaMenu"
-            component={EnhancedLazyScreens.PizzaMenuScreen}
-            options={{
-                ...createOptimizedScreenOptions(),
-                headerShown: true,
-                title: 'Pizza Menu',
-            }}
-        />
-        <Stack.Screen
-            name="DealsMenu"
-            component={EnhancedLazyScreens.DealsMenuScreen}
-            options={{
-                ...createOptimizedScreenOptions(),
-                headerShown: true,
-                title: 'Deals & Offers',
-            }}
-        />
-        <Stack.Screen
             name="AccountSettings"
             component={EnhancedLazyScreens.AccountSettingsScreen}
             options={{

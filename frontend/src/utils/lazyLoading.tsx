@@ -356,21 +356,6 @@ export const LazyScreens = {
         }
     ),
 
-    // Menu Screens
-    PizzaMenuScreen: LazyComponentManager.createLazyComponent(
-        'PizzaMenuScreen',
-        {
-            loader: () => import('../screens/customer/menu/PizzaMenuScreen')
-        }
-    ),
-
-    DealsMenuScreen: LazyComponentManager.createLazyComponent(
-        'DealsMenuScreen',
-        {
-            loader: () => import('../screens/customer/menu/DealsMenuScreen')
-        }
-    ),
-
     // Profile Screens
     AccountSettingsScreen: LazyComponentManager.createLazyComponent(
         'AccountSettingsScreen',
@@ -427,16 +412,6 @@ export const EnhancedLazyScreens = {
 
     PaymentMethodsScreen: withLazyLoading(LazyScreens.PaymentMethodsScreen, {
         loadingMessage: 'Loading payment methods...'
-    }),
-
-    PizzaMenuScreen: withLazyLoading(LazyScreens.PizzaMenuScreen, {
-        skeletonLoader: MenuScreenSkeleton,
-        loadingMessage: 'Loading pizza menu...'
-    }),
-
-    DealsMenuScreen: withLazyLoading(LazyScreens.DealsMenuScreen, {
-        skeletonLoader: MenuScreenSkeleton,
-        loadingMessage: 'Loading deals...'
     }),
 
     AccountSettingsScreen: withLazyLoading(LazyScreens.AccountSettingsScreen, {

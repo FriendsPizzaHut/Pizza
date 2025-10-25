@@ -62,14 +62,6 @@ export const CART_ENDPOINTS = {
     REMOVE_COUPON: `${API_BASE}/cart/coupon`,
 };
 
-// Coupon Endpoints
-export const COUPON_ENDPOINTS = {
-    GET_ALL: `${API_BASE}/coupons`,
-    GET_BY_CODE: (code: string) => `${API_BASE}/coupons/${code}`,
-    VALIDATE: `${API_BASE}/coupons/validate`,
-    GET_AVAILABLE: `${API_BASE}/coupons/available`,
-};
-
 // Payment Endpoints
 export const PAYMENT_ENDPOINTS = {
     CREATE_ORDER: `${API_BASE}/payments/create-order`,
@@ -115,15 +107,6 @@ export const ADMIN_ORDER_ENDPOINTS = {
     UPDATE_STATUS: (id: string) => `${API_BASE}/admin/orders/${id}/status`,
     ASSIGN_DELIVERY: (id: string) => `${API_BASE}/admin/orders/${id}/assign`,
     GET_STATISTICS: `${API_BASE}/admin/orders/statistics`,
-};
-
-// Admin - Coupon Management Endpoints
-export const ADMIN_COUPON_ENDPOINTS = {
-    GET_ALL: `${API_BASE}/admin/coupons`,
-    CREATE: `${API_BASE}/admin/coupons`,
-    UPDATE: (id: string) => `${API_BASE}/admin/coupons/${id}`,
-    DELETE: (id: string) => `${API_BASE}/admin/coupons/${id}`,
-    TOGGLE_STATUS: (id: string) => `${API_BASE}/admin/coupons/${id}/toggle`,
 };
 
 // Admin - Dashboard Endpoints
@@ -184,13 +167,11 @@ export default {
     MENU_ENDPOINTS,
     ORDER_ENDPOINTS,
     CART_ENDPOINTS,
-    COUPON_ENDPOINTS,
     PAYMENT_ENDPOINTS,
     ADDRESS_ENDPOINTS,
     NOTIFICATION_ENDPOINTS,
     ADMIN_MENU_ENDPOINTS,
     ADMIN_ORDER_ENDPOINTS,
-    ADMIN_COUPON_ENDPOINTS,
     ADMIN_DASHBOARD_ENDPOINTS,
     DELIVERY_ENDPOINTS,
     REVIEW_ENDPOINTS,
