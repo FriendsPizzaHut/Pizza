@@ -7,6 +7,7 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
+import { getCloudinaryFolder, getCloudinaryTransformation } from '../constants/cloudinaryFolders.js';
 
 dotenv.config();
 
@@ -38,12 +39,16 @@ cloudinary.config({
 /**
  * Upload image to Cloudinary
  * @param {string} filePath - Local file path or base64 string
- * @param {string} folder - Cloudinary folder (products, users/documents, etc.)
+ * @param {string} type - Upload type: 'product', 'avatar', 'document', 'banner', 'store', 'category', 'offer', or 'general'
  * @param {object} options - Additional upload options
  * @returns {Promise<object>} Upload result with secure_url
  */
-export const uploadToCloudinary = async (filePath, folder = 'pizza-app', options = {}) => {
+export const uploadToCloudinary = async (filePath, type = 'general', options = {}) => {
     try {
+        // Get folder and transformation based on type
+        const folder = getCloudinaryFolder(type);
+        const transformation = getCloudinaryTransformation(type);
+
         // Try unsigned upload first (faster, no API key verification needed)
         const useUnsigned = process.env.CLOUDINARY_UPLOAD_PRESET || false;
 
@@ -51,20 +56,17 @@ export const uploadToCloudinary = async (filePath, folder = 'pizza-app', options
             folder: folder,
             resource_type: 'auto',
             timeout: 120000, // 2 minutes timeout for slow connections
-            // Simplified transformations for faster processing
-            transformation: [
-                { width: 800, height: 800, crop: 'limit' },
-                { quality: 'auto' },
-            ],
+            // Use type-specific transformations
+            transformation: [transformation],
             ...options,
         };
 
         // Add upload preset if using unsigned upload
         if (useUnsigned) {
             uploadOptions.upload_preset = process.env.CLOUDINARY_UPLOAD_PRESET;
-            console.log('📤 Using unsigned upload (faster):', { filePath, folder, preset: useUnsigned });
+            console.log('📤 Using unsigned upload (faster):', { filePath, folder, type, preset: useUnsigned });
         } else {
-            console.log('📤 Using signed upload:', { filePath, folder });
+            console.log('📤 Using signed upload:', { filePath, folder, type });
         }
 
         console.log('⏱️  This may take 5-30 seconds depending on network speed...');
@@ -131,13 +133,13 @@ export const deleteFromCloudinary = async (publicId) => {
 /**
  * Upload multiple images to Cloudinary
  * @param {Array<string>} filePaths - Array of local file paths
- * @param {string} folder - Cloudinary folder
+ * @param {string} type - Upload type
  * @returns {Promise<Array<object>>} Array of upload results
  */
-export const uploadMultipleToCloudinary = async (filePaths, folder = 'pizza-app') => {
+export const uploadMultipleToCloudinary = async (filePaths, type = 'general') => {
     try {
         const uploadPromises = filePaths.map((filePath) =>
-            uploadToCloudinary(filePath, folder)
+            uploadToCloudinary(filePath, type)
         );
         const results = await Promise.all(uploadPromises);
         return {

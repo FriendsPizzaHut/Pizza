@@ -15,6 +15,7 @@ import {
     updateUser,
     deleteUser,
     getDeliveryAgents,
+    updateProfileImage,
 } from '../controllers/userController.js';
 import {
     addAddress,
@@ -39,6 +40,9 @@ router.get('/:id', protect, getUserById);
 
 // Update user profile (authenticated, with validation)
 router.patch('/:id', protect, validate(updateProfileValidator), updateUser);
+
+// Update profile image (authenticated users only)
+router.put('/:id/profile-image', protect, updateProfileImage);
 
 // Delete user (admin only)
 router.delete('/:id', protect, adminOnly, deleteUser);

@@ -8,6 +8,7 @@ import { AppDispatch, RootState } from '../../../../redux/store';
 import { fetchProductByIdThunk } from '../../../../redux/thunks/productThunks';
 import { addToCartThunk } from '../../../../redux/thunks/cartThunks';
 import { Product } from '../../../services/productService';
+import { getRestaurantSettings, Topping as AvailableTopping } from '../../../services/restaurantSettingsService';
 
 type PizzaDetailsRouteProp = RouteProp<CustomerStackParamList, 'PizzaDetails'>;
 
@@ -25,6 +26,7 @@ export default function PizzaDetailsScreen() {
     const [scrollY] = useState(new Animated.Value(0));
     const [isLoading, setIsLoading] = useState(true);
     const [isAddingToCart, setIsAddingToCart] = useState(false);
+    const [availableToppings, setAvailableToppings] = useState<AvailableTopping[]>([]);
 
     // Get product from Redux store (check both products array and selectedProduct)
     const product = useSelector((state: RootState) =>
@@ -52,21 +54,32 @@ export default function PizzaDetailsScreen() {
         firstFiveProductIds: allProductIds
     });
 
-    // Fetch product data
+    // Fetch product data and available toppings
     useEffect(() => {
         console.log('🔄 useEffect triggered - pizzaId:', pizzaId, 'displayProduct exists:', !!displayProduct);
 
-        const fetchProduct = async () => {
-            console.log('📡 Starting fetchProductByIdThunk for pizzaId:', pizzaId);
+        const fetchData = async () => {
+            console.log('📡 Starting data fetch for pizzaId:', pizzaId);
             setIsLoading(true);
             try {
-                const result = await dispatch(fetchProductByIdThunk(pizzaId));
-                console.log('✅ fetchProductByIdThunk completed:', {
-                    success: !!result,
-                    data: result
-                });
+                // Fetch product if not in store
+                if (!displayProduct) {
+                    console.log('⚠️ Product not in store, fetching from API...');
+                    const result = await dispatch(fetchProductByIdThunk(pizzaId));
+                    console.log('✅ fetchProductByIdThunk completed:', { success: !!result });
+                } else {
+                    console.log('✅ Product found in store, using cached data');
+                }
+
+                // Fetch available toppings from restaurant settings
+                console.log('📡 Fetching available toppings from restaurant settings...');
+                const settings = await getRestaurantSettings();
+                const activeToppings = settings.availableToppings.filter((t: AvailableTopping) => t.isActive);
+                console.log('✅ Available toppings fetched:', activeToppings.length, 'active toppings');
+                setAvailableToppings(activeToppings);
+
             } catch (error) {
-                console.error('❌ Error fetching product:', error);
+                console.error('❌ Error fetching data:', error);
                 Alert.alert('Error', 'Failed to load product details');
             } finally {
                 console.log('🏁 Setting isLoading to false');
@@ -74,13 +87,7 @@ export default function PizzaDetailsScreen() {
             }
         };
 
-        if (!displayProduct) {
-            console.log('⚠️ Product not in store, fetching from API...');
-            fetchProduct();
-        } else {
-            console.log('✅ Product found in store, using cached data');
-            setIsLoading(false);
-        }
+        fetchData();
     }, [pizzaId]);
 
     const toggleTopping = (index: number) => {
@@ -111,16 +118,23 @@ export default function PizzaDetailsScreen() {
         return sizes.length > 0 ? sizes : [{ name: 'Regular', price: displayProduct.basePrice, servings: '1-2 people' }];
     };
 
-    // Get toppings with prices
+    // Get toppings with prices from restaurant settings
     const getToppings = () => {
         if (!displayProduct || !displayProduct.toppings) return [];
 
-        return displayProduct.toppings.map((topping, index) => ({
-            name: topping.name,
-            price: 1.99, // Default topping price (static)
-            category: topping.category || 'Other',
-            index
-        }));
+        return displayProduct.toppings.map((topping, index) => {
+            // Find matching topping in availableToppings to get the real price
+            const availableTopping = availableToppings.find(
+                at => at.name.toLowerCase() === topping.name.toLowerCase()
+            );
+
+            return {
+                name: topping.name,
+                price: availableTopping?.price || 0, // Use real price from restaurant settings, fallback to 0
+                category: topping.category || availableTopping?.category || 'Other',
+                index
+            };
+        });
     };
 
     const sizes = getSizes();

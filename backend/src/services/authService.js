@@ -16,7 +16,7 @@ import { generateAccessToken, generateRefreshToken } from '../utils/token.js';
  * @returns {Object} - Created user and tokens
  */
 export const registerUser = async (userData) => {
-    const { name, email, phone, password, role, address, vehicleInfo, documents } = userData;
+    const { name, email, phone, password, role, address, vehicleInfo, documents, profileImage } = userData;
 
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
@@ -36,6 +36,8 @@ export const registerUser = async (userData) => {
         address: address || [],
         // Delivery boys need admin approval, so set isActive to false
         isActive: role === 'delivery' ? false : true,
+        // Set profile image if provided, otherwise it will be null (default in schema)
+        profileImage: profileImage || null,
     };
 
     // Add delivery-specific fields if role is delivery

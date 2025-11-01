@@ -7,6 +7,7 @@ import cartSlice from './slices/cartSlice';
 import addressSlice from './slices/addressSlice';
 import dashboardSlice from './slices/dashboardSlice';
 import notificationSlice from './slices/notificationSlice';
+import userManagementSlice from './slices/userManagementSlice';
 import { baseApi } from './slices/api/baseApi';
 
 // Store configuration with RTK Query
@@ -20,6 +21,7 @@ const store = configureStore({
         address: addressSlice,
         dashboard: dashboardSlice,
         notifications: notificationSlice,
+        userManagement: userManagementSlice,
 
         // RTK Query API slice
         [baseApi.reducerPath]: baseApi.reducer,

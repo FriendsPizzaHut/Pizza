@@ -104,7 +104,7 @@ export default ({ config }) => {
                 process.env.EXPO_PUBLIC_API_URL_PRODUCTION || 'https://pizzabackend-u9ui.onrender.com',
 
             // Socket URLs
-            socketUrlDevelopment: process.env.EXPO_PUBLIC_SOCKET_URL_DEVELOPMENT || 'http://192.168.1.9:5000',
+            socketUrlDevelopment: process.env.EXPO_PUBLIC_SOCKET_URL_DEVELOPMENT || 'http://192.168.1.27:5000',
             socketUrlProduction:
                 process.env.EXPO_PUBLIC_SOCKET_URL_PRODUCTION || 'https://pizzabackend-u9ui.onrender.com',
 

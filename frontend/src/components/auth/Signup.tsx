@@ -22,17 +22,24 @@ import {
     Platform,
     ActivityIndicator,
     Alert,
+    StatusBar,
+    Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useDispatch, useSelector } from 'react-redux';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as ImagePicker from 'expo-image-picker';
 import { AuthStackParamList } from '../../types/navigation';
 import { signupThunk } from '../../../redux/thunks/authThunks';
 import { clearError } from '../../../redux/slices/authSlice';
 import { RootState } from '../../../redux/store';
 import { useNetwork } from '../../context/NetworkContext';
+import { uploadImage, isLocalFileUri } from '../../utils/imageUpload';
+import Avatar from '../common/Avatar';
 
+const { width } = Dimensions.get('window');
 type SignupNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
 export default function Signup() {
@@ -50,6 +57,10 @@ export default function Signup() {
         confirmPassword: '',
     });
 
+    // Avatar state
+    const [avatarImage, setAvatarImage] = useState<string | null>(null);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
     // Validation errors
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -63,6 +74,44 @@ export default function Signup() {
             dispatch(clearError());
         };
     }, [dispatch]);
+
+    // Request image picker permissions
+    useEffect(() => {
+        (async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                console.log('Image picker permission not granted');
+            }
+        })();
+    }, []);
+
+    /**
+     * Handle avatar image selection
+     */
+    const handleAvatarPick = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1], // Square aspect ratio for avatar
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setAvatarImage(result.assets[0].uri);
+            }
+        } catch (error: any) {
+            console.error('Error picking avatar:', error);
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
+        }
+    };
+
+    /**
+     * Remove avatar image
+     */
+    const handleRemoveAvatar = () => {
+        setAvatarImage(null);
+    };
 
     /**
      * Handle input change
@@ -163,6 +212,40 @@ export default function Signup() {
         }
 
         try {
+            // Upload avatar to Cloudinary if selected
+            let profileImageUrl = null;
+
+            if (avatarImage && isLocalFileUri(avatarImage)) {
+                setIsUploadingAvatar(true);
+                console.log('📤 Uploading avatar to Cloudinary...');
+
+                try {
+                    profileImageUrl = await uploadImage(avatarImage, 'avatar');
+                    console.log('✅ Avatar uploaded successfully:', profileImageUrl);
+                } catch (uploadError: any) {
+                    console.error('❌ Avatar upload failed:', uploadError);
+                    setIsUploadingAvatar(false);
+
+                    // Ask user if they want to continue without avatar
+                    const shouldContinue = await new Promise<boolean>((resolve) => {
+                        Alert.alert(
+                            'Avatar Upload Failed',
+                            `Failed to upload avatar: ${uploadError.message}\n\nWould you like to continue without a profile picture?`,
+                            [
+                                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                                { text: 'Continue', onPress: () => resolve(true) },
+                            ]
+                        );
+                    });
+
+                    if (!shouldContinue) {
+                        return;
+                    }
+                }
+
+                setIsUploadingAvatar(false);
+            }
+
             // Dispatch signup thunk
             const result = await dispatch(signupThunk({
                 name: formData.name.trim(),
@@ -170,6 +253,7 @@ export default function Signup() {
                 phone: formData.phone.replace(/\D/g, ''),
                 password: formData.password,
                 role: 'customer', // Default role
+                profileImage: profileImageUrl, // Include avatar URL (null if not uploaded)
             }) as any);
 
             // Check if signup was successful
@@ -192,405 +276,655 @@ export default function Signup() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                bounces={false}
+        <>
+            <StatusBar barStyle="light-content" backgroundColor="#cb202d" />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={0}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.title}>Create Account</Text>
-                    <Text style={styles.subtitle}>
-                        Join us and start ordering delicious pizzas!
-                    </Text>
-                </View>
-
-                {/* Offline Banner */}
-                {!isConnected && (
-                    <View style={styles.offlineBanner}>
-                        <Ionicons name="cloud-offline" size={16} color="#FFFFFF" />
-                        <Text style={styles.offlineText}>
-                            You're offline. Connect to internet to sign up.
-                        </Text>
-                    </View>
-                )}
-
-                {/* Global Error */}
-                {error && (
-                    <View style={styles.errorBanner}>
-                        <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                        <Text style={styles.errorBannerText}>{error}</Text>
-                    </View>
-                )}
-
-                {/* Form */}
-                <View style={styles.form}>
-                    {/* Name Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Full Name</Text>
-                        <View style={[
-                            styles.inputContainer,
-                            validationErrors.name && styles.inputError
-                        ]}>
-                            <Ionicons name="person-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter your full name"
-                                placeholderTextColor="#94A3B8"
-                                value={formData.name}
-                                onChangeText={(value) => handleInputChange('name', value)}
-                                editable={!isLoading}
-                                autoCapitalize="words"
-                            />
-                        </View>
-                        {validationErrors.name && (
-                            <Text style={styles.errorText}>{validationErrors.name}</Text>
-                        )}
-                    </View>
-
-                    {/* Email Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email Address</Text>
-                        <View style={[
-                            styles.inputContainer,
-                            validationErrors.email && styles.inputError
-                        ]}>
-                            <Ionicons name="mail-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter your email"
-                                placeholderTextColor="#94A3B8"
-                                value={formData.email}
-                                onChangeText={(value) => handleInputChange('email', value)}
-                                editable={!isLoading}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                        </View>
-                        {validationErrors.email && (
-                            <Text style={styles.errorText}>{validationErrors.email}</Text>
-                        )}
-                    </View>
-
-                    {/* Phone Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Phone Number</Text>
-                        <View style={[
-                            styles.inputContainer,
-                            validationErrors.phone && styles.inputError
-                        ]}>
-                            <Ionicons name="call-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter 10-digit phone number"
-                                placeholderTextColor="#94A3B8"
-                                value={formData.phone}
-                                onChangeText={(value) => handleInputChange('phone', value)}
-                                editable={!isLoading}
-                                keyboardType="phone-pad"
-                                maxLength={10}
-                            />
-                        </View>
-                        {validationErrors.phone && (
-                            <Text style={styles.errorText}>{validationErrors.phone}</Text>
-                        )}
-                    </View>
-
-                    {/* Password Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <View style={[
-                            styles.inputContainer,
-                            validationErrors.password && styles.inputError
-                        ]}>
-                            <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Min 6 chars, uppercase, lowercase, number"
-                                placeholderTextColor="#94A3B8"
-                                value={formData.password}
-                                onChangeText={(value) => handleInputChange('password', value)}
-                                editable={!isLoading}
-                                secureTextEntry={!showPassword}
-                                autoCapitalize="none"
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowPassword(!showPassword)}
-                                style={styles.eyeIcon}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                                    size={20}
-                                    color="#94A3B8"
-                                />
-                            </TouchableOpacity>
-                        </View>
-                        {validationErrors.password && (
-                            <Text style={styles.errorText}>{validationErrors.password}</Text>
-                        )}
-                        {!validationErrors.password && (
-                            <Text style={styles.helperText}>
-                                Example: Naitik@123 or Password1
-                            </Text>
-                        )}
-                    </View>
-
-                    {/* Confirm Password Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password</Text>
-                        <View style={[
-                            styles.inputContainer,
-                            validationErrors.confirmPassword && styles.inputError
-                        ]}>
-                            <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Re-enter your password"
-                                placeholderTextColor="#94A3B8"
-                                value={formData.confirmPassword}
-                                onChangeText={(value) => handleInputChange('confirmPassword', value)}
-                                editable={!isLoading}
-                                secureTextEntry={!showConfirmPassword}
-                                autoCapitalize="none"
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                style={styles.eyeIcon}
-                            >
-                                <Ionicons
-                                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                                    size={20}
-                                    color="#94A3B8"
-                                />
-                            </TouchableOpacity>
-                        </View>
-                        {validationErrors.confirmPassword && (
-                            <Text style={styles.errorText}>{validationErrors.confirmPassword}</Text>
-                        )}
-                    </View>
-
-                    {/* Signup Button */}
-                    <TouchableOpacity
-                        style={[
-                            styles.signupButton,
-                            (isLoading || !isConnected) && styles.signupButtonDisabled
-                        ]}
-                        onPress={handleSignup}
-                        disabled={isLoading || !isConnected}
+                <ScrollView
+                    style={styles.container}
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    keyboardDismissMode="on-drag"
+                    nestedScrollEnabled={true}
+                    bounces={false}
+                >
+                    {/* Modern Header with Gradient */}
+                    <LinearGradient
+                        colors={['#cb202d', '#e63946', '#cb202d']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.headerGradient}
                     >
-                        {isLoading ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.signupButtonText}>Create Account</Text>
+                        <View style={styles.headerDecoration}>
+                            <View style={styles.circle1} />
+                            <View style={styles.circle2} />
+                            <View style={styles.circle3} />
+                        </View>
+
+                        <View style={styles.header}>
+                            <View style={styles.logoContainer}>
+                                <Text style={styles.logo}>🍕</Text>
+                            </View>
+                            <Text style={styles.title}>Join Friends Pizza</Text>
+                            <Text style={styles.subtitle}>Create your account to start ordering</Text>
+                        </View>
+                    </LinearGradient>
+
+                    {/* Form Card */}
+                    <View style={styles.formCard}>
+                        {/* Offline Banner */}
+                        {!isConnected && (
+                            <View style={styles.offlineBanner}>
+                                <MaterialIcons name="cloud-off" size={16} color="#FFFFFF" />
+                                <Text style={styles.offlineText}>
+                                    You're offline. Connect to internet to sign up.
+                                </Text>
+                            </View>
                         )}
-                    </TouchableOpacity>
 
-                    {/* Login Link */}
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>Already have an account? </Text>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('Login')}
-                            disabled={isLoading}
-                        >
-                            <Text style={styles.loginLink}>Login</Text>
-                        </TouchableOpacity>
-                    </View>
+                        {/* Global Error */}
+                        {error && (
+                            <View style={styles.errorBanner}>
+                                <MaterialIcons name="error-outline" size={16} color="#e63946" />
+                                <Text style={styles.errorBannerText}>{error}</Text>
+                            </View>
+                        )}
 
-                    {/* Delivery Partner Link */}
-                    <View style={styles.deliveryLinkContainer}>
-                        <View style={styles.divider} />
-                        <TouchableOpacity
-                            style={styles.deliveryButton}
-                            onPress={() => navigation.navigate('DeliverySignup')}
-                            disabled={isLoading}
-                        >
-                            <Ionicons name="bicycle" size={20} color="#4CAF50" />
-                            <Text style={styles.deliveryButtonText}>
-                                Want to become a delivery partner? Register here
-                            </Text>
-                            <Ionicons name="arrow-forward" size={18} color="#4CAF50" />
-                        </TouchableOpacity>
+                        {/* Form */}
+                        <View style={styles.form}>
+                            {/* Avatar Section (Optional) */}
+                            <View style={styles.avatarSection}>
+                                <Text style={styles.avatarLabel}>Profile Picture (Optional)</Text>
+                                <View style={styles.avatarContainer}>
+                                    <Avatar
+                                        name={formData.name || 'User'}
+                                        imageUrl={avatarImage}
+                                        size={100}
+                                    />
+                                    <View style={styles.avatarActions}>
+                                        <TouchableOpacity
+                                            style={styles.avatarButton}
+                                            onPress={handleAvatarPick}
+                                            disabled={isLoading || isUploadingAvatar}
+                                        >
+                                            <MaterialIcons name="add-a-photo" size={20} color="#cb202d" />
+                                            <Text style={styles.avatarButtonText}>
+                                                {avatarImage ? 'Change' : 'Add Photo'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {avatarImage && (
+                                            <TouchableOpacity
+                                                style={[styles.avatarButton, styles.removeButton]}
+                                                onPress={handleRemoveAvatar}
+                                                disabled={isLoading || isUploadingAvatar}
+                                            >
+                                                <MaterialIcons name="delete" size={20} color="#e63946" />
+                                                <Text style={[styles.avatarButtonText, { color: '#e63946' }]}>
+                                                    Remove
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </View>
+                                <Text style={styles.avatarHint}>
+                                    {avatarImage
+                                        ? 'Your profile picture will be uploaded when you create your account'
+                                        : 'If you don\'t add a photo, we\'ll use your initials'}
+                                </Text>
+                            </View>
+
+                            {/* Name Input */}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.label}>Full Name</Text>
+                                <View style={[
+                                    styles.inputContainer,
+                                    validationErrors.name && styles.inputContainerError
+                                ]}>
+                                    <MaterialIcons name="person" size={20} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter your full name"
+                                        placeholderTextColor="#999"
+                                        value={formData.name}
+                                        onChangeText={(value) => handleInputChange('name', value)}
+                                        editable={!isLoading}
+                                        autoCapitalize="words"
+                                    />
+                                </View>
+                                {validationErrors.name && (
+                                    <Text style={styles.errorText}>
+                                        <MaterialIcons name="error-outline" size={12} /> {validationErrors.name}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {/* Email Input */}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.label}>Email Address</Text>
+                                <View style={[
+                                    styles.inputContainer,
+                                    validationErrors.email && styles.inputContainerError
+                                ]}>
+                                    <MaterialIcons name="email" size={20} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter your email"
+                                        placeholderTextColor="#999"
+                                        value={formData.email}
+                                        onChangeText={(value) => handleInputChange('email', value)}
+                                        editable={!isLoading}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                                {validationErrors.email && (
+                                    <Text style={styles.errorText}>
+                                        <MaterialIcons name="error-outline" size={12} /> {validationErrors.email}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {/* Phone Input */}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.label}>Phone Number</Text>
+                                <View style={[
+                                    styles.inputContainer,
+                                    validationErrors.phone && styles.inputContainerError
+                                ]}>
+                                    <MaterialIcons name="phone" size={20} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter 10-digit phone number"
+                                        placeholderTextColor="#999"
+                                        value={formData.phone}
+                                        onChangeText={(value) => handleInputChange('phone', value)}
+                                        editable={!isLoading}
+                                        keyboardType="phone-pad"
+                                        maxLength={10}
+                                    />
+                                </View>
+                                {validationErrors.phone && (
+                                    <Text style={styles.errorText}>
+                                        <MaterialIcons name="error-outline" size={12} /> {validationErrors.phone}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {/* Password Input */}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.label}>Password</Text>
+                                <View style={[
+                                    styles.inputContainer,
+                                    validationErrors.password && styles.inputContainerError
+                                ]}>
+                                    <MaterialIcons name="lock" size={20} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { flex: 1 }]}
+                                        placeholder="Min 6 chars (uppercase, lowercase, number)"
+                                        placeholderTextColor="#999"
+                                        value={formData.password}
+                                        onChangeText={(value) => handleInputChange('password', value)}
+                                        editable={!isLoading}
+                                        secureTextEntry={!showPassword}
+                                        autoCapitalize="none"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setShowPassword(!showPassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        <MaterialIcons
+                                            name={showPassword ? 'visibility' : 'visibility-off'}
+                                            size={20}
+                                            color="#999"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                                {validationErrors.password && (
+                                    <Text style={styles.errorText}>
+                                        <MaterialIcons name="error-outline" size={12} /> {validationErrors.password}
+                                    </Text>
+                                )}
+                                {!validationErrors.password && formData.password && (
+                                    <Text style={styles.helperText}>
+                                        Example: Naitik@123 or Password1
+                                    </Text>
+                                )}
+                            </View>
+
+                            {/* Confirm Password Input */}
+                            <View style={styles.inputWrapper}>
+                                <Text style={styles.label}>Confirm Password</Text>
+                                <View style={[
+                                    styles.inputContainer,
+                                    validationErrors.confirmPassword && styles.inputContainerError
+                                ]}>
+                                    <MaterialIcons name="lock" size={20} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { flex: 1 }]}
+                                        placeholder="Re-enter your password"
+                                        placeholderTextColor="#999"
+                                        value={formData.confirmPassword}
+                                        onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                                        editable={!isLoading}
+                                        secureTextEntry={!showConfirmPassword}
+                                        autoCapitalize="none"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        <MaterialIcons
+                                            name={showConfirmPassword ? 'visibility' : 'visibility-off'}
+                                            size={20}
+                                            color="#999"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                                {validationErrors.confirmPassword && (
+                                    <Text style={styles.errorText}>
+                                        <MaterialIcons name="error-outline" size={12} /> {validationErrors.confirmPassword}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {/* Signup Button */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.signupButton,
+                                    ((isLoading || isUploadingAvatar) || !isConnected) && styles.signupButtonDisabled
+                                ]}
+                                onPress={handleSignup}
+                                disabled={(isLoading || isUploadingAvatar) || !isConnected}
+                            >
+                                <LinearGradient
+                                    colors={((isLoading || isUploadingAvatar) || !isConnected) ? ['#BDBDBD', '#BDBDBD'] : ['#cb202d', '#e63946']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.signupButtonGradient}
+                                >
+                                    {(isLoading || isUploadingAvatar) ? (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <ActivityIndicator color="#fff" />
+                                            <Text style={styles.signupButtonText}>
+                                                {isUploadingAvatar ? 'Uploading Photo...' : 'Creating Account...'}
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.signupButtonText}>Create Account</Text>
+                                            <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            {/* Login Link */}
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>Already have an account? </Text>
+                                <TouchableOpacity
+                                    onPress={() => navigation.navigate('Login')}
+                                    disabled={isLoading}
+                                >
+                                    <Text style={styles.loginLink}>Sign In</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Delivery Partner Link */}
+                            <View style={styles.deliveryLinkContainer}>
+                                <TouchableOpacity
+                                    style={styles.deliveryButton}
+                                    onPress={() => navigation.navigate('DeliverySignup')}
+                                    disabled={isLoading}
+                                >
+                                    <MaterialIcons name="delivery-dining" size={24} color="#0C7C59" />
+                                    <View style={styles.deliveryButtonContent}>
+                                        <Text style={styles.deliveryButtonTitle}>Become a Delivery Partner</Text>
+                                        <Text style={styles.deliveryButtonSubtitle}>Register as delivery agent</Text>
+                                    </View>
+                                    <MaterialIcons name="chevron-right" size={20} color="#999" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#fff',
     },
     scrollContent: {
         flexGrow: 1,
-        padding: 24,
+    },
+
+    // Header Styles
+    headerGradient: {
         paddingTop: 60,
-        paddingBottom: 40, // Extra padding to prevent keyboard overlap
+        paddingBottom: 50,
+        paddingHorizontal: 20,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    headerDecoration: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    circle1: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        top: -80,
+        right: -50,
+    },
+    circle2: {
+        position: 'absolute',
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        bottom: -40,
+        left: -30,
+    },
+    circle3: {
+        position: 'absolute',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        top: 80,
+        left: 40,
     },
     header: {
-        marginBottom: 32,
+        alignItems: 'center',
+        zIndex: 1,
+    },
+    logoContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    logo: {
+        fontSize: 50,
     },
     title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#1E293B',
-        marginBottom: 8,
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        marginBottom: 6,
+        letterSpacing: 0.5,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#64748B',
-        lineHeight: 24,
+        fontSize: 14,
+        color: '#FFFFFF',
+        opacity: 0.95,
+        fontWeight: '400',
     },
+
+    // Form Card Styles
+    formCard: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        marginTop: -24,
+        paddingTop: 28,
+        paddingHorizontal: 24,
+        paddingBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+
+    // Banner Styles
     offlineBanner: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F59E0B',
         padding: 12,
-        borderRadius: 8,
+        borderRadius: 10,
         marginBottom: 16,
     },
     offlineText: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 13,
         marginLeft: 8,
         flex: 1,
+        fontWeight: '500',
     },
     errorBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEE2E2',
-        padding: 12,
-        borderRadius: 8,
+        backgroundColor: '#ffe5e5',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 10,
         marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: '#e63946',
     },
     errorBannerText: {
-        color: '#DC2626',
-        fontSize: 14,
+        color: '#e63946',
+        fontSize: 13,
         marginLeft: 8,
         flex: 1,
+        fontWeight: '500',
     },
+
+    // Form Styles
     form: {
         flex: 1,
     },
-    inputGroup: {
-        marginBottom: 20,
+
+    // Avatar Section Styles
+    avatarSection: {
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingVertical: 16,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 16,
+    },
+    avatarLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2d2d2d',
+        marginBottom: 16,
+    },
+    avatarContainer: {
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    avatarActions: {
+        flexDirection: 'row',
+        marginTop: 12,
+        gap: 12,
+    },
+    avatarButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: '#cb202d',
+        gap: 6,
+    },
+    removeButton: {
+        borderColor: '#e63946',
+    },
+    avatarButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#cb202d',
+    },
+    avatarHint: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+        fontStyle: 'italic',
+        paddingHorizontal: 20,
+    },
+
+    inputWrapper: {
+        marginBottom: 18,
     },
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#334155',
+        color: '#2d2d2d',
         marginBottom: 8,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderWidth: 1.5,
+        borderColor: '#e0e0e0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
+        paddingVertical: 4,
+        backgroundColor: '#fafafa',
     },
-    inputError: {
-        borderColor: '#DC2626',
-        backgroundColor: '#FEF2F2',
+    inputContainerFocused: {
+        borderColor: '#cb202d',
+        backgroundColor: '#fff',
+        shadowColor: '#cb202d',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    inputContainerError: {
+        borderColor: '#e63946',
+        backgroundColor: '#fff5f5',
     },
     inputIcon: {
         marginRight: 12,
     },
     input: {
         flex: 1,
-        height: 52,
-        fontSize: 16,
-        color: '#1E293B',
+        fontSize: 15,
+        color: '#2d2d2d',
+        paddingVertical: 14,
     },
     eyeIcon: {
-        padding: 8,
+        padding: 4,
+        marginLeft: 8,
     },
     errorText: {
-        color: '#DC2626',
+        color: '#e63946',
         fontSize: 12,
         marginTop: 6,
         marginLeft: 4,
+        fontWeight: '500',
     },
     helperText: {
-        color: '#64748B',
-        fontSize: 12,
-        marginTop: 6,
+        color: '#666',
+        fontSize: 11,
+        marginTop: 4,
         marginLeft: 4,
+        fontStyle: 'italic',
     },
+
+    // Button Styles
     signupButton: {
-        backgroundColor: '#FF6347',
         borderRadius: 12,
-        height: 52,
-        justifyContent: 'center',
-        alignItems: 'center',
+        overflow: 'hidden',
         marginTop: 8,
-        shadowColor: '#FF6347',
+        shadowColor: '#cb202d',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowRadius: 12,
+        elevation: 6,
     },
     signupButtonDisabled: {
-        backgroundColor: '#94A3B8',
         shadowOpacity: 0,
         elevation: 0,
     },
+    signupButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        gap: 8,
+    },
     signupButtonText: {
         color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
+
+    // Footer Styles
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 24,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
     },
     footerText: {
         fontSize: 14,
-        color: '#64748B',
+        color: '#666',
     },
     loginLink: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#FF6347',
+        color: '#cb202d',
+        fontWeight: '700',
     },
+
+    // Delivery Link Styles
     deliveryLinkContainer: {
-        marginTop: 32,
-        alignItems: 'center',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#E2E8F0',
-        width: '100%',
-        marginBottom: 24,
+        marginTop: 24,
     },
     deliveryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        backgroundColor: '#F0FDF4',
+        padding: 16,
         borderRadius: 12,
         borderWidth: 1.5,
-        borderColor: '#4CAF50',
-        gap: 8,
+        borderColor: '#c8e6c9',
+        backgroundColor: '#f1f8f4',
     },
-    deliveryButtonText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#4CAF50',
+    deliveryButtonContent: {
         flex: 1,
-        textAlign: 'center',
+        marginLeft: 12,
+    },
+    deliveryButtonTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0C7C59',
+        marginBottom: 2,
+    },
+    deliveryButtonSubtitle: {
+        fontSize: 12,
+        color: '#0C7C59',
+        opacity: 0.8,
     },
 });

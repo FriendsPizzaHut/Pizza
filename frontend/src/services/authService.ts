@@ -31,6 +31,7 @@ export interface User {
     phone?: string;
     role: 'customer' | 'admin' | 'delivery';
     avatar?: string;
+    profileImage?: string | null; // Profile image URL from Cloudinary
     createdAt?: string;
 }
 
@@ -50,6 +51,7 @@ export interface SignupData {
     phone: string;
     password: string;
     role?: 'customer' | 'admin' | 'delivery';
+    profileImage?: string | null; // Optional profile image URL from Cloudinary
     // Delivery boy specific fields
     vehicleInfo?: {
         type: 'bike' | 'scooter' | 'bicycle' | 'car';

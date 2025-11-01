@@ -17,6 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomerStackParamList } from '../../../types/navigation';
 import { Typography, Colors, Spacing, BorderRadius, Shadows, createCardStyle } from '../../../constants/designSystem';
+import { CUSTOMER_CATEGORY_FILTERS } from '../../../constants/foodCategories';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -304,20 +305,20 @@ export default function MenuScreen() {
             {/* Categories */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
                 <View style={styles.categories}>
-                    {['All', 'Pizza', 'Sides', 'Beverages', 'Desserts'].map((category, index) => (
+                    {CUSTOMER_CATEGORY_FILTERS.map((category) => (
                         <TouchableOpacity
-                            key={index}
+                            key={category.id}
                             style={[
                                 styles.categoryChip,
-                                selectedCategory === category.toLowerCase() && styles.activeCategoryChip
+                                selectedCategory === category.id && styles.activeCategoryChip
                             ]}
-                            onPress={() => handleCategoryChange(category)}
+                            onPress={() => handleCategoryChange(category.label)}
                         >
                             <Text style={[
                                 styles.categoryText,
-                                selectedCategory === category.toLowerCase() && styles.activeCategoryText
+                                selectedCategory === category.id && styles.activeCategoryText
                             ]}>
-                                {category}
+                                {category.icon} {category.label}
                             </Text>
                         </TouchableOpacity>
                     ))}

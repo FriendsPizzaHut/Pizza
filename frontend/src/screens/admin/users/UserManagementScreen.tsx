@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -10,183 +10,130 @@ import {
     Modal,
     Alert,
     FlatList,
+    RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../../../redux/store';
+import {
+    setSearchQuery,
+    setFilterRole,
+    incrementPage,
+    UserListItem,
+} from '../../../../redux/slices/userManagementSlice';
+import {
+    fetchUsers,
+    fetchUserDetails,
+    deleteUserById,
+    refreshUsers,
+    loadMoreUsers,
+} from '../../../../redux/thunks/userManagementThunks';
 
-type User = {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    avatar: string;
-    joinedDate: string;
-    totalOrders: number;
-    totalSpent: number;
-    role: 'customer' | 'delivery boy' | 'admin';
-    address: string;
-    favoriteItems: string[];
-    orderHistory: {
-        id: string;
-        date: string;
-        items: number;
-        total: number;
-        status: string;
-    }[];
+// Debounce hook for search
+const useDebounce = (value: string, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
 };
 
 const UserManagementScreen = () => {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterRole, setFilterRole] = useState<'all' | 'customer' | 'delivery boy' | 'admin'>('all');
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const dispatch = useDispatch<AppDispatch>();
+
+    // Redux state
+    const {
+        users,
+        selectedUser,
+        isLoading,
+        isRefreshing,
+        isLoadingDetails,
+        error,
+        searchQuery,
+        filterRole,
+        pagination,
+        hasMore,
+    } = useSelector((state: RootState) => state.userManagement);
+
     const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+    const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
-    // Mock data - Replace with API call
-    const [users, setUsers] = useState<User[]>([
-        {
-            id: '1',
-            name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '+1 234-567-8900',
-            avatar: 'https://i.pravatar.cc/150?img=12',
-            joinedDate: '2024-01-15',
-            totalOrders: 45,
-            totalSpent: 1250.50,
-            role: 'customer',
-            address: '123 Main St, Apt 4B, New York, NY 10001',
-            favoriteItems: ['Margherita Pizza', 'Caesar Salad', 'Garlic Bread'],
-            orderHistory: [
-                { id: 'ORD001', date: '2024-03-20', items: 3, total: 45.99, status: 'Delivered' },
-                { id: 'ORD002', date: '2024-03-15', items: 2, total: 32.50, status: 'Delivered' },
-                { id: 'ORD003', date: '2024-03-10', items: 4, total: 67.25, status: 'Delivered' },
-            ],
-        },
-        {
-            id: '2',
-            name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            phone: '+1 234-567-8901',
-            avatar: 'https://i.pravatar.cc/150?img=23',
-            joinedDate: '2024-02-10',
-            totalOrders: 28,
-            totalSpent: 825.75,
-            role: 'customer',
-            address: '456 Oak Ave, Suite 12, Brooklyn, NY 11201',
-            favoriteItems: ['Pepperoni Pizza', 'Wings'],
-            orderHistory: [
-                { id: 'ORD004', date: '2024-03-19', items: 2, total: 38.50, status: 'Delivered' },
-                { id: 'ORD005', date: '2024-03-12', items: 3, total: 52.00, status: 'Delivered' },
-            ],
-        },
-        {
-            id: '3',
-            name: 'Mike Johnson',
-            email: 'mike.j@example.com',
-            phone: '+1 234-567-8902',
-            avatar: 'https://i.pravatar.cc/150?img=33',
-            joinedDate: '2023-11-20',
-            totalOrders: 156,
-            totalSpent: 0,
-            role: 'delivery boy',
-            address: '789 Pine Rd, Queens, NY 11354',
-            favoriteItems: [],
-            orderHistory: [],
-        },
-        {
-            id: '4',
-            name: 'Sarah Williams',
-            email: 'sarah.w@example.com',
-            phone: '+1 234-567-8903',
-            avatar: 'https://i.pravatar.cc/150?img=47',
-            joinedDate: '2024-03-01',
-            totalOrders: 8,
-            totalSpent: 215.50,
-            role: 'customer',
-            address: '321 Elm St, Manhattan, NY 10011',
-            favoriteItems: ['Veggie Supreme', 'Mushroom Pizza'],
-            orderHistory: [
-                { id: 'ORD007', date: '2024-03-21', items: 3, total: 55.50, status: 'Delivered' },
-            ],
-        },
-        {
-            id: '5',
-            name: 'Robert Brown',
-            email: 'rob.brown@example.com',
-            phone: '+1 234-567-8904',
-            avatar: 'https://i.pravatar.cc/150?img=60',
-            joinedDate: '2024-01-05',
-            totalOrders: 0,
-            totalSpent: 0,
-            role: 'admin',
-            address: '555 Broadway, Staten Island, NY 10301',
-            favoriteItems: [],
-            orderHistory: [],
-        },
-        {
-            id: '6',
-            name: 'Alex Turner',
-            email: 'alex.turner@example.com',
-            phone: '+1 234-567-8905',
-            avatar: 'https://i.pravatar.cc/150?img=68',
-            joinedDate: '2023-12-10',
-            totalOrders: 234,
-            totalSpent: 0,
-            role: 'delivery boy',
-            address: '890 Broadway, Manhattan, NY 10012',
-            favoriteItems: [],
-            orderHistory: [],
-        },
-        {
-            id: '7',
-            name: 'Emily Davis',
-            email: 'emily.d@example.com',
-            phone: '+1 234-567-8906',
-            avatar: 'https://i.pravatar.cc/150?img=45',
-            joinedDate: '2024-02-20',
-            totalOrders: 0,
-            totalSpent: 0,
-            role: 'admin',
-            address: '123 Admin Tower, NY 10001',
-            favoriteItems: [],
-            orderHistory: [],
-        },
-    ]);
+    // Debounced search query
+    const debouncedSearchQuery = useDebounce(localSearchQuery, 500);
 
-    const filteredUsers = users.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.phone.includes(searchQuery);
-        const matchesFilter = filterRole === 'all' || user.role === filterRole;
-        return matchesSearch && matchesFilter;
-    });
+    // Fetch users on mount
+    useEffect(() => {
+        dispatch(fetchUsers({ refresh: true }));
+    }, []);
+
+    // Fetch users when debounced search or filter changes
+    useEffect(() => {
+        if (debouncedSearchQuery !== searchQuery) {
+            dispatch(setSearchQuery(debouncedSearchQuery));
+            dispatch(fetchUsers({ refresh: true }));
+        }
+    }, [debouncedSearchQuery]);
+
+    // Refetch when filter changes
+    useEffect(() => {
+        dispatch(fetchUsers({ refresh: true }));
+    }, [filterRole]);
+
+    // Get role counts
+    const roleCounts = useMemo(() => {
+        return {
+            all: pagination.total,
+            customer: users.filter((u) => u.role === 'customer').length,
+            delivery: users.filter((u) => u.role === 'delivery').length,
+            admin: users.filter((u) => u.role === 'admin').length,
+        };
+    }, [users, pagination.total]);
 
     const getRoleColor = (role: string) => {
         switch (role) {
-            case 'customer': return '#2196F3';
-            case 'delivery boy': return '#FF9800';
-            case 'admin': return '#9C27B0';
-            default: return '#999';
+            case 'customer':
+                return '#2196F3';
+            case 'delivery':
+                return '#FF9800';
+            case 'admin':
+                return '#9C27B0';
+            default:
+                return '#999';
         }
     };
 
     const getRoleIcon = (role: string) => {
         switch (role) {
-            case 'customer': return 'person';
-            case 'delivery boy': return 'delivery-dining';
-            case 'admin': return 'admin-panel-settings';
-            default: return 'person';
+            case 'customer':
+                return 'person';
+            case 'delivery':
+                return 'delivery-dining';
+            case 'admin':
+                return 'admin-panel-settings';
+            default:
+                return 'person';
         }
     };
 
-    const handleViewDetails = (user: User) => {
-        setSelectedUser(user);
+    const handleViewDetails = useCallback((user: UserListItem) => {
+        dispatch(fetchUserDetails(user._id));
         setDetailsModalVisible(true);
-    };
+    }, [dispatch]);
 
-    const handleDeleteUser = (userId: string) => {
+    const handleDeleteUser = useCallback((userId: string) => {
         Alert.alert(
             'Delete User',
             'Are you sure you want to delete this user? This action cannot be undone.',
@@ -195,17 +142,51 @@ const UserManagementScreen = () => {
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {
-                        setUsers(users.filter(user => user.id !== userId));
-                        setDetailsModalVisible(false);
-                        Alert.alert('Success', 'User has been deleted');
-                    }
-                }
+                    onPress: async () => {
+                        try {
+                            await dispatch(deleteUserById(userId)).unwrap();
+                            setDetailsModalVisible(false);
+                            Alert.alert('Success', 'User has been deleted');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to delete user');
+                        }
+                    },
+                },
             ]
         );
-    };
+    }, [dispatch]);
 
-    const renderUserCard = ({ item }: { item: User }) => (
+    const handleRefresh = useCallback(() => {
+        dispatch(refreshUsers());
+    }, [dispatch]);
+
+    const handleLoadMore = useCallback(() => {
+        if (hasMore && !isLoading) {
+            dispatch(incrementPage());
+            dispatch(loadMoreUsers());
+        }
+    }, [hasMore, isLoading, dispatch]);
+
+    const handleFilterChange = useCallback((role: 'all' | 'customer' | 'delivery' | 'admin') => {
+        dispatch(setFilterRole(role));
+    }, [dispatch]);
+
+    // Skeleton loader for user cards
+    const SkeletonUserCard = () => (
+        <View style={styles.userCard}>
+            <View style={styles.userCardTop}>
+                <View style={styles.userCardHeader}>
+                    <View style={[styles.avatar, { backgroundColor: '#E0E0E0' }]} />
+                    <View style={styles.userHeaderInfo}>
+                        <View style={{ width: 150, height: 18, backgroundColor: '#E0E0E0', borderRadius: 4, marginBottom: 8 }} />
+                        <View style={{ width: 100, height: 12, backgroundColor: '#E0E0E0', borderRadius: 4 }} />
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+
+    const renderUserCard = ({ item }: { item: UserListItem }) => (
         <TouchableOpacity
             style={styles.userCard}
             onPress={() => handleViewDetails(item)}
@@ -215,21 +196,33 @@ const UserManagementScreen = () => {
             <View style={styles.userCardTop}>
                 <View style={styles.userCardHeader}>
                     <View style={styles.avatarContainer}>
-                        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                        <Image source={{ uri: item.profileImage }} style={styles.avatar} />
                     </View>
 
                     <View style={styles.userHeaderInfo}>
                         <View style={styles.nameRow}>
-                            <Text style={styles.userName}>{item.name}</Text>
-                            <View style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) + '20' }]}>
-                                <MaterialIcons name={getRoleIcon(item.role)} size={12} color={getRoleColor(item.role)} />
+                            <Text style={styles.userName} numberOfLines={1}>
+                                {item.name}
+                            </Text>
+                            <View
+                                style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) + '20' }]}
+                            >
+                                <MaterialIcons
+                                    name={getRoleIcon(item.role)}
+                                    size={12}
+                                    color={getRoleColor(item.role)}
+                                />
                                 <Text style={[styles.roleBadgeText, { color: getRoleColor(item.role) }]}>
                                     {item.role}
                                 </Text>
                             </View>
                         </View>
                         <Text style={styles.userJoinedDate}>
-                            Member since {new Date(item.joinedDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                            Member since{' '}
+                            {new Date(item.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                year: 'numeric',
+                            })}
                         </Text>
                     </View>
                 </View>
@@ -240,7 +233,9 @@ const UserManagementScreen = () => {
                 <View style={styles.contactRow}>
                     <View style={styles.contactItem}>
                         <MaterialIcons name="email" size={14} color="#666" />
-                        <Text style={styles.contactText} numberOfLines={1}>{item.email}</Text>
+                        <Text style={styles.contactText} numberOfLines={1}>
+                            {item.email}
+                        </Text>
                     </View>
                     <View style={styles.contactItem}>
                         <MaterialIcons name="phone" size={14} color="#666" />
@@ -249,30 +244,53 @@ const UserManagementScreen = () => {
                 </View>
             </View>
 
-            {/* Bottom Section: Stats */}
-            <View style={styles.userCardBottom}>
-                <View style={styles.statCardSmall}>
-                    <View style={[styles.statIconBox, { backgroundColor: '#E3F2FD' }]}>
-                        <MaterialIcons name="shopping-cart" size={16} color="#2196F3" />
-                    </View>
-                    <View style={styles.statInfo}>
-                        <Text style={styles.statValue}>{item.totalOrders}</Text>
-                        <Text style={styles.statLabel}>{item.role === 'delivery boy' ? 'Deliveries' : 'Total Orders'}</Text>
-                    </View>
-                </View>
+            {/* Bottom Section: Stats - Only show if available */}
+            {(item.totalOrders !== undefined || item.totalDeliveries !== undefined) && (
+                <View style={styles.userCardBottom}>
+                    {item.role === 'customer' && item.totalOrders !== undefined && (
+                        <>
+                            <View style={styles.statCardSmall}>
+                                <View style={[styles.statIconBox, { backgroundColor: '#E3F2FD' }]}>
+                                    <MaterialIcons name="shopping-cart" size={16} color="#2196F3" />
+                                </View>
+                                <View style={styles.statInfo}>
+                                    <Text style={styles.statValue}>{item.totalOrders}</Text>
+                                    <Text style={styles.statLabel}>Total Orders</Text>
+                                </View>
+                            </View>
 
-                <View style={styles.statDivider} />
+                            {item.totalSpent !== undefined && (
+                                <>
+                                    <View style={styles.statDivider} />
+                                    <View style={styles.statCardSmall}>
+                                        <View style={[styles.statIconBox, { backgroundColor: '#E8F5E9' }]}>
+                                            <MaterialIcons name="attach-money" size={16} color="#4CAF50" />
+                                        </View>
+                                        <View style={styles.statInfo}>
+                                            <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+                                                ₹{item.totalSpent.toFixed(0)}
+                                            </Text>
+                                            <Text style={styles.statLabel}>Total Spent</Text>
+                                        </View>
+                                    </View>
+                                </>
+                            )}
+                        </>
+                    )}
 
-                <View style={styles.statCardSmall}>
-                    <View style={[styles.statIconBox, { backgroundColor: '#E8F5E9' }]}>
-                        <MaterialIcons name="attach-money" size={16} color="#4CAF50" />
-                    </View>
-                    <View style={styles.statInfo}>
-                        <Text style={[styles.statValue, { color: '#4CAF50' }]}>₹{item.totalSpent.toFixed(0)}</Text>
-                        <Text style={styles.statLabel}>Total Spent</Text>
-                    </View>
+                    {item.role === 'delivery' && item.totalDeliveries !== undefined && (
+                        <View style={styles.statCardSmall}>
+                            <View style={[styles.statIconBox, { backgroundColor: '#FFF3E0' }]}>
+                                <MaterialIcons name="delivery-dining" size={16} color="#FF9800" />
+                            </View>
+                            <View style={styles.statInfo}>
+                                <Text style={styles.statValue}>{item.totalDeliveries}</Text>
+                                <Text style={styles.statLabel}>Deliveries</Text>
+                            </View>
+                        </View>
+                    )}
                 </View>
-            </View>
+            )}
         </TouchableOpacity>
     );
 
@@ -302,152 +320,217 @@ const UserManagementScreen = () => {
                         <View style={styles.modalHeaderRight} />
                     </View>
 
-                    <ScrollView style={styles.modalContent}>
-                        {/* User Profile Section */}
-                        <View style={styles.profileSection}>
-                            <View style={styles.profileAvatar}>
-                                <Image source={{ uri: selectedUser.avatar }} style={styles.profileAvatarImage} />
-                            </View>
-                            <Text style={styles.profileName}>{selectedUser.name}</Text>
-                            <View style={[styles.profileRoleBadge, { backgroundColor: getRoleColor(selectedUser.role) + '20' }]}>
-                                <MaterialIcons name={getRoleIcon(selectedUser.role)} size={16} color={getRoleColor(selectedUser.role)} />
-                                <Text style={[styles.profileRoleText, { color: getRoleColor(selectedUser.role) }]}>
-                                    {selectedUser.role.toUpperCase()}
-                                </Text>
-                            </View>
+                    {isLoadingDetails ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#cb202d" />
+                            <Text style={styles.loadingText}>Loading details...</Text>
                         </View>
-
-                        {/* Statistics Cards */}
-                        <View style={styles.statsGrid}>
-                            <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
-                                <MaterialIcons name="shopping-cart" size={24} color="#2196F3" />
-                                <Text style={styles.statCardValue}>{selectedUser.totalOrders}</Text>
-                                <Text style={styles.statCardLabel}>{selectedUser.role === 'delivery boy' ? 'Deliveries' : 'Total Orders'}</Text>
-                            </View>
-                            <View style={[styles.statCard, { backgroundColor: '#E8F5E9' }]}>
-                                <MaterialIcons name="attach-money" size={24} color="#4CAF50" />
-                                <Text style={styles.statCardValue}>₹{selectedUser.totalSpent.toFixed(0)}</Text>
-                                <Text style={styles.statCardLabel}>Total Spent</Text>
-                            </View>
-                        </View>
-
-                        {/* Contact Information */}
-                        <View style={styles.detailSection}>
-                            <View style={styles.detailSectionHeader}>
-                                <MaterialIcons name="contact-mail" size={20} color="#cb202d" />
-                                <Text style={styles.detailSectionTitle}>Contact Information</Text>
-                            </View>
-
-                            <View style={styles.detailRow}>
-                                <MaterialIcons name="email" size={18} color="#666" />
-                                <View style={styles.detailRowContent}>
-                                    <Text style={styles.detailLabel}>Email</Text>
-                                    <Text style={styles.detailValue}>{selectedUser.email}</Text>
+                    ) : (
+                        <ScrollView style={styles.modalContent}>
+                            {/* User Profile Section */}
+                            <View style={styles.profileSection}>
+                                <View style={styles.profileAvatar}>
+                                    <Image
+                                        source={{ uri: selectedUser.profileImage }}
+                                        style={styles.profileAvatarImage}
+                                    />
+                                </View>
+                                <Text style={styles.profileName}>{selectedUser.name}</Text>
+                                <View
+                                    style={[
+                                        styles.profileRoleBadge,
+                                        { backgroundColor: getRoleColor(selectedUser.role) + '20' },
+                                    ]}
+                                >
+                                    <MaterialIcons
+                                        name={getRoleIcon(selectedUser.role)}
+                                        size={16}
+                                        color={getRoleColor(selectedUser.role)}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.profileRoleText,
+                                            { color: getRoleColor(selectedUser.role) },
+                                        ]}
+                                    >
+                                        {selectedUser.role.toUpperCase()}
+                                    </Text>
                                 </View>
                             </View>
 
-                            <View style={styles.detailRow}>
-                                <MaterialIcons name="phone" size={18} color="#666" />
-                                <View style={styles.detailRowContent}>
-                                    <Text style={styles.detailLabel}>Phone</Text>
-                                    <Text style={styles.detailValue}>{selectedUser.phone}</Text>
-                                </View>
-                            </View>
+                            {/* Statistics Cards - Only show if data is available */}
+                            {(selectedUser.totalOrders !== undefined ||
+                                selectedUser.totalDeliveries !== undefined) && (
+                                    <View style={styles.statsGrid}>
+                                        {selectedUser.role === 'customer' && (
+                                            <>
+                                                {selectedUser.totalOrders !== undefined && (
+                                                    <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
+                                                        <MaterialIcons name="shopping-cart" size={24} color="#2196F3" />
+                                                        <Text style={styles.statCardValue}>
+                                                            {selectedUser.totalOrders}
+                                                        </Text>
+                                                        <Text style={styles.statCardLabel}>Total Orders</Text>
+                                                    </View>
+                                                )}
+                                                {selectedUser.totalSpent !== undefined && (
+                                                    <View style={[styles.statCard, { backgroundColor: '#E8F5E9' }]}>
+                                                        <MaterialIcons name="attach-money" size={24} color="#4CAF50" />
+                                                        <Text style={styles.statCardValue}>
+                                                            ₹{selectedUser.totalSpent.toFixed(0)}
+                                                        </Text>
+                                                        <Text style={styles.statCardLabel}>Total Spent</Text>
+                                                    </View>
+                                                )}
+                                            </>
+                                        )}
+                                        {selectedUser.role === 'delivery' && selectedUser.totalDeliveries !== undefined && (
+                                            <View style={[styles.statCard, { backgroundColor: '#FFF3E0' }]}>
+                                                <MaterialIcons name="delivery-dining" size={24} color="#FF9800" />
+                                                <Text style={styles.statCardValue}>{selectedUser.totalDeliveries}</Text>
+                                                <Text style={styles.statCardLabel}>Total Deliveries</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
 
-                            <View style={styles.detailRow}>
-                                <MaterialIcons name="location-on" size={18} color="#666" />
-                                <View style={styles.detailRowContent}>
-                                    <Text style={styles.detailLabel}>Address</Text>
-                                    <Text style={styles.detailValue}>{selectedUser.address}</Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Account Information */}
-                        <View style={styles.detailSection}>
-                            <View style={styles.detailSectionHeader}>
-                                <MaterialIcons name="person" size={20} color="#cb202d" />
-                                <Text style={styles.detailSectionTitle}>Account Information</Text>
-                            </View>
-
-                            <View style={styles.detailRow}>
-                                <MaterialIcons name="calendar-today" size={18} color="#666" />
-                                <View style={styles.detailRowContent}>
-                                    <Text style={styles.detailLabel}>Joined Date</Text>
-                                    <Text style={styles.detailValue}>{new Date(selectedUser.joinedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.detailRow}>
-                                <MaterialIcons name="badge" size={18} color="#666" />
-                                <View style={styles.detailRowContent}>
-                                    <Text style={styles.detailLabel}>User Role</Text>
-                                    <Text style={styles.detailValue}>{selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1)}</Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Favorite Items */}
-                        {selectedUser.favoriteItems.length > 0 && (
+                            {/* Contact Information */}
                             <View style={styles.detailSection}>
                                 <View style={styles.detailSectionHeader}>
-                                    <MaterialIcons name="favorite" size={20} color="#cb202d" />
-                                    <Text style={styles.detailSectionTitle}>Favorite Items</Text>
+                                    <MaterialIcons name="contact-mail" size={20} color="#cb202d" />
+                                    <Text style={styles.detailSectionTitle}>Contact Information</Text>
                                 </View>
-                                <View style={styles.favoritesContainer}>
-                                    {selectedUser.favoriteItems.map((item, index) => (
-                                        <View key={index} style={styles.favoriteChip}>
-                                            <MaterialIcons name="local-pizza" size={14} color="#cb202d" />
-                                            <Text style={styles.favoriteChipText}>{item}</Text>
+
+                                <View style={styles.detailRow}>
+                                    <MaterialIcons name="email" size={18} color="#666" />
+                                    <View style={styles.detailRowContent}>
+                                        <Text style={styles.detailLabel}>Email</Text>
+                                        <Text style={styles.detailValue}>{selectedUser.email}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.detailRow}>
+                                    <MaterialIcons name="phone" size={18} color="#666" />
+                                    <View style={styles.detailRowContent}>
+                                        <Text style={styles.detailLabel}>Phone</Text>
+                                        <Text style={styles.detailValue}>{selectedUser.phone}</Text>
+                                    </View>
+                                </View>
+
+                                {selectedUser.addresses && selectedUser.addresses.length > 0 && (
+                                    <View style={styles.detailRow}>
+                                        <MaterialIcons name="location-on" size={18} color="#666" />
+                                        <View style={styles.detailRowContent}>
+                                            <Text style={styles.detailLabel}>Address</Text>
+                                            <Text style={styles.detailValue}>
+                                                {selectedUser.addresses[0].street},{' '}
+                                                {selectedUser.addresses[0].city}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Account Information */}
+                            <View style={styles.detailSection}>
+                                <View style={styles.detailSectionHeader}>
+                                    <MaterialIcons name="person" size={20} color="#cb202d" />
+                                    <Text style={styles.detailSectionTitle}>Account Information</Text>
+                                </View>
+
+                                <View style={styles.detailRow}>
+                                    <MaterialIcons name="calendar-today" size={18} color="#666" />
+                                    <View style={styles.detailRowContent}>
+                                        <Text style={styles.detailLabel}>Joined Date</Text>
+                                        <Text style={styles.detailValue}>
+                                            {new Date(selectedUser.createdAt).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                            })}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.detailRow}>
+                                    <MaterialIcons name="badge" size={18} color="#666" />
+                                    <View style={styles.detailRowContent}>
+                                        <Text style={styles.detailLabel}>User Role</Text>
+                                        <Text style={styles.detailValue}>
+                                            {selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Favorite Items - Only show if available */}
+                            {selectedUser.favoriteItems && selectedUser.favoriteItems.length > 0 && (
+                                <View style={styles.detailSection}>
+                                    <View style={styles.detailSectionHeader}>
+                                        <MaterialIcons name="favorite" size={20} color="#cb202d" />
+                                        <Text style={styles.detailSectionTitle}>Favorite Items</Text>
+                                    </View>
+                                    <View style={styles.favoritesContainer}>
+                                        {selectedUser.favoriteItems.map((item, index) => (
+                                            <View key={index} style={styles.favoriteChip}>
+                                                <MaterialIcons name="local-pizza" size={14} color="#cb202d" />
+                                                <Text style={styles.favoriteChipText}>{item}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Order History - Only show if available */}
+                            {selectedUser.orderHistory && selectedUser.orderHistory.length > 0 && (
+                                <View style={styles.detailSection}>
+                                    <View style={styles.detailSectionHeader}>
+                                        <MaterialIcons name="history" size={20} color="#cb202d" />
+                                        <Text style={styles.detailSectionTitle}>Recent Orders</Text>
+                                    </View>
+                                    {selectedUser.orderHistory.map((order) => (
+                                        <View key={order.id} style={styles.orderHistoryCard}>
+                                            <View style={styles.orderHistoryHeader}>
+                                                <Text style={styles.orderHistoryId}>{order.id}</Text>
+                                                <Text style={[styles.orderHistoryStatus, { color: '#4CAF50' }]}>
+                                                    {order.status}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.orderHistoryDetails}>
+                                                <View style={styles.orderHistoryDetailItem}>
+                                                    <MaterialIcons name="calendar-today" size={12} color="#999" />
+                                                    <Text style={styles.orderHistoryDetailText}>
+                                                        {new Date(order.date).toLocaleDateString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.orderHistoryDetailItem}>
+                                                    <MaterialIcons name="shopping-bag" size={12} color="#999" />
+                                                    <Text style={styles.orderHistoryDetailText}>
+                                                        {order.items} items
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.orderHistoryDetailItem}>
+                                                    <MaterialIcons name="attach-money" size={12} color="#999" />
+                                                    <Text style={styles.orderHistoryDetailText}>
+                                                        ₹{order.total.toFixed(0)}
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
                                     ))}
                                 </View>
-                            </View>
-                        )}
+                            )}
 
-                        {/* Order History */}
-                        {selectedUser.orderHistory.length > 0 && (
-                            <View style={styles.detailSection}>
-                                <View style={styles.detailSectionHeader}>
-                                    <MaterialIcons name="history" size={20} color="#cb202d" />
-                                    <Text style={styles.detailSectionTitle}>Recent Orders</Text>
-                                </View>
-                                {selectedUser.orderHistory.map((order) => (
-                                    <View key={order.id} style={styles.orderHistoryCard}>
-                                        <View style={styles.orderHistoryHeader}>
-                                            <Text style={styles.orderHistoryId}>{order.id}</Text>
-                                            <Text style={[styles.orderHistoryStatus, { color: '#4CAF50' }]}>{order.status}</Text>
-                                        </View>
-                                        <View style={styles.orderHistoryDetails}>
-                                            <View style={styles.orderHistoryDetailItem}>
-                                                <MaterialIcons name="calendar-today" size={12} color="#999" />
-                                                <Text style={styles.orderHistoryDetailText}>
-                                                    {new Date(order.date).toLocaleDateString()}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.orderHistoryDetailItem}>
-                                                <MaterialIcons name="shopping-bag" size={12} color="#999" />
-                                                <Text style={styles.orderHistoryDetailText}>{order.items} items</Text>
-                                            </View>
-                                            <View style={styles.orderHistoryDetailItem}>
-                                                <MaterialIcons name="attach-money" size={12} color="#999" />
-                                                <Text style={styles.orderHistoryDetailText}>₹{order.total.toFixed(0)}</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-
-                        {/* Bottom spacing */}
-                        <View style={{ height: 100 }} />
-                    </ScrollView>
+                            {/* Bottom spacing */}
+                            <View style={{ height: 100 }} />
+                        </ScrollView>
+                    )}
 
                     {/* Action Buttons */}
                     <View style={styles.modalFooter}>
                         <TouchableOpacity
                             style={[styles.actionButton, { backgroundColor: '#F44336' }]}
-                            onPress={() => handleDeleteUser(selectedUser.id)}
+                            onPress={() => handleDeleteUser(selectedUser._id)}
                         >
                             <MaterialIcons name="delete" size={20} color="#fff" />
                             <Text style={styles.actionButtonText}>Delete User</Text>
@@ -462,15 +545,12 @@ const UserManagementScreen = () => {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <MaterialIcons name="arrow-back" size={24} color="#2d2d2d" />
                 </TouchableOpacity>
                 <View style={styles.headerCenter}>
                     <Text style={styles.headerTitle}>User Management</Text>
-                    <Text style={styles.headerSubtitle}>{filteredUsers.length} users</Text>
+                    <Text style={styles.headerSubtitle}>{pagination.total} users</Text>
                 </View>
                 <View style={styles.headerRight} />
             </View>
@@ -482,11 +562,11 @@ const UserManagementScreen = () => {
                     style={styles.searchInput}
                     placeholder="Search by name, email, or phone..."
                     placeholderTextColor="#999"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
+                    value={localSearchQuery}
+                    onChangeText={setLocalSearchQuery}
                 />
-                {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                {localSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setLocalSearchQuery('')}>
                         <MaterialIcons name="close" size={20} color="#999" />
                     </TouchableOpacity>
                 )}
@@ -497,57 +577,133 @@ const UserManagementScreen = () => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <TouchableOpacity
                         style={[styles.filterChip, filterRole === 'all' && styles.filterChipActive]}
-                        onPress={() => setFilterRole('all')}
+                        onPress={() => handleFilterChange('all')}
                     >
-                        <MaterialIcons name="people" size={16} color={filterRole === 'all' ? '#fff' : '#666'} />
-                        <Text style={[styles.filterChipText, filterRole === 'all' && styles.filterChipTextActive]}>
-                            All ({users.length})
+                        <MaterialIcons
+                            name="people"
+                            size={16}
+                            color={filterRole === 'all' ? '#fff' : '#666'}
+                        />
+                        <Text
+                            style={[
+                                styles.filterChipText,
+                                filterRole === 'all' && styles.filterChipTextActive,
+                            ]}
+                        >
+                            All ({pagination.total})
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.filterChip, filterRole === 'customer' && styles.filterChipActive]}
-                        onPress={() => setFilterRole('customer')}
+                        onPress={() => handleFilterChange('customer')}
                     >
-                        <MaterialIcons name="person" size={16} color={filterRole === 'customer' ? '#fff' : '#2196F3'} />
-                        <Text style={[styles.filterChipText, filterRole === 'customer' && styles.filterChipTextActive]}>
-                            Customers ({users.filter(u => u.role === 'customer').length})
+                        <MaterialIcons
+                            name="person"
+                            size={16}
+                            color={filterRole === 'customer' ? '#fff' : '#2196F3'}
+                        />
+                        <Text
+                            style={[
+                                styles.filterChipText,
+                                filterRole === 'customer' && styles.filterChipTextActive,
+                            ]}
+                        >
+                            Customers
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.filterChip, filterRole === 'delivery boy' && styles.filterChipActive]}
-                        onPress={() => setFilterRole('delivery boy')}
+                        style={[styles.filterChip, filterRole === 'delivery' && styles.filterChipActive]}
+                        onPress={() => handleFilterChange('delivery')}
                     >
-                        <MaterialIcons name="delivery-dining" size={16} color={filterRole === 'delivery boy' ? '#fff' : '#FF9800'} />
-                        <Text style={[styles.filterChipText, filterRole === 'delivery boy' && styles.filterChipTextActive]}>
-                            Delivery Boys ({users.filter(u => u.role === 'delivery boy').length})
+                        <MaterialIcons
+                            name="delivery-dining"
+                            size={16}
+                            color={filterRole === 'delivery' ? '#fff' : '#FF9800'}
+                        />
+                        <Text
+                            style={[
+                                styles.filterChipText,
+                                filterRole === 'delivery' && styles.filterChipTextActive,
+                            ]}
+                        >
+                            Delivery Boys
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.filterChip, filterRole === 'admin' && styles.filterChipActive]}
-                        onPress={() => setFilterRole('admin')}
+                        onPress={() => handleFilterChange('admin')}
                     >
-                        <MaterialIcons name="admin-panel-settings" size={16} color={filterRole === 'admin' ? '#fff' : '#9C27B0'} />
-                        <Text style={[styles.filterChipText, filterRole === 'admin' && styles.filterChipTextActive]}>
-                            Admins ({users.filter(u => u.role === 'admin').length})
+                        <MaterialIcons
+                            name="admin-panel-settings"
+                            size={16}
+                            color={filterRole === 'admin' ? '#fff' : '#9C27B0'}
+                        />
+                        <Text
+                            style={[
+                                styles.filterChipText,
+                                filterRole === 'admin' && styles.filterChipTextActive,
+                            ]}
+                        >
+                            Admins
                         </Text>
                     </TouchableOpacity>
                 </ScrollView>
             </View>
 
+            {/* Error Message */}
+            {error && (
+                <View style={styles.errorBanner}>
+                    <MaterialIcons name="error-outline" size={20} color="#F44336" />
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            )}
+
             {/* User List */}
             <FlatList
-                data={filteredUsers}
+                data={users}
                 renderItem={renderUserCard}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item._id}
                 contentContainerStyle={styles.userList}
                 showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <MaterialIcons name="person-off" size={64} color="#ccc" />
-                        <Text style={styles.emptyText}>No users found</Text>
-                        <Text style={styles.emptySubtext}>Try adjusting your search or filters</Text>
-                    </View>
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#cb202d']}
+                        tintColor="#cb202d"
+                    />
                 }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={() => {
+                    if (isLoading && users.length > 0) {
+                        return (
+                            <View style={styles.footerLoader}>
+                                <ActivityIndicator size="small" color="#cb202d" />
+                                <Text style={styles.footerLoaderText}>Loading more...</Text>
+                            </View>
+                        );
+                    }
+                    return null;
+                }}
+                ListEmptyComponent={() => {
+                    if (isLoading) {
+                        return (
+                            <View>
+                                <SkeletonUserCard />
+                                <SkeletonUserCard />
+                                <SkeletonUserCard />
+                            </View>
+                        );
+                    }
+                    return (
+                        <View style={styles.emptyContainer}>
+                            <MaterialIcons name="person-off" size={64} color="#ccc" />
+                            <Text style={styles.emptyText}>No users found</Text>
+                            <Text style={styles.emptySubtext}>Try adjusting your search or filters</Text>
+                        </View>
+                    );
+                }}
             />
 
             {/* User Details Modal */}
@@ -652,6 +808,25 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
 
+    // Error Banner
+    errorBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFEBEE',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 8,
+        gap: 8,
+    },
+    errorText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#F44336',
+        fontWeight: '500',
+    },
+
     // User List
     userList: {
         padding: 16,
@@ -682,17 +857,6 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-    },
-    avatarPlaceholder: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarText: {
-        fontSize: 20,
-        fontWeight: '700',
     },
     userHeaderInfo: {
         flex: 1,
@@ -792,17 +956,30 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         marginHorizontal: 8,
     },
-    viewDetailsButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#FFF5F5',
+
+    // Loading & Empty States
+    loadingContainer: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 8,
+        paddingVertical: 60,
     },
-
-    // Empty State
+    loadingText: {
+        fontSize: 14,
+        color: '#999',
+        marginTop: 12,
+    },
+    footerLoader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        gap: 8,
+    },
+    footerLoaderText: {
+        fontSize: 13,
+        color: '#999',
+    },
     emptyContainer: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -880,17 +1057,6 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-    },
-    profileAvatarPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    profileAvatarText: {
-        fontSize: 36,
-        fontWeight: '700',
     },
     profileName: {
         fontSize: 24,

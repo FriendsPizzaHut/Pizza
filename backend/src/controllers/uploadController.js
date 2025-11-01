@@ -19,10 +19,10 @@ export const uploadImage = async (req, res, next) => {
             throw new ApiError(400, 'No image file provided');
         }
 
-        const { folder = 'pizza-app/general' } = req.body;
+        const { type = 'general' } = req.body;
 
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary(req.file.path, folder);
+        // Upload to Cloudinary with type-based folder
+        const result = await uploadToCloudinary(req.file.path, type);
 
         // Cleanup temp file
         cleanupTempFile(req.file.path);
@@ -58,12 +58,7 @@ export const uploadProductImage = async (req, res, next) => {
         }
 
         // Upload to Cloudinary in products folder
-        const result = await uploadToCloudinary(req.file.path, 'pizza-app/products', {
-            transformation: [
-                { width: 800, height: 800, crop: 'limit' },
-                { quality: 'auto:best' },
-            ],
-        });
+        const result = await uploadToCloudinary(req.file.path, 'product');
 
         // Cleanup temp file
         cleanupTempFile(req.file.path);
@@ -95,19 +90,8 @@ export const uploadDocumentImage = async (req, res, next) => {
             throw new ApiError(400, 'No image file provided');
         }
 
-        const { documentType = 'general' } = req.body;
-
         // Upload to Cloudinary in documents folder
-        const result = await uploadToCloudinary(
-            req.file.path,
-            `pizza-app/documents/${documentType}`,
-            {
-                transformation: [
-                    { width: 1200, height: 1200, crop: 'limit' },
-                    { quality: 'auto:good' },
-                ],
-            }
-        );
+        const result = await uploadToCloudinary(req.file.path, 'document');
 
         // Cleanup temp file
         cleanupTempFile(req.file.path);
@@ -162,7 +146,7 @@ export const deleteImage = async (req, res, next) => {
  */
 export const uploadBase64Image = async (req, res, next) => {
     try {
-        const { image, folder = 'pizza-app/general' } = req.body;
+        const { image, type = 'general' } = req.body;
 
         if (!image) {
             throw new ApiError(400, 'No base64 image data provided');
@@ -173,8 +157,8 @@ export const uploadBase64Image = async (req, res, next) => {
             throw new ApiError(400, 'Invalid base64 image format');
         }
 
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary(image, folder);
+        // Upload to Cloudinary using type-based folder
+        const result = await uploadToCloudinary(image, type);
 
         res.status(200).json({
             success: true,
@@ -189,10 +173,78 @@ export const uploadBase64Image = async (req, res, next) => {
     }
 };
 
+/**
+ * Upload avatar/profile picture to Cloudinary
+ * @route POST /api/v1/upload/avatar
+ */
+export const uploadAvatar = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            throw new ApiError(400, 'No image file provided');
+        }
+
+        // Upload to Cloudinary in avatars folder with face detection
+        const result = await uploadToCloudinary(req.file.path, 'avatar');
+
+        // Cleanup temp file
+        cleanupTempFile(req.file.path);
+
+        res.status(200).json({
+            success: true,
+            message: 'Avatar uploaded successfully',
+            data: {
+                url: result.url,
+                publicId: result.publicId,
+            },
+        });
+    } catch (error) {
+        // Cleanup temp file on error
+        if (req.file) {
+            cleanupTempFile(req.file.path);
+        }
+        next(error);
+    }
+};
+
+/**
+ * Upload banner/promotional image to Cloudinary
+ * @route POST /api/v1/upload/banner
+ */
+export const uploadBanner = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            throw new ApiError(400, 'No image file provided');
+        }
+
+        // Upload to Cloudinary in banners folder
+        const result = await uploadToCloudinary(req.file.path, 'banner');
+
+        // Cleanup temp file
+        cleanupTempFile(req.file.path);
+
+        res.status(200).json({
+            success: true,
+            message: 'Banner uploaded successfully',
+            data: {
+                url: result.url,
+                publicId: result.publicId,
+            },
+        });
+    } catch (error) {
+        // Cleanup temp file on error
+        if (req.file) {
+            cleanupTempFile(req.file.path);
+        }
+        next(error);
+    }
+};
+
 export default {
     uploadImage,
     uploadProductImage,
     uploadDocumentImage,
+    uploadAvatar,
+    uploadBanner,
     deleteImage,
     uploadBase64Image,
 };

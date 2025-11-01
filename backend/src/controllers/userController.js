@@ -104,6 +104,48 @@ export const deleteUser = async (req, res, next) => {
 };
 
 /**
+ * Update user profile image
+ * PUT /api/v1/users/:id/profile-image
+ * @access Private (user can update their own profile image)
+ */
+export const updateProfileImage = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { profileImage } = req.body;
+
+        console.log('🖼️ [UPDATE PROFILE IMAGE] Request received');
+        console.log('  - User ID:', id);
+        console.log('  - Profile Image URL:', profileImage);
+        console.log('  - Authenticated User:', req.user?.id);
+
+        // Verify user is updating their own profile (or is admin)
+        if (req.user.id !== id && req.user.role !== 'admin') {
+            const error = new Error('You can only update your own profile image');
+            error.statusCode = 403;
+            throw error;
+        }
+
+        if (!profileImage) {
+            const error = new Error('Profile image URL is required');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const user = await userService.updateProfileImage(id, profileImage);
+
+        console.log('✅ [UPDATE PROFILE IMAGE] Profile image updated successfully');
+
+        sendResponse(res, 200, 'Profile image updated successfully', {
+            profileImage: user.profileImage,
+            user: user.getPublicProfile(),
+        });
+    } catch (error) {
+        console.error('❌ [UPDATE PROFILE IMAGE] Error:', error.message);
+        next(error);
+    }
+};
+
+/**
  * Get all delivery agents with their availability status
  * GET /api/v1/users/delivery-agents
  * @access Private/Admin

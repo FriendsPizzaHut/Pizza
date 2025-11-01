@@ -13,6 +13,7 @@ export interface AuthState {
     name: string | null;
     email: string | null;
     userId: string | null;
+    profileImage: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     error: string | null;
@@ -24,6 +25,7 @@ const initialState: AuthState = {
     name: null,
     email: null,
     userId: null,
+    profileImage: null,
     isAuthenticated: false,
     isLoading: true, // Start with loading state
     error: null,
@@ -144,6 +146,10 @@ const authSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+        // Update profile image
+        updateProfileImage: (state, action: PayloadAction<string>) => {
+            state.profileImage = action.payload;
+        },
     },
     extraReducers: (builder) => {
         // Signup
@@ -168,6 +174,7 @@ const authSlice = createSlice({
             state.name = action.payload.user.name;
             state.email = action.payload.user.email;
             state.userId = action.payload.user.id;
+            state.profileImage = action.payload.user.profileImage || null;
             state.isAuthenticated = true;
             state.isLoading = false;
             state.error = null;
@@ -189,6 +196,7 @@ const authSlice = createSlice({
             state.name = action.payload.user.name;
             state.email = action.payload.user.email;
             state.userId = action.payload.user.id;
+            state.profileImage = action.payload.user.profileImage || null;
             state.isAuthenticated = true;
             state.isLoading = false;
             state.error = null;
@@ -209,6 +217,7 @@ const authSlice = createSlice({
             state.name = null;
             state.email = null;
             state.userId = null;
+            state.profileImage = null;
             state.isAuthenticated = false;
             state.isLoading = false;
             state.error = null;
@@ -235,6 +244,7 @@ const authSlice = createSlice({
                 state.name = action.payload.user.name;
                 state.email = action.payload.user.email;
                 state.userId = action.payload.user.id;
+                state.profileImage = action.payload.user.profileImage || null;
                 state.isAuthenticated = true;
             }
             state.isLoading = false;
@@ -257,6 +267,7 @@ export const {
     restoreAuthState,
     setLoading,
     clearError,
+    updateProfileImage,
 } = authSlice.actions;
 
 export default authSlice.reducer;

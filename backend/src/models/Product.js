@@ -25,8 +25,21 @@ const productSchema = new mongoose.Schema(
             type: String,
             required: [true, 'Product category is required'],
             enum: {
-                values: ['pizza', 'sides', 'beverages', 'desserts'],
-                message: 'Category must be one of: pizza, sides, beverages, desserts',
+                values: [
+                    'pizza',
+                    'burger',
+                    'grilled-sandwich',
+                    'special-combo',
+                    'pasta',
+                    'noodles',
+                    'snacks',
+                    'milkshakes',
+                    'cold-drinks',
+                    'rice-items',
+                    'sweets',
+                    'sides'
+                ],
+                message: 'Category must be one of: pizza, burger, grilled-sandwich, special-combo, pasta, noodles, snacks, milkshakes, cold-drinks, rice-items, sweets, sides',
             },
         },
         // Mixed type to support both multi-size (object) and single price (number)
@@ -137,12 +150,21 @@ const productSchema = new mongoose.Schema(
 
 // Pre-save hook: Auto-generate preparationTime based on category
 productSchema.pre('save', function (next) {
-    if (this.isNew || this.isModified('category')) {
+    // Always ensure preparationTime is set (for new products, updates, or category changes)
+    if (this.isNew || this.isModified('category') || !this.preparationTime || this.preparationTime < 5) {
         const prepTimes = {
-            pizza: 20,
-            sides: 10,
-            beverages: 2,
-            desserts: 5,
+            'pizza': 20,
+            'burger': 15,
+            'grilled-sandwich': 12,
+            'special-combo': 25,
+            'pasta': 18,
+            'noodles': 15,
+            'snacks': 10,
+            'milkshakes': 5,
+            'cold-drinks': 2,
+            'rice-items': 20,
+            'sweets': 5,
+            'sides': 10,
         };
         this.preparationTime = prepTimes[this.category] || 15;
     }
@@ -159,7 +181,8 @@ productSchema.pre('save', function (next) {
 
 // Pre-save hook: Calculate basePrice from pricing
 productSchema.pre('save', function (next) {
-    if (this.isNew || this.isModified('pricing')) {
+    // Always ensure basePrice is set (for new products, pricing changes, or missing basePrice)
+    if (this.isNew || this.isModified('pricing') || !this.basePrice || this.basePrice <= 0) {
         if (this.category === 'pizza' && typeof this.pricing === 'object') {
             // For pizza, use the smallest available size price as base
             const prices = Object.values(this.pricing);

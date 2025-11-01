@@ -11,6 +11,7 @@ import { fetchProductByIdThunk, updateProductThunk, deleteProductThunk, refreshP
 import { clearMessages } from '../../../../redux/slices/productSlice';
 import { uploadImage, isLocalFileUri } from '../../../utils/imageUpload';
 import { Product } from '../../../services/productService';
+import { FOOD_CATEGORIES, CategoryId, isMultiSizeCategory } from '../../../constants/foodCategories';
 
 export default function EditMenuItemScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -27,7 +28,7 @@ export default function EditMenuItemScreen() {
     const [itemData, setItemData] = useState({
         name: '',
         description: '',
-        category: 'pizza' as 'pizza' | 'sides' | 'beverages' | 'desserts',
+        category: 'pizza' as CategoryId,
         // For pizza: multi-size pricing
         priceSmall: '',
         priceMedium: '',
@@ -49,12 +50,11 @@ export default function EditMenuItemScreen() {
     const [showToppingModal, setShowToppingModal] = useState(false);
     const [selectedToppingCategory, setSelectedToppingCategory] = useState<'vegetables' | 'meat' | 'cheese' | 'sauce' | null>(null);
 
-    const categories: Array<{ value: 'pizza' | 'sides' | 'beverages' | 'desserts', label: string }> = [
-        { value: 'pizza', label: 'Pizzas' },
-        { value: 'sides', label: 'Sides' },
-        { value: 'beverages', label: 'Beverages' },
-        { value: 'desserts', label: 'Desserts' },
-    ];
+    const categories = FOOD_CATEGORIES.filter(cat => cat.id !== 'all').map(cat => ({
+        value: cat.id as CategoryId,
+        label: cat.label,
+        icon: cat.icon
+    }));
 
     // Topping options by category
     const toppingOptions = {
@@ -218,7 +218,7 @@ export default function EditMenuItemScreen() {
         }
 
         // Validate pricing based on category
-        if (itemData.category === 'pizza') {
+        if (isMultiSizeCategory(itemData.category)) {
             const hasSmall = itemData.priceSmall && parseFloat(itemData.priceSmall) > 0;
             const hasMedium = itemData.priceMedium && parseFloat(itemData.priceMedium) > 0;
             const hasLarge = itemData.priceLarge && parseFloat(itemData.priceLarge) > 0;
@@ -289,7 +289,7 @@ export default function EditMenuItemScreen() {
         // Prepare pricing based on category
         let pricing: number | { small?: number; medium?: number; large?: number };
 
-        if (itemData.category === 'pizza') {
+        if (isMultiSizeCategory(itemData.category)) {
             pricing = {};
             if (itemData.priceSmall && parseFloat(itemData.priceSmall) > 0) {
                 pricing.small = parseFloat(itemData.priceSmall);
@@ -486,7 +486,7 @@ export default function EditMenuItemScreen() {
                                         styles.categoryText,
                                         itemData.category === category.value && styles.selectedCategoryText
                                     ]}>
-                                        {category.label}
+                                        {category.icon} {category.label}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -500,7 +500,7 @@ export default function EditMenuItemScreen() {
                             <Text style={styles.sectionTitle}>Pricing</Text>
                         </View>
 
-                        {itemData.category === 'pizza' ? (
+                        {isMultiSizeCategory(itemData.category) ? (
                             <>
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Small (10")</Text>

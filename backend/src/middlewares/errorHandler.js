@@ -97,6 +97,20 @@ export const errorHandler = (err, req, res, next) => {
         const errors = Object.values(err.errors).map((error) => error.message);
         message = `Validation failed: ${errors.join(', ')}`;
         isOperational = true;
+
+        // Add detailed debugging for validation errors
+        console.error('❌ [VALIDATION ERROR DEBUG] Full validation error:', {
+            name: err.name,
+            message: err.message,
+            errors: err.errors,
+            errorDetails: Object.entries(err.errors || {}).map(([field, error]) => ({
+                field,
+                message: error.message,
+                value: error.value,
+                kind: error.kind,
+                path: error.path,
+            })),
+        });
     }
 
     // Mongoose Duplicate Key Error
@@ -187,17 +201,27 @@ export const errorHandler = (err, req, res, next) => {
 
     // Build structured JSON response
     const response = {
-        status,
-        code,
+        success: false,
+        statusCode,
         message,
         timestamp: new Date().toISOString(),
         path: req.path,
     };
 
+    // Add validation errors if present
+    if (err.name === 'ValidationError' && err.errors) {
+        response.errors = Object.entries(err.errors).map(([field, error]) => ({
+            field,
+            message: error.message,
+            value: error.value,
+        }));
+    }
+
     // Add extra details in development mode
     if (process.env.NODE_ENV === 'development') {
         response.error = {
             name: err.name,
+            code,
             isOperational,
             ...(err.stack && { stack: err.stack.split('\n').slice(0, 5) }), // First 5 lines only
             ...(err.details && { details: err.details }),
@@ -217,6 +241,12 @@ export const errorHandler = (err, req, res, next) => {
         console.error('❌ Headers already sent, cannot send error response');
         return next(err);
     }
+
+    // Log what we're sending to client
+    console.log('📤 [ERROR RESPONSE DEBUG] Sending error response to client:', {
+        statusCode,
+        response: JSON.stringify(response, null, 2),
+    });
 
     // Send response - ALWAYS respond, never crash
     res.status(statusCode).json(response);

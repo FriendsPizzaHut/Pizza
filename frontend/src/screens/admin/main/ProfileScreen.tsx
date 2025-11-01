@@ -1,19 +1,121 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../redux/store';
 import { logoutThunk } from '../../../../redux/thunks/authThunks';
+import { updateProfileImage as updateProfileImageAction } from '../../../../redux/slices/authSlice';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImage, isLocalFileUri } from '../../../utils/imageUpload';
+import { updateProfileImage } from '../../../services/userService';
+import Avatar from '../../../components/common/Avatar';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-    const { name, email, role, isLoading } = useSelector((state: RootState) => state.auth);
+    const { name, email, role, userId, profileImage, isLoading } = useSelector((state: RootState) => state.auth);
     const dispatch = useDispatch();
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
+
+    // Avatar upload state
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+    // Debug: Log current auth state on mount and when profileImage changes
+    useEffect(() => {
+        console.log('=== PROFILE SCREEN AUTH STATE ===');
+        console.log('Name:', name);
+        console.log('Email:', email);
+        console.log('User ID:', userId);
+        console.log('Profile Image:', profileImage);
+        console.log('=== END AUTH STATE ===\n');
+    }, [profileImage]);
+
+    /**
+     * Handle avatar image selection and upload
+     */
+    const handleAvatarChange = async () => {
+        try {
+            // Request permissions
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission Required',
+                    'We need camera roll permissions to change your profile picture.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Launch image picker
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1], // Square aspect ratio
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+
+                // Upload immediately without confirmation
+                setIsUploadingAvatar(true);
+                try {
+                    console.log('=== AVATAR UPLOAD STARTED ===');
+                    console.log('User ID:', userId);
+                    console.log('Current profileImage:', profileImage);
+                    console.log('Image URI:', imageUri);
+
+                    console.log('\n📤 [STEP 1] Uploading to Cloudinary...');
+                    const cloudinaryUrl = await uploadImage(imageUri, 'avatar');
+                    console.log('✅ [STEP 1] Cloudinary upload successful!');
+                    console.log('   URL:', cloudinaryUrl);
+                    console.log('   URL type:', typeof cloudinaryUrl);
+                    console.log('   URL length:', cloudinaryUrl?.length);
+
+                    if (!cloudinaryUrl) {
+                        throw new Error('Cloudinary URL is empty!');
+                    }
+
+                    console.log('\n💾 [STEP 2] Updating backend database...');
+                    console.log('   Calling updateProfileImage with:');
+                    console.log('   - userId:', userId);
+                    console.log('   - cloudinaryUrl:', cloudinaryUrl);
+
+                    const response = await updateProfileImage(userId!, cloudinaryUrl);
+                    console.log('✅ [STEP 2] Backend update successful!');
+                    console.log('   Response:', JSON.stringify(response, null, 2));
+
+                    console.log('\n🔄 [STEP 3] Updating Redux store...');
+                    dispatch(updateProfileImageAction(cloudinaryUrl));
+                    console.log('✅ [STEP 3] Redux updated!');
+
+                    console.log('\n=== AVATAR UPLOAD COMPLETE ===\n');
+
+                    Alert.alert('Success', 'Profile picture updated successfully!');
+                } catch (error: any) {
+                    console.error('\n❌ === AVATAR UPLOAD FAILED ===');
+                    console.error('Error:', error);
+                    console.error('Error message:', error.message);
+                    console.error('Error response:', error.response?.data);
+                    console.error('=== END ERROR ===\n');
+
+                    Alert.alert(
+                        'Upload Failed',
+                        error.message || 'Failed to upload profile picture. Please try again.',
+                        [{ text: 'OK' }]
+                    );
+                } finally {
+                    setIsUploadingAvatar(false);
+                }
+            }
+        } catch (error: any) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to select image. Please try again.');
+        }
+    };
 
     const handleLogout = async () => {
         Alert.alert(
@@ -128,12 +230,22 @@ export default function ProfileScreen() {
                 <View style={styles.profileSection}>
                     {/* Profile Avatar */}
                     <View style={styles.avatarContainer}>
-                        <Image
-                            source={{ uri: 'https://images.pexels.com/photos/91227/pexels-photo-91227.jpeg' }}
-                            style={styles.avatar}
+                        <Avatar
+                            name={name || 'Admin'}
+                            imageUrl={profileImage}
+                            size={100}
                         />
-                        <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8}>
-                            <MaterialIcons name="camera-alt" size={16} color="#fff" />
+                        <TouchableOpacity
+                            style={styles.cameraButton}
+                            activeOpacity={0.8}
+                            onPress={handleAvatarChange}
+                            disabled={isUploadingAvatar}
+                        >
+                            {isUploadingAvatar ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <MaterialIcons name="camera-alt" size={16} color="#fff" />
+                            )}
                         </TouchableOpacity>
                     </View>
 

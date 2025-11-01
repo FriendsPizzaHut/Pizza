@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar, Platform, Alert, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar, Platform, Alert, Switch, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { getRestaurantSettings, updateRestaurantSettings } from '../../../services/restaurantSettingsService';
+import { getRestaurantSettings, updateRestaurantSettings, Topping } from '../../../services/restaurantSettingsService';
 
 export default function RestaurantSettingsScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -25,8 +25,18 @@ export default function RestaurantSettingsScreen() {
         freeDeliveryThreshold: '',
     });
 
+    const [toppings, setToppings] = useState<Topping[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Modal states
+    const [isAddToppingModalVisible, setIsAddToppingModalVisible] = useState(false);
+    const [newTopping, setNewTopping] = useState<{ name: string; category: 'vegetables' | 'meat' | 'cheese' | 'sauce'; price: string }>({
+        name: '',
+        category: 'vegetables',
+        price: ''
+    });
+    const [editingTopping, setEditingTopping] = useState<{ index: number; topping: Topping } | null>(null);
 
     // Fetch settings on component mount
     useEffect(() => {
@@ -48,6 +58,8 @@ export default function RestaurantSettingsScreen() {
                 deliveryFee: settings.deliveryFee.toString(),
                 freeDeliveryThreshold: settings.freeDeliveryThreshold.toString(),
             });
+
+            setToppings(settings.availableToppings || []);
 
             console.log('✅ Restaurant settings loaded successfully');
         } catch (error: any) {
@@ -97,6 +109,7 @@ export default function RestaurantSettingsScreen() {
                 taxRate: restaurantData.taxRate,
                 deliveryFee: restaurantData.deliveryFee,
                 freeDeliveryThreshold: restaurantData.freeDeliveryThreshold,
+                availableToppings: toppings,
             });
 
             console.log('✅ Restaurant settings updated successfully');
@@ -117,6 +130,88 @@ export default function RestaurantSettingsScreen() {
             setIsSaving(false);
         }
     };
+
+    const handleAddTopping = () => {
+        if (!newTopping.name.trim()) {
+            Alert.alert('Error', 'Please enter topping name');
+            return;
+        }
+
+        const price = parseFloat(newTopping.price);
+        if (isNaN(price) || price < 0) {
+            Alert.alert('Error', 'Please enter a valid price (0 or greater)');
+            return;
+        }
+
+        setToppings([...toppings, { name: newTopping.name.trim(), category: newTopping.category, price, isActive: true }]);
+        setNewTopping({ name: '', category: 'vegetables', price: '' });
+        setIsAddToppingModalVisible(false);
+    };
+
+    const handleEditTopping = (index: number) => {
+        setEditingTopping({ index, topping: { ...toppings[index] } });
+    };
+
+    const handleUpdateTopping = () => {
+        if (!editingTopping) return;
+
+        const updatedToppings = [...toppings];
+        updatedToppings[editingTopping.index] = editingTopping.topping;
+        setToppings(updatedToppings);
+        setEditingTopping(null);
+    };
+
+    const handleToggleTopping = (index: number) => {
+        const updatedToppings = [...toppings];
+        updatedToppings[index].isActive = !updatedToppings[index].isActive;
+        setToppings(updatedToppings);
+    };
+
+    const handleDeleteTopping = (index: number) => {
+        Alert.alert(
+            'Delete Topping',
+            `Are you sure you want to delete "${toppings[index].name}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        const updatedToppings = toppings.filter((_, i) => i !== index);
+                        setToppings(updatedToppings);
+                    },
+                },
+            ]
+        );
+    };
+
+    const getCategoryIcon = (category: string) => {
+        switch (category) {
+            case 'vegetables': return '🥬';
+            case 'meat': return '🍖';
+            case 'cheese': return '🧀';
+            case 'sauce': return '🍅';
+            default: return '📦';
+        }
+    };
+
+    const getCategoryColor = (category: string) => {
+        switch (category) {
+            case 'vegetables': return '#4CAF50';
+            case 'meat': return '#F44336';
+            case 'cheese': return '#FF9800';
+            case 'sauce': return '#E91E63';
+            default: return '#9E9E9E';
+        }
+    };
+
+    const groupedToppings = toppings.reduce((acc, topping, index) => {
+        if (!acc[topping.category]) {
+            acc[topping.category] = [];
+        }
+        acc[topping.category].push({ ...topping, index });
+        return acc;
+    }, {} as Record<string, Array<Topping & { index: number }>>);
 
     return (
         <View style={styles.container}>
@@ -283,11 +378,282 @@ export default function RestaurantSettingsScreen() {
                             </View>
                         </View>
 
+                        {/* Section 4: Pizza Toppings Management */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <MaterialIcons name="local-pizza" size={20} color="#cb202d" />
+                                <Text style={styles.sectionTitle}>Pizza Toppings</Text>
+                            </View>
+                            <Text style={styles.sectionDescription}>
+                                Manage available toppings for pizza customization
+                            </Text>
+
+                            {/* Add Topping Button */}
+                            <TouchableOpacity
+                                style={styles.addToppingButton}
+                                onPress={() => setIsAddToppingModalVisible(true)}
+                            >
+                                <MaterialIcons name="add-circle" size={20} color="#cb202d" />
+                                <Text style={styles.addToppingButtonText}>Add New Topping</Text>
+                            </TouchableOpacity>
+
+                            {/* Toppings List Grouped by Category */}
+                            {Object.entries(groupedToppings).map(([category, categoryToppings]) => (
+                                <View key={category} style={styles.toppingCategory}>
+                                    <View style={styles.categoryHeader}>
+                                        <Text style={styles.categoryEmoji}>{getCategoryIcon(category)}</Text>
+                                        <Text style={[styles.categoryTitle, { color: getCategoryColor(category) }]}>
+                                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                                        </Text>
+                                        <Text style={styles.categoryCount}>({categoryToppings.length})</Text>
+                                    </View>
+
+                                    {categoryToppings.map((topping) => (
+                                        <View key={topping.index} style={styles.toppingItem}>
+                                            <View style={styles.toppingInfo}>
+                                                <View>
+                                                    <Text style={[
+                                                        styles.toppingName,
+                                                        !topping.isActive && styles.toppingNameInactive
+                                                    ]}>
+                                                        {topping.name}
+                                                    </Text>
+                                                    <Text style={styles.toppingPrice}>₹{topping.price}</Text>
+                                                </View>
+                                                {!topping.isActive && (
+                                                    <Text style={styles.inactiveBadge}>Inactive</Text>
+                                                )}
+                                            </View>
+
+                                            <View style={styles.toppingActions}>
+                                                <Switch
+                                                    value={topping.isActive}
+                                                    onValueChange={() => handleToggleTopping(topping.index)}
+                                                    trackColor={{ false: '#d1d1d1', true: '#cb202d' }}
+                                                    thumbColor="#fff"
+                                                />
+                                                <TouchableOpacity
+                                                    style={styles.iconButton}
+                                                    onPress={() => handleEditTopping(topping.index)}
+                                                >
+                                                    <MaterialIcons name="edit" size={20} color="#2196F3" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.iconButton}
+                                                    onPress={() => handleDeleteTopping(topping.index)}
+                                                >
+                                                    <MaterialIcons name="delete" size={20} color="#F44336" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            ))}
+
+                            {toppings.length === 0 && (
+                                <View style={styles.emptyState}>
+                                    <MaterialIcons name="local-pizza" size={48} color="#d1d1d1" />
+                                    <Text style={styles.emptyStateText}>No toppings added yet</Text>
+                                    <Text style={styles.emptyStateSubtext}>
+                                        Add toppings that will be available for pizza customization
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
                         {/* Bottom spacing */}
                         <View style={{ height: 100 }} />
                     </View>
                 </ScrollView>
             )}
+
+            {/* Add Topping Modal */}
+            <Modal
+                visible={isAddToppingModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setIsAddToppingModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Add New Topping</Text>
+                            <TouchableOpacity onPress={() => setIsAddToppingModalVisible(false)}>
+                                <MaterialIcons name="close" size={24} color="#2d2d2d" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Topping Name <Text style={styles.required}>*</Text></Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={newTopping.name}
+                                    onChangeText={(text) => setNewTopping({ ...newTopping, name: text })}
+                                    placeholder="e.g., Extra Cheese, Olives"
+                                    placeholderTextColor="#999"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Price (₹) <Text style={styles.required}>*</Text></Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={newTopping.price}
+                                    onChangeText={(text) => setNewTopping({ ...newTopping, price: text })}
+                                    placeholder="e.g., 30"
+                                    placeholderTextColor="#999"
+                                    keyboardType="decimal-pad"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Category <Text style={styles.required}>*</Text></Text>
+                                <View style={styles.categorySelector}>
+                                    {(['vegetables', 'meat', 'cheese', 'sauce'] as const).map((cat) => (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            style={[
+                                                styles.categoryOption,
+                                                newTopping.category === cat && styles.categoryOptionSelected,
+                                                { borderColor: getCategoryColor(cat) }
+                                            ]}
+                                            onPress={() => setNewTopping({ ...newTopping, category: cat })}
+                                        >
+                                            <Text style={styles.categoryEmoji}>{getCategoryIcon(cat)}</Text>
+                                            <Text style={[
+                                                styles.categoryOptionText,
+                                                newTopping.category === cat && { color: getCategoryColor(cat) }
+                                            ]}>
+                                                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonCancel]}
+                                onPress={() => {
+                                    setNewTopping({ name: '', category: 'vegetables', price: '' });
+                                    setIsAddToppingModalVisible(false);
+                                }}
+                            >
+                                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonAdd]}
+                                onPress={handleAddTopping}
+                            >
+                                <Text style={styles.modalButtonTextAdd}>Add Topping</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Edit Topping Modal */}
+            <Modal
+                visible={editingTopping !== null}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setEditingTopping(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Topping</Text>
+                            <TouchableOpacity onPress={() => setEditingTopping(null)}>
+                                <MaterialIcons name="close" size={24} color="#2d2d2d" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {editingTopping && (
+                            <View style={styles.modalBody}>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Topping Name <Text style={styles.required}>*</Text></Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={editingTopping.topping.name}
+                                        onChangeText={(text) =>
+                                            setEditingTopping({
+                                                ...editingTopping,
+                                                topping: { ...editingTopping.topping, name: text }
+                                            })
+                                        }
+                                        placeholder="e.g., Extra Cheese, Olives"
+                                        placeholderTextColor="#999"
+                                    />
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Price (₹) <Text style={styles.required}>*</Text></Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={editingTopping.topping.price.toString()}
+                                        onChangeText={(text) =>
+                                            setEditingTopping({
+                                                ...editingTopping,
+                                                topping: { ...editingTopping.topping, price: parseFloat(text) || 0 }
+                                            })
+                                        }
+                                        placeholder="e.g., 30"
+                                        placeholderTextColor="#999"
+                                        keyboardType="decimal-pad"
+                                    />
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Category <Text style={styles.required}>*</Text></Text>
+                                    <View style={styles.categorySelector}>
+                                        {(['vegetables', 'meat', 'cheese', 'sauce'] as const).map((cat) => (
+                                            <TouchableOpacity
+                                                key={cat}
+                                                style={[
+                                                    styles.categoryOption,
+                                                    editingTopping.topping.category === cat && styles.categoryOptionSelected,
+                                                    { borderColor: getCategoryColor(cat) }
+                                                ]}
+                                                onPress={() =>
+                                                    setEditingTopping({
+                                                        ...editingTopping,
+                                                        topping: { ...editingTopping.topping, category: cat }
+                                                    })
+                                                }
+                                            >
+                                                <Text style={styles.categoryEmoji}>{getCategoryIcon(cat)}</Text>
+                                                <Text style={[
+                                                    styles.categoryOptionText,
+                                                    editingTopping.topping.category === cat && { color: getCategoryColor(cat) }
+                                                ]}>
+                                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonCancel]}
+                                onPress={() => setEditingTopping(null)}
+                            >
+                                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonAdd]}
+                                onPress={handleUpdateTopping}
+                            >
+                                <Text style={styles.modalButtonTextAdd}>Update Topping</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Save Button */}
             {!isLoading && (
@@ -515,4 +881,216 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#8E8E93',
     },
+
+    // Topping Management Styles
+    addToppingButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#cb202d',
+        borderRadius: 12,
+        paddingVertical: 12,
+        marginBottom: 20,
+        gap: 8,
+    },
+    addToppingButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#cb202d',
+    },
+
+    toppingCategory: {
+        marginBottom: 20,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+    },
+    categoryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        gap: 8,
+    },
+    categoryEmoji: {
+        fontSize: 20,
+    },
+    categoryTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    categoryCount: {
+        fontSize: 14,
+        color: '#8E8E93',
+    },
+
+    toppingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F8F9FA',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 8,
+    },
+    toppingInfo: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    toppingName: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#2d2d2d',
+    },
+    toppingPrice: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4CAF50',
+        marginTop: 2,
+    },
+    toppingNameInactive: {
+        color: '#999',
+        textDecorationLine: 'line-through',
+    },
+    inactiveBadge: {
+        fontSize: 11,
+        color: '#fff',
+        backgroundColor: '#999',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+
+    toppingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    iconButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#fff',
+    },
+
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    emptyStateText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#999',
+        marginTop: 12,
+    },
+    emptyStateSubtext: {
+        fontSize: 13,
+        color: '#B0B0B0',
+        marginTop: 4,
+        textAlign: 'center',
+        paddingHorizontal: 40,
+    },
+
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        width: '100%',
+        maxWidth: 400,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2d2d2d',
+    },
+    modalBody: {
+        padding: 20,
+    },
+    categorySelector: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    categoryOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        borderRadius: 20,
+        backgroundColor: '#F8F9FA',
+    },
+    categoryOptionSelected: {
+        backgroundColor: '#FFF5F5',
+    },
+    categoryOptionText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#2d2d2d',
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        gap: 12,
+        padding: 20,
+        paddingTop: 0,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalButtonCancel: {
+        backgroundColor: '#F8F9FA',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    modalButtonTextCancel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2d2d2d',
+    },
+    modalButtonAdd: {
+        backgroundColor: '#cb202d',
+    },
+    modalButtonTextAdd: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
+    },
 });
+

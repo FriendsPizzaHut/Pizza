@@ -30,6 +30,7 @@ import {
 } from '../../../../redux/thunks/productThunks';
 import { Product } from '../../../services/productService';
 import MenuItemSkeleton from '../../../components/admin/MenuItemSkeleton';
+import { ADMIN_CATEGORY_FILTERS } from '../../../constants/foodCategories';
 
 /**
  * Decode HTML entities in image URL
@@ -79,13 +80,14 @@ export default function MenuManagementScreen() {
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Categories with counts (will be updated dynamically)
-    const [categories, setCategories] = useState([
-        { id: 'all', label: 'All Items', count: total },
-        { id: 'pizza', label: 'Pizzas', count: 0 },
-        { id: 'sides', label: 'Sides', count: 0 },
-        { id: 'beverages', label: 'Beverages', count: 0 },
-        { id: 'desserts', label: 'Desserts', count: 0 },
-    ]);
+    const [categories, setCategories] = useState(
+        ADMIN_CATEGORY_FILTERS.map(cat => ({
+            id: cat.id,
+            label: cat.label,
+            icon: cat.icon,
+            count: cat.id === 'all' ? total : 0
+        }))
+    );
 
     // Load initial products
     useEffect(() => {
@@ -488,7 +490,7 @@ export default function MenuManagementScreen() {
                                     selectedCategory === item.id && styles.activeFilterText,
                                 ]}
                             >
-                                {item.label}
+                                {item.icon} {item.label}
                             </Text>
                         </TouchableOpacity>
                     )}

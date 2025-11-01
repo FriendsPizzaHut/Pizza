@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, StatusBar, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../../../../redux/store';
+import { updateProfileImage as updateProfileImageAction } from '../../../../redux/slices/authSlice';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImage, isLocalFileUri } from '../../../utils/imageUpload';
+import { updateProfileImage } from '../../../services/userService';
+import Avatar from '../../../components/common/Avatar';
 
 export default function AccountSettingsScreen() {
     const navigation = useNavigation();
+    const dispatch = useDispatch();
+    const { name, email, userId, profileImage } = useSelector((state: RootState) => state.auth);
+
+    // Avatar upload state
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+    // Debug: Log current auth state
+    useEffect(() => {
+        console.log('=== CUSTOMER ACCOUNT SETTINGS AUTH STATE ===');
+        console.log('Name:', name);
+        console.log('User ID:', userId);
+        console.log('Profile Image:', profileImage);
+        console.log('=== END AUTH STATE ===\n');
+    }, [profileImage]);
 
     // Personal Information State
     const [personalInfo, setPersonalInfo] = useState({
@@ -38,6 +59,99 @@ export default function AccountSettingsScreen() {
         personalInfo.email !== originalPersonalInfo.email ||
         personalInfo.phone !== originalPersonalInfo.phone;
 
+    /**
+     * Handle avatar image selection and upload
+     */
+    const handleAvatarChange = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission Required',
+                    'We need camera roll permissions to change your profile picture.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+                setIsUploadingAvatar(true);
+
+                try {
+                    console.log('=== AVATAR UPLOAD STARTED (Customer) ===');
+                    console.log('User ID:', userId);
+                    console.log('Image URI:', imageUri);
+
+                    console.log('\n📤 [STEP 1] Uploading to Cloudinary...');
+                    const cloudinaryUrl = await uploadImage(imageUri, 'avatar');
+                    console.log('✅ [STEP 1] Cloudinary upload successful!');
+                    console.log('   URL:', cloudinaryUrl);
+
+                    if (!cloudinaryUrl) {
+                        throw new Error('Cloudinary URL is empty!');
+                    }
+
+                    console.log('\n💾 [STEP 2] Updating backend database...');
+                    const response = await updateProfileImage(userId!, cloudinaryUrl);
+                    console.log('✅ [STEP 2] Backend update successful!');
+
+                    console.log('\n🔄 [STEP 3] Updating Redux store...');
+                    dispatch(updateProfileImageAction(cloudinaryUrl));
+                    console.log('✅ [STEP 3] Redux updated!');
+
+                    console.log('\n=== AVATAR UPLOAD COMPLETE ===\n');
+
+                    Alert.alert('Success', 'Profile picture updated successfully!');
+                } catch (error: any) {
+                    console.error('\n❌ === AVATAR UPLOAD FAILED ===');
+                    console.error('Error:', error);
+                    console.error('Error message:', error.message);
+                    console.error('=== END ERROR ===\n');
+
+                    Alert.alert('Upload Failed', error.message || 'Failed to upload profile picture.');
+                } finally {
+                    setIsUploadingAvatar(false);
+                }
+            }
+        } catch (error: any) {
+            Alert.alert('Error', 'Failed to select image. Please try again.');
+        }
+    };
+
+    /**
+     * Remove avatar
+     */
+    const handleRemoveAvatar = () => {
+        Alert.alert(
+            'Remove Profile Picture',
+            'Are you sure you want to remove your profile picture?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await updateProfileImage(userId!, '');
+                            dispatch(updateProfileImageAction(''));
+                            Alert.alert('Success', 'Profile picture removed!');
+                        } catch (error: any) {
+                            Alert.alert('Error', 'Failed to remove profile picture.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleSavePersonalInfo = () => {
         // Here you would typically make an API call to save the data
         Alert.alert(
@@ -69,6 +183,64 @@ export default function AccountSettingsScreen() {
                     <View style={styles.placeholder} />
                 </View>
             </View>            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Profile Picture Section */}
+                <View style={styles.section}>
+                    <LinearGradient
+                        colors={['#E1BEE7', '#CE93D8']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.colorfulSectionHeader}
+                    >
+                        <View style={styles.sectionIconContainer}>
+                            <MaterialIcons name="photo-camera" size={20} color="#7B1FA2" />
+                        </View>
+                        <Text style={styles.colorfulSectionTitle}>Profile Picture</Text>
+                    </LinearGradient>
+
+                    <View style={styles.avatarSection}>
+                        <Avatar
+                            name={personalInfo.fullName}
+                            imageUrl={profileImage}
+                            size={100}
+                        />
+                        <View style={styles.avatarActions}>
+                            <TouchableOpacity
+                                style={styles.avatarButton}
+                                onPress={handleAvatarChange}
+                                disabled={isUploadingAvatar}
+                            >
+                                {isUploadingAvatar ? (
+                                    <ActivityIndicator size="small" color="#7B1FA2" />
+                                ) : (
+                                    <>
+                                        <MaterialIcons name="add-a-photo" size={20} color="#7B1FA2" />
+                                        <Text style={styles.avatarButtonText}>
+                                            {profileImage ? 'Change Photo' : 'Add Photo'}
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                            {profileImage && (
+                                <TouchableOpacity
+                                    style={[styles.avatarButton, styles.removeAvatarButton]}
+                                    onPress={handleRemoveAvatar}
+                                    disabled={isUploadingAvatar}
+                                >
+                                    <MaterialIcons name="delete" size={20} color="#e63946" />
+                                    <Text style={[styles.avatarButtonText, { color: '#e63946' }]}>
+                                        Remove
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={styles.avatarHint}>
+                            {profileImage
+                                ? 'Your profile picture is visible on your orders'
+                                : 'Add a profile picture to personalize your account'}
+                        </Text>
+                    </View>
+                </View>
+
                 {/* Personal Information */}
                 <View style={styles.section}>
                     <LinearGradient
@@ -399,6 +571,51 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#2d2d2d',
     },
+
+    // Avatar Section Styles
+    avatarSection: {
+        alignItems: 'center',
+        paddingVertical: 24,
+        paddingHorizontal: 16,
+    },
+    avatarActions: {
+        flexDirection: 'row',
+        marginTop: 16,
+        gap: 12,
+    },
+    avatarButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        borderWidth: 1.5,
+        borderColor: '#7B1FA2',
+        gap: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    removeAvatarButton: {
+        borderColor: '#e63946',
+    },
+    avatarButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#7B1FA2',
+    },
+    avatarHint: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+        marginTop: 12,
+        fontStyle: 'italic',
+        paddingHorizontal: 20,
+    },
+
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',

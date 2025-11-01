@@ -6,6 +6,10 @@
  */
 
 import axios from 'axios';
+import { getCloudinaryFolder, ImageUploadType, getCloudinaryTransformation } from '../constants/cloudinaryFolders';
+
+// Re-export ImageUploadType for convenience
+export type { ImageUploadType } from '../constants/cloudinaryFolders';
 
 // Cloudinary configuration from .env
 const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -14,12 +18,12 @@ const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESE
 /**
  * Upload image directly to Cloudinary (bypasses backend)
  * @param {string} imageUri - Local file URI from expo-image-picker
- * @param {string} type - Upload type: 'product', 'document', or 'general'
+ * @param {ImageUploadType} type - Upload type: 'product', 'avatar', 'document', 'banner', 'store', 'category', 'offer', or 'general'
  * @returns {Promise<string>} Cloudinary URL
  */
 export const uploadImage = async (
     imageUri: string,
-    type: 'product' | 'document' | 'general' = 'general'
+    type: ImageUploadType = 'general'
 ): Promise<string> => {
     try {
         if (!imageUri) {
@@ -67,13 +71,11 @@ export const uploadImage = async (
         // Append upload preset (required for unsigned upload)
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-        // Append folder based on type
-        const folderMap = {
-            product: 'pizza-app/products',
-            document: 'pizza-app/documents',
-            general: 'pizza-app/general',
-        };
-        formData.append('folder', folderMap[type]);
+        // Append folder based on type using the centralized folder structure
+        const folder = getCloudinaryFolder(type);
+        formData.append('folder', folder);
+
+        console.log('📁 Folder:', folder);
 
         // Upload directly to Cloudinary
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -114,12 +116,12 @@ export const uploadImage = async (
 /**
  * Upload multiple images to Cloudinary
  * @param {string[]} imageUris - Array of local file URIs
- * @param {string} type - Upload type
+ * @param {ImageUploadType} type - Upload type
  * @returns {Promise<string[]>} Array of Cloudinary URLs
  */
 export const uploadMultipleImages = async (
     imageUris: string[],
-    type: 'product' | 'document' | 'general' = 'general'
+    type: ImageUploadType = 'general'
 ): Promise<string[]> => {
     try {
         // Upload all images in parallel
@@ -135,12 +137,12 @@ export const uploadMultipleImages = async (
 /**
  * Upload base64 image to Cloudinary (NOT RECOMMENDED - use uploadImage instead)
  * @param {string} base64Data - Base64 image data
- * @param {string} folder - Cloudinary folder
+ * @param {ImageUploadType} type - Upload type
  * @returns {Promise<string>} Cloudinary URL
  */
 export const uploadBase64Image = async (
     base64Data: string,
-    folder: string = 'pizza-app/general'
+    type: ImageUploadType = 'general'
 ): Promise<string> => {
     try {
         if (!base64Data) {
@@ -154,6 +156,9 @@ export const uploadBase64Image = async (
         const formData = new FormData();
         formData.append('file', base64Data);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+        // Use centralized folder structure
+        const folder = getCloudinaryFolder(type);
         formData.append('folder', folder);
 
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;

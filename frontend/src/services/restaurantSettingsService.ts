@@ -8,6 +8,14 @@ import apiClient from '../api/apiClient';
 
 // ==================== TYPES ====================
 
+export interface Topping {
+    _id?: string;
+    name: string;
+    category: 'vegetables' | 'meat' | 'cheese' | 'sauce';
+    price: number;
+    isActive: boolean;
+}
+
 export interface RestaurantSettings {
     _id: string;
     name: string;
@@ -18,6 +26,7 @@ export interface RestaurantSettings {
     taxRate: number;
     deliveryFee: number;
     freeDeliveryThreshold: number;
+    availableToppings: Topping[];
     lastUpdatedBy?: string;
     createdAt: string;
     updatedAt: string;
@@ -39,6 +48,7 @@ export interface UpdateSettingsParams {
     taxRate?: string | number;
     deliveryFee?: string | number;
     freeDeliveryThreshold?: string | number;
+    availableToppings?: Topping[];
 }
 
 // ==================== API FUNCTIONS ====================

@@ -11,30 +11,128 @@ import Payment from '../models/Payment.js';
 import Notification from '../models/Notification.js';
 
 /**
- * Get all users with pagination and filters
- * @param {Object} query - Query parameters (page, limit, role)
+ * Get all users with pagination     return agents;
+};
+
+/**
+ * Update user profile image
+ * @param {String} userId - User ID
+ * @param {String} profileImage - Cloudinary image URL
+ * @returns {Object} - Updated user
+ */
+export const updateProfileImage = async (userId, profileImage) => {
+    console.log('🖼️ [USER SERVICE] Updating profile image');
+    console.log('  - User ID:', userId);
+    console.log('  - Profile Image URL:', profileImage);
+
+    // Find user and update profile image
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { $set: { profileImage } },
+        {
+            new: true,
+            runValidators: true,
+        }
+    ).select('-password');
+
+    if (!user) {
+        console.error('❌ [USER SERVICE] User not found');
+        const error = new Error('User not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    console.log('✅ [USER SERVICE] Profile image updated successfully');
+    console.log('  - User:', user.name);
+    console.log('  - New Profile Image:', user.profileImage);
+
+    return user;
+};
+
+/**
+ * @param {Object} query - Query parameters (page, limit, role, search)
  * @returns {Object} - Users and pagination info
  */
 export const getAllUsers = async (query = {}) => {
-    const { page = 1, limit = 10, role } = query;
+    const { page = 1, limit = 20, role, search } = query;
     const skip = (page - 1) * limit;
 
     // Build filter query
     const filter = {};
-    if (role) {
+    if (role && role !== 'all') {
         filter.role = role;
     }
 
+    // Add search functionality (name, email, phone)
+    if (search && search.trim()) {
+        filter.$or = [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    // Fetch users with basic info
     const users = await User.find(filter)
         .select('-password')
         .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 });
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 })
+        .lean();
 
     const total = await User.countDocuments(filter);
 
+    // Enrich user data with stats (only for customers)
+    const enrichedUsers = await Promise.all(
+        users.map(async (user) => {
+            const baseUser = {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                role: user.role,
+                profileImage: user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`,
+                createdAt: user.createdAt,
+                isActive: user.isActive,
+                isApproved: user.isApproved,
+                isRejected: user.isRejected,
+            };
+
+            // Add role-specific data
+            if (user.role === 'customer') {
+                // Get order stats
+                const orders = await Order.find({ user: user._id }).select('totalAmount status').lean();
+                const totalOrders = orders.length;
+                const totalSpent = orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+                return {
+                    ...baseUser,
+                    totalOrders,
+                    totalSpent,
+                    lastOrderDate: orders.length > 0 ? orders[0].createdAt : null,
+                };
+            } else if (user.role === 'delivery') {
+                // Get delivery stats
+                const totalDeliveries = await Order.countDocuments({
+                    deliveryAgent: user._id,
+                    status: 'delivered'
+                });
+
+                return {
+                    ...baseUser,
+                    totalDeliveries,
+                    vehicleInfo: user.vehicleInfo,
+                    status: user.status,
+                };
+            } else {
+                // Admin or other roles - no stats needed
+                return baseUser;
+            }
+        })
+    );
+
     return {
-        users,
+        users: enrichedUsers,
         pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
@@ -45,17 +143,77 @@ export const getAllUsers = async (query = {}) => {
 };
 
 /**
- * Get user by ID
+ * Get user by ID with detailed stats
  * @param {String} userId - User ID
- * @returns {Object} - User data
+ * @returns {Object} - User data with stats
  */
 export const getUserById = async (userId) => {
-    const user = await User.findById(userId).select('-password');
+    const user = await User.findById(userId).select('-password').lean();
 
     if (!user) {
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
+    }
+
+    // Enrich with role-specific data
+    if (user.role === 'customer') {
+        // Get order history with details
+        const orders = await Order.find({ user: userId })
+            .select('orderNumber totalAmount status items createdAt')
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+
+        const totalOrders = await Order.countDocuments({ user: userId });
+        const totalSpent = await Order.aggregate([
+            { $match: { user: userId } },
+            { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+        ]);
+
+        // Get favorite items (most ordered items)
+        const favoriteItems = await Order.aggregate([
+            { $match: { user: userId } },
+            { $unwind: '$items' },
+            { $group: { _id: '$items.name', count: { $sum: '$items.quantity' } } },
+            { $sort: { count: -1 } },
+            { $limit: 5 },
+            { $project: { _id: 0, name: '$_id', orderCount: '$count' } }
+        ]);
+
+        return {
+            ...user,
+            totalOrders,
+            totalSpent: totalSpent[0]?.total || 0,
+            orderHistory: orders.map(order => ({
+                id: order.orderNumber,
+                date: order.createdAt,
+                items: order.items?.length || 0,
+                total: order.totalAmount,
+                status: order.status
+            })),
+            favoriteItems: favoriteItems.map(item => item.name),
+            addresses: user.addresses || []
+        };
+    } else if (user.role === 'delivery') {
+        // Get delivery stats
+        const totalDeliveries = await Order.countDocuments({
+            deliveryAgent: userId,
+            status: 'delivered'
+        });
+
+        const activeDeliveries = await Order.countDocuments({
+            deliveryAgent: userId,
+            status: { $in: ['out_for_delivery', 'ready'] }
+        });
+
+        return {
+            ...user,
+            totalDeliveries,
+            activeDeliveries,
+            vehicleInfo: user.vehicleInfo,
+            status: user.status,
+        };
     }
 
     return user;
@@ -252,4 +410,5 @@ export default {
     updateUser,
     deleteUser,
     getDeliveryAgents,
+    updateProfileImage,
 };

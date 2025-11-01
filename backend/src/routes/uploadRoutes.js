@@ -9,6 +9,8 @@ import {
     uploadImage,
     uploadProductImage,
     uploadDocumentImage,
+    uploadAvatar,
+    uploadBanner,
     deleteImage,
     uploadBase64Image,
 } from '../controllers/uploadController.js';
@@ -26,8 +28,14 @@ router.post('/image', uploadSingle, uploadImage);
 // Upload product image
 router.post('/product-image', uploadSingle, uploadProductImage);
 
+// Upload avatar/profile picture
+router.post('/avatar', uploadSingle, uploadAvatar);
+
 // Upload document image (for user verification documents)
 router.post('/document-image', uploadSingle, uploadDocumentImage);
+
+// Upload banner/promotional image
+router.post('/banner', uploadSingle, uploadBanner);
 
 // Upload base64 image (alternative for React Native)
 router.post('/base64-image', uploadBase64Image);

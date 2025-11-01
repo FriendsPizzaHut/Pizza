@@ -65,6 +65,32 @@ const restaurantSettingsSchema = new mongoose.Schema(
             default: 2490,
         },
 
+        // Pizza Toppings Configuration
+        availableToppings: [
+            {
+                name: {
+                    type: String,
+                    required: true,
+                    trim: true,
+                },
+                category: {
+                    type: String,
+                    enum: ['vegetables', 'meat', 'cheese', 'sauce'],
+                    required: true,
+                },
+                price: {
+                    type: Number,
+                    required: true,
+                    min: [0, 'Topping price cannot be negative'],
+                    default: 0,
+                },
+                isActive: {
+                    type: Boolean,
+                    default: true,
+                },
+            },
+        ],
+
         // System tracking
         lastUpdatedBy: {
             type: mongoose.Schema.Types.ObjectId,
@@ -95,6 +121,36 @@ restaurantSettingsSchema.statics.getSingleton = async function () {
             taxRate: 8.5,
             deliveryFee: 40,
             freeDeliveryThreshold: 2490,
+            availableToppings: [
+                // Vegetables (₹20-30)
+                { name: 'Onion', category: 'vegetables', price: 20, isActive: true },
+                { name: 'Tomato', category: 'vegetables', price: 20, isActive: true },
+                { name: 'Capsicum', category: 'vegetables', price: 25, isActive: true },
+                { name: 'Mushroom', category: 'vegetables', price: 30, isActive: true },
+                { name: 'Corn', category: 'vegetables', price: 25, isActive: true },
+                { name: 'Jalapeno', category: 'vegetables', price: 30, isActive: true },
+                { name: 'Olives', category: 'vegetables', price: 35, isActive: true },
+                { name: 'Bell Pepper', category: 'vegetables', price: 25, isActive: true },
+
+                // Meat (₹40-60)
+                { name: 'Chicken', category: 'meat', price: 50, isActive: true },
+                { name: 'Chicken Sausage', category: 'meat', price: 55, isActive: true },
+                { name: 'Pepperoni', category: 'meat', price: 60, isActive: true },
+                { name: 'Chicken Tikka', category: 'meat', price: 55, isActive: true },
+                { name: 'BBQ Chicken', category: 'meat', price: 60, isActive: true },
+
+                // Cheese (₹30-50)
+                { name: 'Mozzarella', category: 'cheese', price: 40, isActive: true },
+                { name: 'Cheddar', category: 'cheese', price: 45, isActive: true },
+                { name: 'Parmesan', category: 'cheese', price: 50, isActive: true },
+                { name: 'Paneer', category: 'cheese', price: 35, isActive: true },
+
+                // Sauce (₹15-25)
+                { name: 'Tomato Sauce', category: 'sauce', price: 15, isActive: true },
+                { name: 'White Sauce', category: 'sauce', price: 20, isActive: true },
+                { name: 'BBQ Sauce', category: 'sauce', price: 25, isActive: true },
+                { name: 'Peri Peri Sauce', category: 'sauce', price: 25, isActive: true },
+            ],
         });
     }
 

@@ -10,6 +10,8 @@ import { AppDispatch, RootState } from '../../../../redux/store';
 import { createProductThunk } from '../../../../redux/thunks/productThunks';
 import { clearMessages } from '../../../../redux/slices/productSlice';
 import { uploadImage, isLocalFileUri } from '../../../utils/imageUpload';
+import { FOOD_CATEGORIES, CategoryId, isMultiSizeCategory } from '../../../constants/foodCategories';
+import { getRestaurantSettings, Topping } from '../../../services/restaurantSettingsService';
 
 export default function AddMenuItemScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -19,7 +21,7 @@ export default function AddMenuItemScreen() {
     const [itemData, setItemData] = useState({
         name: '',
         description: '',
-        category: 'pizza' as 'pizza' | 'sides' | 'beverages' | 'desserts',
+        category: 'pizza' as CategoryId,
         // For pizza: multi-size pricing
         priceSmall: '',
         priceMedium: '',
@@ -39,53 +41,63 @@ export default function AddMenuItemScreen() {
     // Toppings state (only for pizza)
     const [toppings, setToppings] = useState<Array<{ name: string; category: 'vegetables' | 'meat' | 'cheese' | 'sauce' }>>([]);
 
+    // Available toppings from restaurant settings
+    const [availableToppings, setAvailableToppings] = useState<Topping[]>([]);
+    const [isLoadingToppings, setIsLoadingToppings] = useState(false);
+
     // Topping modal state
     const [showToppingModal, setShowToppingModal] = useState(false);
     const [selectedToppingCategory, setSelectedToppingCategory] = useState<'vegetables' | 'meat' | 'cheese' | 'sauce' | null>(null);
 
-    const categories: Array<{ value: 'pizza' | 'sides' | 'beverages' | 'desserts', label: string }> = [
-        { value: 'pizza', label: 'Pizzas' },
-        { value: 'sides', label: 'Sides' },
-        { value: 'beverages', label: 'Beverages' },
-        { value: 'desserts', label: 'Desserts' },
-    ];
+    const categories = FOOD_CATEGORIES.filter(cat => cat.id !== 'all').map(cat => ({
+        value: cat.id as CategoryId,
+        label: cat.label,
+        icon: cat.icon
+    }));
 
-    // Topping options by category
-    const toppingOptions = {
-        vegetables: [
-            { name: 'Mushrooms', icon: '🍄' },
-            { name: 'Onions', icon: '🧅' },
-            { name: 'Bell Peppers', icon: '🫑' },
-            { name: 'Olives', icon: '🫒' },
-            { name: 'Tomatoes', icon: '🍅' },
-            { name: 'Spinach', icon: '🥬' },
-            { name: 'Jalapenos', icon: '🌶️' },
-            { name: 'Pineapple', icon: '🍍' },
-        ],
-        meat: [
-            { name: 'Pepperoni', icon: '🍖' },
-            { name: 'Sausage', icon: '🌭' },
-            { name: 'Bacon', icon: '🥓' },
-            { name: 'Ham', icon: '🍖' },
-            { name: 'Chicken', icon: '🍗' },
-            { name: 'Beef', icon: '🥩' },
-        ],
-        cheese: [
-            { name: 'Mozzarella', icon: '🧀' },
-            { name: 'Parmesan', icon: '🧀' },
-            { name: 'Cheddar', icon: '🧀' },
-            { name: 'Feta', icon: '🧀' },
-            { name: 'Ricotta', icon: '🧀' },
-            { name: 'Goat Cheese', icon: '🧀' },
-        ],
-        sauce: [
-            { name: 'Marinara', icon: '🍅' },
-            { name: 'BBQ Sauce', icon: '🍖' },
-            { name: 'Pesto', icon: '🌿' },
-            { name: 'Alfredo', icon: '🥛' },
-            { name: 'Ranch', icon: '🥗' },
-            { name: 'Buffalo', icon: '🌶️' },
-        ],
+    // Fetch available toppings from restaurant settings
+    useEffect(() => {
+        fetchAvailableToppings();
+    }, []);
+
+    const fetchAvailableToppings = async () => {
+        try {
+            setIsLoadingToppings(true);
+            const settings = await getRestaurantSettings();
+            // Only show active toppings
+            const activeToppings = settings.availableToppings?.filter(t => t.isActive) || [];
+            setAvailableToppings(activeToppings);
+            console.log('✅ Loaded', activeToppings.length, 'active toppings from settings');
+        } catch (error) {
+            console.error('❌ Failed to load toppings:', error);
+            // If API fails, set empty array (no hardcoded fallback)
+            setAvailableToppings([]);
+        } finally {
+            setIsLoadingToppings(false);
+        }
+    };
+
+    // Group available toppings by category
+    const toppingOptions = availableToppings.reduce((acc, topping) => {
+        if (!acc[topping.category]) {
+            acc[topping.category] = [];
+        }
+        acc[topping.category].push({
+            name: topping.name,
+            icon: getCategoryIcon(topping.category) // Use category icon as fallback
+        });
+        return acc;
+    }, {} as Record<string, Array<{ name: string; icon: string }>>);
+
+    // Helper function to get category icon
+    const getCategoryIcon = (category: string) => {
+        switch (category) {
+            case 'vegetables': return '🥬';
+            case 'meat': return '�';
+            case 'cheese': return '�';
+            case 'sauce': return '🍅';
+            default: return '📦';
+        }
     };
 
     const handleAddTopping = (toppingName: string, category: 'vegetables' | 'meat' | 'cheese' | 'sauce') => {
@@ -161,7 +173,7 @@ export default function AddMenuItemScreen() {
         }
 
         // Validate pricing based on category
-        if (itemData.category === 'pizza') {
+        if (isMultiSizeCategory(itemData.category)) {
             // For pizza, at least one size must have a price
             const hasSmall = itemData.priceSmall && parseFloat(itemData.priceSmall) > 0;
             const hasMedium = itemData.priceMedium && parseFloat(itemData.priceMedium) > 0;
@@ -247,7 +259,7 @@ export default function AddMenuItemScreen() {
         // Prepare pricing based on category
         let pricing: number | { small?: number; medium?: number; large?: number };
 
-        if (itemData.category === 'pizza') {
+        if (isMultiSizeCategory(itemData.category)) {
             // For pizza: create object with available sizes
             pricing = {};
             if (itemData.priceSmall && parseFloat(itemData.priceSmall) > 0) {
@@ -378,7 +390,7 @@ export default function AddMenuItemScreen() {
                                         styles.categoryText,
                                         itemData.category === category.value && styles.selectedCategoryText
                                     ]}>
-                                        {category.label}
+                                        {category.icon} {category.label}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -392,7 +404,7 @@ export default function AddMenuItemScreen() {
                             <Text style={styles.sectionTitle}>Pricing</Text>
                         </View>
 
-                        {itemData.category === 'pizza' ? (
+                        {isMultiSizeCategory(itemData.category) ? (
                             // Multi-size pricing for pizza
                             <>
                                 <Text style={styles.label}>Pizza Sizes <Text style={styles.required}>*</Text></Text>
@@ -477,37 +489,67 @@ export default function AddMenuItemScreen() {
                                 <MaterialIcons name="restaurant" size={20} color="#cb202d" />
                                 <Text style={styles.sectionTitle}>Pizza Toppings (Optional)</Text>
                             </View>
-                            <Text style={[styles.helperText, { marginBottom: 12 }]}>Add toppings to customize your pizza</Text>
 
-                            {/* Toppings List */}
-                            {toppings.map((topping, index) => (
-                                <View key={index} style={styles.toppingItem}>
-                                    <View style={styles.toppingInfo}>
-                                        <Text style={styles.toppingName}>{topping.name}</Text>
-                                        <Text style={styles.toppingCategory}>
-                                            {topping.category.charAt(0).toUpperCase() + topping.category.slice(1)}
-                                        </Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            const newToppings = toppings.filter((_, i) => i !== index);
-                                            setToppings(newToppings);
-                                        }}
-                                        style={styles.removeToppingButton}
-                                    >
-                                        <MaterialIcons name="close" size={18} color="#cb202d" />
-                                    </TouchableOpacity>
+                            {isLoadingToppings ? (
+                                <View style={{ padding: 20, alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color="#cb202d" />
+                                    <Text style={{ marginTop: 8, fontSize: 13, color: '#8E8E93' }}>
+                                        Loading available toppings...
+                                    </Text>
                                 </View>
-                            ))}
+                            ) : availableToppings.length === 0 ? (
+                                <View style={{
+                                    backgroundColor: '#FFF3CD',
+                                    padding: 16,
+                                    borderRadius: 8,
+                                    marginBottom: 12,
+                                    borderLeftWidth: 4,
+                                    borderLeftColor: '#FF9800'
+                                }}>
+                                    <Text style={{ fontSize: 14, color: '#856404', fontWeight: '600', marginBottom: 4 }}>
+                                        No toppings configured
+                                    </Text>
+                                    <Text style={{ fontSize: 13, color: '#856404' }}>
+                                        Please add toppings in Restaurant Settings to enable topping customization.
+                                    </Text>
+                                </View>
+                            ) : (
+                                <>
+                                    <Text style={[styles.helperText, { marginBottom: 12 }]}>
+                                        Add toppings to customize your pizza
+                                    </Text>
 
-                            {/* Add Topping Button */}
-                            <TouchableOpacity
-                                style={styles.addToppingButton}
-                                onPress={() => setShowToppingModal(true)}
-                            >
-                                <MaterialIcons name="add" size={20} color="#cb202d" />
-                                <Text style={styles.addToppingText}>Add Topping</Text>
-                            </TouchableOpacity>
+                                    {/* Toppings List */}
+                                    {toppings.map((topping, index) => (
+                                        <View key={index} style={styles.toppingItem}>
+                                            <View style={styles.toppingInfo}>
+                                                <Text style={styles.toppingName}>{topping.name}</Text>
+                                                <Text style={styles.toppingCategory}>
+                                                    {topping.category.charAt(0).toUpperCase() + topping.category.slice(1)}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    const newToppings = toppings.filter((_, i) => i !== index);
+                                                    setToppings(newToppings);
+                                                }}
+                                                style={styles.removeToppingButton}
+                                            >
+                                                <MaterialIcons name="close" size={18} color="#cb202d" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+
+                                    {/* Add Topping Button */}
+                                    <TouchableOpacity
+                                        style={styles.addToppingButton}
+                                        onPress={() => setShowToppingModal(true)}
+                                    >
+                                        <MaterialIcons name="add" size={20} color="#cb202d" />
+                                        <Text style={styles.addToppingText}>Add Topping</Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
                         </View>
                     )}
 
@@ -815,26 +857,45 @@ export default function AddMenuItemScreen() {
                                 </View>
 
                                 <ScrollView style={styles.toppingGrid}>
-                                    <View style={styles.toppingGridContainer}>
-                                        {toppingOptions[selectedToppingCategory].map((topping, index) => (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={[
-                                                    styles.toppingChip,
-                                                    toppings.some(t => t.name === topping.name) && styles.toppingChipSelected
-                                                ]}
-                                                onPress={() => handleAddTopping(topping.name, selectedToppingCategory)}
-                                            >
-                                                <Text style={styles.toppingChipIcon}>{topping.icon}</Text>
-                                                <Text style={[
-                                                    styles.toppingChipText,
-                                                    toppings.some(t => t.name === topping.name) && styles.toppingChipTextSelected
-                                                ]}>
-                                                    {topping.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
+                                    {isLoadingToppings ? (
+                                        <View style={{ padding: 40, alignItems: 'center' }}>
+                                            <ActivityIndicator size="large" color="#cb202d" />
+                                            <Text style={{ marginTop: 12, fontSize: 14, color: '#8E8E93' }}>
+                                                Loading toppings...
+                                            </Text>
+                                        </View>
+                                    ) : !toppingOptions[selectedToppingCategory] || toppingOptions[selectedToppingCategory].length === 0 ? (
+                                        <View style={{ padding: 40, alignItems: 'center' }}>
+                                            <MaterialIcons name="local-pizza" size={48} color="#d1d1d1" />
+                                            <Text style={{ marginTop: 12, fontSize: 16, fontWeight: '600', color: '#999' }}>
+                                                No toppings available
+                                            </Text>
+                                            <Text style={{ marginTop: 4, fontSize: 13, color: '#B0B0B0', textAlign: 'center' }}>
+                                                Add toppings in Restaurant Settings first
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.toppingGridContainer}>
+                                            {toppingOptions[selectedToppingCategory].map((topping, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    style={[
+                                                        styles.toppingChip,
+                                                        toppings.some(t => t.name === topping.name) && styles.toppingChipSelected
+                                                    ]}
+                                                    onPress={() => handleAddTopping(topping.name, selectedToppingCategory)}
+                                                >
+                                                    <Text style={styles.toppingChipIcon}>{topping.icon}</Text>
+                                                    <Text style={[
+                                                        styles.toppingChipText,
+                                                        toppings.some(t => t.name === topping.name) && styles.toppingChipTextSelected
+                                                    ]}>
+                                                        {topping.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
                                 </ScrollView>
                             </>
                         )}

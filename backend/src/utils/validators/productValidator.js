@@ -30,8 +30,21 @@ export const createProductValidator = [
         .trim()
         .notEmpty()
         .withMessage('Category is required')
-        .isIn(['pizza', 'sides', 'beverages', 'desserts'])
-        .withMessage('Category must be pizza, sides, beverages, or desserts'),
+        .isIn([
+            'pizza',
+            'burger',
+            'grilled-sandwich',
+            'special-combo',
+            'pasta',
+            'noodles',
+            'snacks',
+            'milkshakes',
+            'cold-drinks',
+            'rice-items',
+            'sweets',
+            'sides'
+        ])
+        .withMessage('Category must be one of: pizza, burger, grilled-sandwich, special-combo, pasta, noodles, snacks, milkshakes, cold-drinks, rice-items, sweets, sides'),
 
     body('pricing')
         .notEmpty()
@@ -138,8 +151,21 @@ export const updateProductValidator = [
     body('category')
         .optional()
         .trim()
-        .isIn(['pizza', 'sides', 'beverages', 'desserts'])
-        .withMessage('Category must be pizza, sides, beverages, or desserts'),
+        .isIn([
+            'pizza',
+            'burger',
+            'grilled-sandwich',
+            'special-combo',
+            'pasta',
+            'noodles',
+            'snacks',
+            'milkshakes',
+            'cold-drinks',
+            'rice-items',
+            'sweets',
+            'sides'
+        ])
+        .withMessage('Category must be one of: pizza, burger, grilled-sandwich, special-combo, pasta, noodles, snacks, milkshakes, cold-drinks, rice-items, sweets, sides'),
 
     body('pricing')
         .optional()
@@ -172,8 +198,9 @@ export const updateProductValidator = [
     body('imageUrl')
         .optional()
         .trim()
-        .isURL()
-        .withMessage('Image URL must be a valid HTTP/HTTPS URL'),
+        .isString()
+        .withMessage('Image URL must be a string'),
+    // Note: Removed strict URL validation to allow various URL formats including Cloudinary
 
     body('isVegetarian')
         .optional()
