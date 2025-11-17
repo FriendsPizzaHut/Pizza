@@ -24,8 +24,6 @@ const connectDB = async () => {
             socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
         });
 
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-
         // Handle connection events
         mongoose.connection.on('error', (err) => {
             console.error(`❌ MongoDB connection error: ${err}`);
@@ -33,10 +31,6 @@ const connectDB = async () => {
 
         mongoose.connection.on('disconnected', () => {
             console.warn('⚠️  MongoDB disconnected. Attempting to reconnect...');
-        });
-
-        mongoose.connection.on('reconnected', () => {
-            console.log('✅ MongoDB reconnected');
         });
 
     } catch (error) {

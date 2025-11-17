@@ -25,8 +25,6 @@ export const processOrderUpdates = async (order, userId) => {
             updateProductStatistics(order),
             updateUserPreferences(order, userId),
         ]);
-
-        console.log(`✅ Post-order processing completed for order ${order.orderNumber}`);
     } catch (error) {
         // Log error but don't throw - this is async processing
         // Order is already created, these are just analytics updates
@@ -77,7 +75,6 @@ const updateProductStatistics = async (order) => {
         // Execute bulk update in single DB call
         if (bulkOps.length > 0) {
             await Product.bulkWrite(bulkOps, { ordered: false });
-            console.log(`📦 Updated ${bulkOps.length} products`);
 
             // Update ratings for affected products (separate operation)
             // This needs to be done individually as rating calculation is complex
@@ -125,7 +122,6 @@ const updateProductRatings = async (productIds) => {
 
         if (ratingUpdates.length > 0) {
             await Product.bulkWrite(ratingUpdates, { ordered: false });
-            console.log(`⭐ Updated ratings for ${ratingUpdates.length} products`);
         }
     } catch (error) {
         console.error('Error updating product ratings:', error.message);
@@ -190,8 +186,6 @@ const updateUserPreferences = async (order, userId) => {
             },
             { new: true }
         );
-
-        console.log(`👤 Updated user preferences for ${user.name}`);
     } catch (error) {
         console.error('Error updating user preferences:', error.message);
         throw error;
@@ -205,8 +199,6 @@ const updateUserPreferences = async (order, userId) => {
  */
 export const batchProcessOrderUpdates = async (orders) => {
     try {
-        console.log(`🔄 Batch processing ${orders.length} orders...`);
-
         // Process in chunks to avoid memory issues
         const CHUNK_SIZE = 50;
         for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
@@ -215,8 +207,6 @@ export const batchProcessOrderUpdates = async (orders) => {
             await Promise.all(
                 chunk.map(order => processOrderUpdates(order, order.user))
             );
-
-            console.log(`✅ Processed ${Math.min(i + CHUNK_SIZE, orders.length)}/${orders.length} orders`);
         }
     } catch (error) {
         console.error('Batch processing error:', error.message);

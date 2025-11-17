@@ -129,17 +129,8 @@ export const fetchAllProducts = async (filters?: {
  * Fetch a single product by ID
  */
 export const fetchProductById = async (productId: string): Promise<Product> => {
-    console.log('🔍 productService.fetchProductById called with:', productId);
     try {
-        console.log('📡 Making API call to: /products/' + productId);
         const response = await apiClient.get(`/products/${productId}`);
-        console.log('✅ API response received:', {
-            status: response.status,
-            success: response.data.success,
-            hasData: !!response.data.data,
-            productId: response.data.data?._id,
-            productName: response.data.data?.name
-        });
         return response.data.data;
     } catch (error: any) {
         console.error('❌ productService.fetchProductById error:', {

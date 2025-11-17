@@ -242,12 +242,6 @@ export const errorHandler = (err, req, res, next) => {
         return next(err);
     }
 
-    // Log what we're sending to client
-    console.log('📤 [ERROR RESPONSE DEBUG] Sending error response to client:', {
-        statusCode,
-        response: JSON.stringify(response, null, 2),
-    });
-
     // Send response - ALWAYS respond, never crash
     res.status(statusCode).json(response);
 };

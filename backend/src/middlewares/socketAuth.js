@@ -47,7 +47,6 @@ export const verifySocketToken = async (socket, next) => {
 
         // No token provided
         if (!token) {
-            console.log('⚠️  Socket connection attempt without token');
             // Allow connection but mark as unauthenticated
             socket.authenticated = false;
             socket.user = null;
@@ -63,7 +62,6 @@ export const verifySocketToken = async (socket, next) => {
         const user = await User.findById(decoded.id).select('-password -refreshToken');
 
         if (!user) {
-            console.log('⚠️  Socket connection with invalid user token');
             return next(new Error('User not found'));
         }
 
@@ -75,8 +73,6 @@ export const verifySocketToken = async (socket, next) => {
             name: user.name,
             role: user.role,
         };
-
-        console.log(`✅ Socket authenticated - User: ${user.name} (${user.role})`);
 
         // Auto-register user
         socket.emit('register', {

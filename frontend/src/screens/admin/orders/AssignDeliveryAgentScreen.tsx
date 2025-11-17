@@ -92,11 +92,8 @@ export default function AssignDeliveryAgentScreen() {
     // ✅ Socket connection for real-time agent status updates
     useEffect(() => {
         if (!userId) {
-            console.log('⚠️ [ADMIN] No userId, skipping socket');
             return;
         }
-
-        console.log('🔌 [ADMIN] Connecting socket for agent updates...');
 
         socketRef.current = io(SOCKET_URL, {
             transports: ['websocket', 'polling'],
@@ -108,26 +105,18 @@ export default function AssignDeliveryAgentScreen() {
         const socket = socketRef.current;
 
         socket.on('connect', () => {
-            console.log('✅ [ADMIN-ASSIGN] Socket connected:', socket.id);
-            console.log('  - Transport:', socket.io.engine.transport.name);
-            console.log('  - URL:', SOCKET_URL);
-
             // Register as admin to join admin room
             socket.emit('register', {
                 userId: userId,
                 role: 'admin'
             });
-            console.log('  - Registered as admin with userId:', userId);
         });
 
         socket.on('registered', (data) => {
-            console.log('✅ [ADMIN-ASSIGN] Registration confirmed!');
-            console.log('  - Response:', JSON.stringify(data, null, 2));
-            console.log('  - Now listening for: delivery:agent:status:update');
+            // Registration confirmed - listening for status updates
         });
 
         socket.on('disconnect', () => {
-            console.log('❌ [ADMIN-ASSIGN] Socket disconnected');
         });
 
         socket.on('connect_error', (error) => {
@@ -136,32 +125,12 @@ export default function AssignDeliveryAgentScreen() {
 
         // ✅ Listen for delivery agent status changes
         socket.on('delivery:agent:status:update', (data: any) => {
-            console.log('🎯 [ADMIN-ASSIGN] ========================================');
-            console.log('🎯 [ADMIN-ASSIGN] RECEIVED STATUS UPDATE EVENT!');
-            console.log('🎯 [ADMIN-ASSIGN] ========================================');
-            console.log('📡 [ADMIN-ASSIGN] Status update:', {
-                agentId: data.deliveryAgentId,
-                name: data.name,
-                isOnline: data.isOnline,
-                state: data.state,
-                timestamp: data.timestamp
-            });
-            console.log('📋 [ADMIN-ASSIGN] Current agents count:', deliveryAgents.length);
-
             setDeliveryAgents(prevAgents => {
-                console.log('🔍 [ADMIN-ASSIGN] Updating agents state...');
-                console.log('  - Previous agents:', prevAgents.map(a => ({ id: a.id, name: a.name, status: a.status })));
-                console.log('  - Looking for agent ID:', data.deliveryAgentId);
-
                 const updated = prevAgents.map(agent => {
                     if (agent.id === data.deliveryAgentId) {
                         const newStatus: 'online' | 'busy' | 'offline' =
                             data.state === 'free' ? 'online' :
                                 data.state === 'busy' ? 'busy' : 'offline';
-
-                        console.log(`🔄 [ADMIN-ASSIGN] FOUND MATCH! ${agent.name}: ${agent.status} → ${newStatus}`);
-                        console.log('  - Old isOnline:', agent.isOnline, '→ New isOnline:', data.isOnline);
-                        console.log('  - Old status:', agent.status, '→ New status:', newStatus);
 
                         return {
                             ...agent,
@@ -172,16 +141,11 @@ export default function AssignDeliveryAgentScreen() {
                     return agent;
                 });
 
-                console.log('✅ [ADMIN-ASSIGN] Updated agents:', updated.map(a => ({ id: a.id, name: a.name, status: a.status })));
                 return updated;
             });
-
-            console.log('🎯 [ADMIN-ASSIGN] State update complete!');
-            console.log('🎯 [ADMIN-ASSIGN] ========================================');
         });
 
         return () => {
-            console.log('🔌 [ADMIN] Disconnecting socket...');
             socket.off('connect');
             socket.off('registered');
             socket.off('disconnect');
@@ -192,12 +156,9 @@ export default function AssignDeliveryAgentScreen() {
 
     const fetchDeliveryAgents = async () => {
         try {
-            console.log('📡 Fetching approved delivery agents...');
             setLoading(true);
 
             const response = await axiosInstance.get('/users/delivery-agents/all');
-
-            console.log('✅ Delivery agents fetched:', response.data);
 
             if (response.data.success && response.data.data.agents) {
                 // Filter to show only approved agents
@@ -205,7 +166,6 @@ export default function AssignDeliveryAgentScreen() {
                     (agent: DeliveryAgent) => agent.isApproved === true
                 );
                 setDeliveryAgents(approvedAgents);
-                console.log(`  - Found ${approvedAgents.length} approved delivery agents`);
             }
         } catch (error: any) {
             console.error('❌ Error fetching delivery agents:', error.message);
@@ -275,14 +235,11 @@ export default function AssignDeliveryAgentScreen() {
 
     const performAssignment = async (agent: DeliveryAgent) => {
         try {
-            console.log(`🚀 Assigning order ${orderId} to ${agent.name}...`);
             setAssigning(true);
 
             const response = await axiosInstance.patch(`/orders/${orderDetails._id || orderDetails.id}/assign-delivery`, {
                 deliveryAgentId: agent.id
             });
-
-            console.log('✅ Order assigned successfully');
 
             Alert.alert(
                 'Success',

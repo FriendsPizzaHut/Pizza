@@ -12,18 +12,8 @@ import apiClient from '../../api/apiClient';
 import type { NotificationData } from '../../types/notification';
 
 // Configure notification handler for foreground notifications
-console.log('🔧 [NOTIFICATIONS] Configuring notification handler...');
 Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('⚡ [FOREGROUND-DEBUG] Notification handler called!');
-        console.log('🆔 [FOREGROUND-DEBUG] ID:', notification.request.identifier);
-        console.log('📦 [FOREGROUND-DEBUG] Full content:', JSON.stringify(notification.request.content, null, 2));
-        console.log('📋 [FOREGROUND-DEBUG] Title:', notification.request.content.title);
-        console.log('📝 [FOREGROUND-DEBUG] Body:', notification.request.content.body);
-        console.log('📦 [FOREGROUND-DEBUG] Data:', notification.request.content.data);
-        console.log('⏰ [FOREGROUND-DEBUG] Timestamp:', new Date().toISOString());
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         return {
             shouldShowAlert: true,
             shouldPlaySound: true,
@@ -33,7 +23,8 @@ Notifications.setNotificationHandler({
         };
     },
 });
-console.log('✅ [NOTIFICATIONS] Notification handler configured'); class NotificationService {
+
+class NotificationService {
     private static instance: NotificationService;
     private expoPushToken: string | null = null;
     private notificationListener: any = null;
@@ -53,60 +44,44 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
      */
     async requestPermissions(): Promise<boolean> {
         try {
-            console.log('🔍 [NOTIFICATIONS] Checking device type...');
-            console.log('📱 [NOTIFICATIONS] Device.isDevice:', Device.isDevice);
-            console.log('📱 [NOTIFICATIONS] Platform:', Platform.OS);
-
             if (!Device.isDevice) {
-                console.log('❌ [NOTIFICATIONS] Must use physical device for Push Notifications');
                 return false;
             }
 
-            console.log('🔍 [NOTIFICATIONS] Getting current permission status...');
             const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            console.log('📋 [NOTIFICATIONS] Current permission status:', existingStatus);
 
             let finalStatus = existingStatus;
 
             if (existingStatus !== 'granted') {
-                console.log('🙏 [NOTIFICATIONS] Requesting permissions...');
                 const { status } = await Notifications.requestPermissionsAsync();
                 finalStatus = status;
-                console.log('📋 [NOTIFICATIONS] Permission request result:', status);
             }
 
             if (finalStatus !== 'granted') {
-                console.log('❌ [NOTIFICATIONS] Permission denied - Final status:', finalStatus);
                 return false;
             }
 
-            console.log('✅ [NOTIFICATIONS] Permission granted - Final status:', finalStatus);
             return true;
         } catch (error) {
             console.error('❌ [NOTIFICATIONS] Error requesting permissions:', error);
             console.error('❌ [NOTIFICATIONS] Error stack:', (error as Error).stack);
             return false;
         }
-    }    /**
+    }
+
+    /**
    * Get Expo push token
    */
     async getExpoPushToken(): Promise<string | null> {
         try {
-            console.log('🔍 [NOTIFICATIONS] Getting FCM push token...');
-
             if (!Device.isDevice) {
-                console.log('❌ [NOTIFICATIONS] Physical device required');
                 return null;
             }
 
             // Get FCM token from Firebase Messaging
-            console.log('📡 [NOTIFICATIONS] Requesting FCM token from Firebase...');
             const fcmToken = await messaging().getToken();
 
             this.expoPushToken = fcmToken;
-            console.log('✅ [NOTIFICATIONS] FCM push token received:', fcmToken.substring(0, 30) + '...');
-            console.log('📏 [NOTIFICATIONS] Token length:', fcmToken.length);
-            console.log('🔍 [NOTIFICATIONS] Token type: FCM (Firebase Cloud Messaging)');
 
             return this.expoPushToken;
         } catch (error) {
@@ -137,10 +112,6 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
 
             const deviceType = Platform.OS === 'ios' ? 'ios' : 'android';
 
-            console.log('📤 [NOTIFICATIONS] Registering token with backend...');
-            console.log('📍 [NOTIFICATIONS] URL:', `${API_URL}/device-tokens`);
-            console.log('📦 [NOTIFICATIONS] Payload:', { userId, userRole, deviceType, platform: 'fcm', tokenLength: token.length });
-
             const response = await apiClient.post(
                 '/device-tokens',
                 {
@@ -153,7 +124,6 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
             );
 
             if (response.data.success) {
-                console.log('✅ [NOTIFICATIONS] Token registered successfully');
                 return true;
             } else {
                 console.error('❌ [NOTIFICATIONS] Failed to register token:', response.data);
@@ -175,8 +145,6 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
         onNotificationTap?: (response: Notifications.NotificationResponse) => void
     ): Promise<boolean> {
         try {
-            console.log('🔔 [NOTIFICATIONS] Initializing notification system...');
-
             // Request permissions
             const hasPermission = await this.requestPermissions();
             if (!hasPermission) {
@@ -192,31 +160,19 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
             }
 
             // Set up notification listeners
-            console.log('🎧 [NOTIFICATIONS] Setting up notification listeners...');
             this.setupListeners(onNotificationReceived, onNotificationTap);
-            console.log('✅ [NOTIFICATIONS] Listeners setup complete');
 
             // Configure notification channel for Android
             if (Platform.OS === 'android') {
-                console.log('📱 [NOTIFICATIONS] Configuring Android notification channel...');
-                const channel = await Notifications.setNotificationChannelAsync('orders', {
+                await Notifications.setNotificationChannelAsync('orders', {
                     name: 'Orders',
                     importance: Notifications.AndroidImportance.HIGH,
                     vibrationPattern: [0, 250, 250, 250],
                     lightColor: '#FF6B35',
                     sound: 'default',
                 });
-                console.log('✅ [NOTIFICATIONS] Android channel created:', JSON.stringify(channel, null, 2));
-
-                // Get all channels to verify
-                const channels = await Notifications.getNotificationChannelsAsync();
-                console.log('📋 [NOTIFICATIONS] All notification channels:', channels.length);
-                channels.forEach(ch => {
-                    console.log(`   - ${ch.id}: ${ch.name} (importance: ${ch.importance})`);
-                });
             }
 
-            console.log('✅ [NOTIFICATIONS] Initialization complete');
             return true;
         } catch (error) {
             console.error('❌ [NOTIFICATIONS] Initialization failed:', error);
@@ -245,40 +201,32 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
                     },
                     trigger: null, // Show immediately
                 });
-                console.log('✅ [FIREBASE-FIX] Local notification scheduled successfully');
             }
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         });
-        console.log('✅ [FIREBASE-DEBUG] Firebase foreground listener registered');
 
         // Listener for notifications received while app is foregrounded
         this.notificationListener = Notifications.addNotificationReceivedListener((notification) => {
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('📬 [EXPO-FOREGROUND-DEBUG] Expo notification received (foreground)');
-            console.log('📦 [EXPO-FOREGROUND-DEBUG] Full notification:', JSON.stringify(notification, null, 2));
-            console.log('� [EXPO-FOREGROUND-DEBUG] Content:', notification.request.content);
-            console.log('⏰ [EXPO-FOREGROUND-DEBUG] Timestamp:', new Date().toISOString());
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             if (onNotificationReceived) {
                 onNotificationReceived(notification);
             } else {
                 console.warn('⚠️ [NOTIFICATIONS] No onNotificationReceived callback');
             }
         });
-        console.log('✅ [NOTIFICATIONS] Foreground listener registered');
 
         // Listener for when user taps on notification
         this.responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
-            console.log('👆 [NOTIFICATIONS] Notification tapped:', response);
             if (onNotificationTap) {
                 onNotificationTap(response);
             } else {
                 console.warn('⚠️ [NOTIFICATIONS] No onNotificationTap callback');
             }
         });
-        console.log('✅ [NOTIFICATIONS] Tap listener registered');
     }
 
+    /**
+     * Deactivate device token on logout
+     * Removes the token from backend to stop receiving notifications
+     */
     /**
      * Deactivate device token on logout
      * Removes the token from backend to stop receiving notifications
@@ -291,17 +239,12 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
                 return true; // Not an error, just no token registered
             }
 
-            console.log('🔕 [NOTIFICATIONS] Deactivating device token...');
-            console.log('  - User ID:', userId);
-            console.log('  - Token length:', token.length);
-
             // Call backend to deactivate the token
             const response = await apiClient.delete(
                 `/device-tokens/${encodeURIComponent(token)}`
             );
 
             if (response.data.success) {
-                console.log('✅ [NOTIFICATIONS] Token deactivated successfully');
                 this.expoPushToken = null; // Clear local reference
                 return true;
             } else {
@@ -328,7 +271,6 @@ console.log('✅ [NOTIFICATIONS] Notification handler configured'); class Notifi
             this.responseListener.remove();
             this.responseListener = null;
         }
-        console.log('🧹 [NOTIFICATIONS] Cleanup complete');
     }
 
     /**

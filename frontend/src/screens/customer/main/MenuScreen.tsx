@@ -100,46 +100,59 @@ export default function MenuScreen() {
     // Fetch user's favorite items from profile
     useEffect(() => {
         const fetchFavorites = async () => {
-            if (!userId) return;
+            if (!userId) {
+                setFavoriteItems([]);
+                return;
+            }
 
             try {
                 setLoadingFavorites(true);
-                console.log('📊 Fetching user favorites for userId:', userId);
 
                 const response = await axiosInstance.get(`/users/${userId}`);
-                console.log('✅ User profile fetched:', response.data);
 
                 if (response.data.success && response.data.data) {
                     const userData = response.data.data;
                     const mostOrdered = userData.orderingBehavior?.mostOrderedItems || [];
 
-                    console.log('📦 Most ordered items:', mostOrdered);
+                    console.log('Fetched user data for favorites:', {
+                        userId,
+                        hasOrderingBehavior: !!userData.orderingBehavior,
+                        mostOrderedCount: mostOrdered.length,
+                        sampleItem: mostOrdered[0]
+                    });
 
-                    // Transform to favorite items format
+                    // Filter out items without valid product data and map to display format
                     const favorites = mostOrdered
-                        .slice(0, 4) // Take top 4
+                        .filter((item: any) => {
+                            // Check if productId exists and has required fields
+                            const product = item.productId;
+                            return product &&
+                                product._id &&
+                                product.name &&
+                                product.imageUrl &&
+                                product.isAvailable !== false; // Only show available products
+                        })
+                        .sort((a: any, b: any) => (b.count || 0) - (a.count || 0))
+                        .slice(0, 10)
                         .map((item: any) => {
-                            // Find the full product data from Redux store
-                            const productData = products.find(p => p._id === item.productId?._id || p._id === item.productId);
-
+                            const product = item.productId;
                             return {
-                                id: item.productId?._id || item.productId || '',
-                                name: item.productId?.name || productData?.name || 'Unknown',
-                                image: item.productId?.imageUrl || productData?.imageUrl || 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150&h=150&fit=crop',
+                                id: product._id,
+                                name: product.name,
+                                image: product.imageUrl,
                                 lastOrdered: item.lastOrdered ? formatLastOrdered(item.lastOrdered) : 'Recently',
                                 orderCount: item.count || 0,
-                                productId: item.productId?._id || item.productId || '',
-                                category: item.productId?.category || productData?.category || 'pizza',
+                                productId: product._id,
+                                category: product.category || 'pizza',
                             };
-                        })
-                        .filter((item: any) => item.productId); // Only include valid items
+                        });
 
-                    console.log('✅ Transformed favorites:', favorites);
                     setFavoriteItems(favorites);
+                } else {
+                    setFavoriteItems([]);
                 }
             } catch (error: any) {
-                console.error('❌ Error fetching favorites:', error);
-                // Fallback to empty array on error
+                console.error('Error fetching favorites:', error);
                 setFavoriteItems([]);
             } finally {
                 setLoadingFavorites(false);
@@ -147,7 +160,7 @@ export default function MenuScreen() {
         };
 
         fetchFavorites();
-    }, [userId, products]);
+    }, [userId]);
 
     // Helper to format last ordered date
     const formatLastOrdered = (dateString: string): string => {
@@ -344,77 +357,72 @@ export default function MenuScreen() {
                 }}
                 scrollEventThrottle={400}
             >
-                {/* Favorite Orders Section */}
-                <View style={styles.favoritesSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.favoritesTitle}>Your Favorites</Text>
+                {/* Favorite Orders Section - Only show if user has favorites */}
+                {(loadingFavorites || favoriteItems.length > 0) && (
+                    <View style={styles.favoritesSection}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.favoritesTitle}>Your Favorites</Text>
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.favoritesContainer}
+                        >
+                            {loadingFavorites ? (
+                                <View style={styles.favoritesLoadingContainer}>
+                                    <ActivityIndicator size="small" color={Colors.primary} />
+                                    <Text style={styles.favoritesLoadingText}>
+                                        Loading your favorites...
+                                    </Text>
+                                </View>
+                            ) : (
+                                favoriteItems.map((favorite) => (
+                                    <TouchableOpacity
+                                        key={favorite.id}
+                                        style={styles.favoriteCard}
+                                        activeOpacity={0.8}
+                                        onPress={() => handleFavoriteClick(favorite)}
+                                    >
+                                        <View style={styles.favoriteImageContainer}>
+                                            <Image
+                                                source={{ uri: favorite.image }}
+                                                style={styles.favoriteImage}
+                                                resizeMode="cover"
+                                            />
+                                            <View style={styles.favoriteOrderBadge}>
+                                                <Text style={styles.favoriteOrderBadgeText}>{favorite.orderCount}x</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={styles.favoriteAddButton}
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    handleFavoriteClick(favorite);
+                                                }}
+                                            >
+                                                <Text style={styles.favoriteAddText}>+</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <View style={styles.favoriteInfo}>
+                                            <Text style={styles.favoriteName} numberOfLines={1}>
+                                                {favorite.name}
+                                            </Text>
+                                            <View style={styles.favoriteStatsRow}>
+                                                <Text style={styles.favoriteDetails}>
+                                                    {favorite.orderCount}x ordered
+                                                </Text>
+                                                <Text style={styles.favoriteDot}>•</Text>
+                                                <Text style={styles.favoriteLastOrder}>
+                                                    {favorite.lastOrdered}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                )))}
+                        </ScrollView>
                     </View>
-
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.favoritesContainer}
-                    >
-                        {loadingFavorites ? (
-                            <View style={{ paddingVertical: 20, paddingHorizontal: 60 }}>
-                                <ActivityIndicator size="small" color={Colors.primary} />
-                                <Text style={{ ...Typography.regular.text200, color: Colors.text.secondary, marginTop: 8 }}>
-                                    Loading favorites...
-                                </Text>
-                            </View>
-                        ) : favoriteItems.length === 0 ? (
-                            <View style={{ paddingVertical: 20, paddingHorizontal: 20 }}>
-                                <Text style={{ ...Typography.regular.text300, color: Colors.text.secondary }}>
-                                    No favorites yet. Start ordering to see your most ordered items here!
-                                </Text>
-                            </View>
-                        ) : (
-                            favoriteItems.map((favorite) => (
-                                <TouchableOpacity
-                                    key={favorite.id}
-                                    style={styles.favoriteCard}
-                                    activeOpacity={0.8}
-                                    onPress={() => handleFavoriteClick(favorite)}
-                                >
-                                    <View style={styles.favoriteImageContainer}>
-                                        <Image
-                                            source={{ uri: favorite.image }}
-                                            style={styles.favoriteImage}
-                                            resizeMode="cover"
-                                        />
-                                        <View style={styles.favoriteOrderBadge}>
-                                            <Text style={styles.favoriteOrderBadgeText}>{favorite.orderCount}x</Text>
-                                        </View>
-                                        <TouchableOpacity
-                                            style={styles.favoriteAddButton}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                handleFavoriteClick(favorite);
-                                            }}
-                                        >
-                                            <Text style={styles.favoriteAddText}>+</Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={styles.favoriteInfo}>
-                                        <Text style={styles.favoriteName} numberOfLines={1}>
-                                            {favorite.name}
-                                        </Text>
-                                        <View style={styles.favoriteStatsRow}>
-                                            <Text style={styles.favoriteDetails}>
-                                                {favorite.orderCount}x ordered
-                                            </Text>
-                                            <Text style={styles.favoriteDot}>•</Text>
-                                            <Text style={styles.favoriteLastOrder}>
-                                                {favorite.lastOrdered}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </TouchableOpacity>
-                            ))
-                        )}
-                    </ScrollView>
-                </View>
+                )}
 
                 <View style={styles.menuSection}>
                     <Text style={styles.sectionTitle}>Our Delicious Menu</Text>
@@ -958,6 +966,39 @@ const styles = StyleSheet.create({
         ...Typography.regular.text300,
         color: Colors.text.secondary,
         marginBottom: Spacing.lg,
+    },
+    // Favorites Loading and Empty States
+    favoritesLoadingContainer: {
+        paddingVertical: 20,
+        paddingHorizontal: 60,
+        alignItems: 'center',
+    },
+    favoritesLoadingText: {
+        ...Typography.regular.text200,
+        color: Colors.text.secondary,
+        marginTop: 8,
+    },
+    favoritesEmptyContainer: {
+        paddingVertical: 20,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        width: 280,
+    },
+    favoritesEmptyIcon: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    favoritesEmptyText: {
+        ...Typography.semibold.text400,
+        color: Colors.text.primary,
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    favoritesEmptySubtext: {
+        ...Typography.regular.text300,
+        color: Colors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 20,
     },
     // Loading, Error, Empty States
     loadingContainer: {

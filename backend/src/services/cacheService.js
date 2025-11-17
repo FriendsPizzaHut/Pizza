@@ -17,7 +17,6 @@ export const setCache = async (key, value, ttl = 3600) => {
     try {
         const serializedValue = JSON.stringify(value);
         await redisClient.setex(key, ttl, serializedValue);
-        console.log(`✅ Cache set: ${key}`);
         return true;
     } catch (error) {
         console.error(`❌ Error setting cache for key ${key}:`, error.message);
@@ -34,10 +33,8 @@ export const getCache = async (key) => {
     try {
         const cachedValue = await redisClient.get(key);
         if (!cachedValue) {
-            console.log(`⚠️  Cache miss: ${key}`);
             return null;
         }
-        console.log(`✅ Cache hit: ${key}`);
         return JSON.parse(cachedValue);
     } catch (error) {
         console.error(`❌ Error getting cache for key ${key}:`, error.message);
@@ -52,7 +49,6 @@ export const getCache = async (key) => {
 export const deleteCache = async (key) => {
     try {
         await redisClient.del(key);
-        console.log(`✅ Cache deleted: ${key}`);
         return true;
     } catch (error) {
         console.error(`❌ Error deleting cache for key ${key}:`, error.message);
@@ -69,7 +65,6 @@ export const deleteCachePattern = async (pattern) => {
         const keys = await redisClient.keys(pattern);
         if (keys.length > 0) {
             await redisClient.del(...keys);
-            console.log(`✅ Deleted ${keys.length} cache keys matching pattern: ${pattern}`);
         }
         return true;
     } catch (error) {
@@ -102,7 +97,6 @@ export const setCachePermanent = async (key, value) => {
     try {
         const serializedValue = JSON.stringify(value);
         await redisClient.set(key, serializedValue);
-        console.log(`✅ Permanent cache set: ${key}`);
         return true;
     } catch (error) {
         console.error(`❌ Error setting permanent cache for key ${key}:`, error.message);

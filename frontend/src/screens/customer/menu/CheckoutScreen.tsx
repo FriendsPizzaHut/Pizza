@@ -143,22 +143,8 @@ export default function CheckoutScreen() {
         {
             id: '2',
             type: 'card',
-            name: 'Credit/Debit Card',
-            icon: '💳',
-            isDefault: false,
-        },
-        {
-            id: '3',
-            type: 'upi',
-            name: 'UPI Payment',
-            icon: '📱',
-            isDefault: false,
-        },
-        {
-            id: '4',
-            type: 'wallet',
-            name: 'Digital Wallet',
-            icon: '👛',
+            name: 'Online Payment',
+            icon: '�',
             isDefault: false,
         },
     ];
@@ -569,6 +555,9 @@ export default function CheckoutScreen() {
                                         <Text style={styles.paymentName}>{payment.name}</Text>
                                         {payment.type === 'cash' && (
                                             <Text style={styles.paymentSubtext}>Pay on delivery</Text>
+                                        )}
+                                        {payment.type === 'card' && (
+                                            <Text style={styles.paymentSubtext}>UPI, Cards, Wallets & more</Text>
                                         )}
                                     </View>
                                 </View>

@@ -229,25 +229,13 @@ export const pingDeviceToken = async (req, res) => {
                 });
             }
 
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log('🔔 [PING-DEBUG] Test notification request received');
-            console.log('👤 [PING-DEBUG] User ID:', userId);
-            console.log('🎫 [PING-DEBUG] Token:', token.substring(0, 30) + '...');
-            console.log('📋 [PING-DEBUG] Title:', title);
-            console.log('📝 [PING-DEBUG] Body:', body);
-            console.log('⏰ [PING-DEBUG] Timestamp:', new Date().toISOString());
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
             logger.info(`[DEVICE_TOKEN] Sending test notification to user ${userId}`);
 
             try {
                 // Import Firebase service dynamically
-                console.log('📦 [PING-DEBUG] Importing Firebase service...');
                 const { sendToDevices } = await import('../services/notifications/firebaseService.js');
-                console.log('✅ [PING-DEBUG] Firebase service imported');
 
                 // Send notification via Firebase
-                console.log('🚀 [PING-DEBUG] Calling sendToDevices...');
                 const result = await sendToDevices(
                     [token],
                     { title, body },
@@ -258,8 +246,6 @@ export const pingDeviceToken = async (req, res) => {
                     }
                 );
 
-                console.log('✅ [PING-DEBUG] sendToDevices completed');
-                console.log('📊 [PING-DEBUG] Result:', JSON.stringify(result, null, 2));
                 logger.info(`[DEVICE_TOKEN] Test notification sent:`, result);
 
                 // Update last used

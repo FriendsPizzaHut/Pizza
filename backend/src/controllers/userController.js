@@ -50,25 +50,7 @@ export const getUserById = async (req, res, next) => {
  */
 export const updateUser = async (req, res, next) => {
     try {
-        console.log('🔧 [UPDATE USER CONTROLLER] Request received');
-        console.log('  - User ID:', req.params.id);
-        console.log('  - Request Body:', JSON.stringify(req.body, null, 2));
-        console.log('  - Approval Fields in Body:', {
-            isApproved: req.body.isApproved,
-            isRejected: req.body.isRejected,
-            rejectionReason: req.body.rejectionReason
-        });
-
         const user = await userService.updateUser(req.params.id, req.body);
-
-        console.log('✅ [UPDATE USER CONTROLLER] User updated successfully');
-        console.log('  - Updated User ID:', user._id);
-        console.log('  - Updated User Role:', user.role);
-        console.log('  - Approval Status After Update:', {
-            isApproved: user.isApproved,
-            isRejected: user.isRejected,
-            rejectionReason: user.rejectionReason
-        });
 
         // Emit real-time update if delivery agent status changed
         if (user.role === 'delivery' && req.body.deliveryStatus) {
@@ -113,11 +95,6 @@ export const updateProfileImage = async (req, res, next) => {
         const { id } = req.params;
         const { profileImage } = req.body;
 
-        console.log('🖼️ [UPDATE PROFILE IMAGE] Request received');
-        console.log('  - User ID:', id);
-        console.log('  - Profile Image URL:', profileImage);
-        console.log('  - Authenticated User:', req.user?.id);
-
         // Verify user is updating their own profile (or is admin)
         if (req.user.id !== id && req.user.role !== 'admin') {
             const error = new Error('You can only update your own profile image');
@@ -133,14 +110,11 @@ export const updateProfileImage = async (req, res, next) => {
 
         const user = await userService.updateProfileImage(id, profileImage);
 
-        console.log('✅ [UPDATE PROFILE IMAGE] Profile image updated successfully');
-
         sendResponse(res, 200, 'Profile image updated successfully', {
             profileImage: user.profileImage,
             user: user.getPublicProfile(),
         });
     } catch (error) {
-        console.error('❌ [UPDATE PROFILE IMAGE] Error:', error.message);
         next(error);
     }
 };

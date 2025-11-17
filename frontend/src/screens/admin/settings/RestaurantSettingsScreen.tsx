@@ -61,7 +61,6 @@ export default function RestaurantSettingsScreen() {
 
             setToppings(settings.availableToppings || []);
 
-            console.log('✅ Restaurant settings loaded successfully');
         } catch (error: any) {
             console.error('❌ Failed to load settings:', error);
             Alert.alert(
@@ -111,8 +110,6 @@ export default function RestaurantSettingsScreen() {
                 freeDeliveryThreshold: restaurantData.freeDeliveryThreshold,
                 availableToppings: toppings,
             });
-
-            console.log('✅ Restaurant settings updated successfully');
 
             Alert.alert(
                 'Success',

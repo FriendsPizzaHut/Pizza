@@ -26,14 +26,6 @@ const redisClient = new Redis({
 });
 
 // Redis connection event handlers
-redisClient.on('connect', () => {
-    console.log('✅ Redis connected successfully');
-});
-
-redisClient.on('ready', () => {
-    console.log('✅ Redis client is ready to use');
-});
-
 redisClient.on('error', (err) => {
     console.error('❌ Redis connection error:', err.message);
 });
@@ -42,17 +34,12 @@ redisClient.on('close', () => {
     console.warn('⚠️  Redis connection closed');
 });
 
-redisClient.on('reconnecting', () => {
-    console.log('🔄 Reconnecting to Redis...');
-});
-
 /**
  * Graceful shutdown for Redis
  */
 export const closeRedis = async () => {
     try {
         await redisClient.quit();
-        console.log('✅ Redis connection closed gracefully');
     } catch (error) {
         console.error('❌ Error closing Redis connection:', error.message);
     }

@@ -67,7 +67,6 @@ export default function AddMenuItemScreen() {
             // Only show active toppings
             const activeToppings = settings.availableToppings?.filter(t => t.isActive) || [];
             setAvailableToppings(activeToppings);
-            console.log('✅ Loaded', activeToppings.length, 'active toppings from settings');
         } catch (error) {
             console.error('❌ Failed to load toppings:', error);
             // If API fails, set empty array (no hardcoded fallback)
@@ -211,11 +210,9 @@ export default function AddMenuItemScreen() {
 
             if (selectedImage && isLocalFileUri(selectedImage)) {
                 setIsUploadingImage(true);
-                console.log('📤 Uploading image to Cloudinary...');
 
                 try {
                     cloudinaryImageUrl = await uploadImage(selectedImage, 'product');
-                    console.log('✅ Image uploaded successfully:', cloudinaryImageUrl);
                 } catch (uploadError: any) {
                     setIsUploadingImage(false);
                     Alert.alert(

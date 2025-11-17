@@ -80,7 +80,6 @@ export const cleanupTempFile = (filePath) => {
     try {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log(`🗑️  Cleaned up temp file: ${filePath}`);
         }
     } catch (error) {
         console.error('❌ Error cleaning up temp file:', error);

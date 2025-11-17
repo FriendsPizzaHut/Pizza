@@ -92,25 +92,14 @@ export const registerUser = async (userData) => {
  * @returns {Object} - User and tokens
  */
 export const loginUser = async (email, password) => {
-    console.log('🔐 [LOGIN] Attempting login for:', email);
-
     // Find user by email and explicitly select password field (it's excluded by default)
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
-        console.log('❌ [LOGIN] User not found');
         const error = new Error('Invalid email or password');
         error.statusCode = 401;
         throw error;
     }
-
-    console.log('👤 [LOGIN] User found:', {
-        id: user._id,
-        role: user.role,
-        isActive: user.isActive,
-        isApproved: user.isApproved,
-        isRejected: user.isRejected
-    });
 
     // Verify password first (before checking approval status)
     const isPasswordValid = await user.comparePassword(password);
@@ -122,11 +111,8 @@ export const loginUser = async (email, password) => {
 
     // Check approval status for delivery agents
     if (user.role === 'delivery') {
-        console.log('🚴 [LOGIN] Delivery agent - checking approval status');
-
         // Check if rejected
         if (user.isRejected) {
-            console.log('❌ [LOGIN] Account rejected:', user.rejectionReason);
             const error = new Error(
                 user.rejectionReason
                     ? `Your delivery partner application has been rejected. Reason: ${user.rejectionReason}`
@@ -139,7 +125,6 @@ export const loginUser = async (email, password) => {
 
         // Check if not yet approved (pending state)
         if (!user.isApproved) {
-            console.log('⏳ [LOGIN] Account pending approval');
             const error = new Error('Your delivery partner account is pending admin approval. Please wait for verification.');
             error.statusCode = 403;
             error.code = 'APPROVAL_PENDING';
@@ -148,14 +133,11 @@ export const loginUser = async (email, password) => {
 
         // If approved, check if account is active
         if (!user.isActive) {
-            console.log('🚫 [LOGIN] Account inactive');
             const error = new Error('Your account has been deactivated. Please contact admin.');
             error.statusCode = 403;
             error.code = 'ACCOUNT_INACTIVE';
             throw error;
         }
-
-        console.log('✅ [LOGIN] Delivery agent approved and active');
     }
 
     // Generate tokens
@@ -172,8 +154,6 @@ export const loginUser = async (email, password) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-
-    console.log('✅ [LOGIN] Login successful for:', email, '| Role:', user.role);
 
     return {
         user: user.getPublicProfile(),
@@ -203,7 +183,6 @@ export const logoutUser = async (userId) => {
             }
 
             // ✅ NEW: Deactivate all device tokens for this user to stop notifications
-            console.log(`[LOGOUT] Deactivating device tokens for user ${userId}`);
             tokenResult = await DeviceToken.updateMany(
                 { userId: userId, isActive: true },
                 {
@@ -212,14 +191,10 @@ export const logoutUser = async (userId) => {
                 }
             );
 
-            console.log(`[LOGOUT] Deactivated ${tokenResult.modifiedCount} device token(s) for user ${user.email}`);
-
             // In a production app, you might want to:
             // 1. Add the token to a blacklist in Redis
             // 2. Clear any active sessions
             // 3. Log the logout event for audit
-
-            console.log(`User ${user.email} logged out successfully`);
         }
 
         return {

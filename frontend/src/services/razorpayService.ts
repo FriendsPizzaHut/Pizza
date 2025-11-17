@@ -70,15 +70,12 @@ export const createRazorpayOrder = async (
     amount: number
 ): Promise<RazorpayOrderResponse> => {
     try {
-        console.log('💳 Creating Razorpay order:', { orderId, amount });
-
         const response = await apiClient.post('/payments/razorpay/create-order', {
             orderId,
             amount,
         });
 
         if (response.data.success) {
-            console.log('✅ Razorpay order created:', response.data.data.razorpayOrderId);
             return response.data.data;
         } else {
             throw new Error(response.data.message || 'Failed to create payment order');
@@ -104,8 +101,6 @@ export const openRazorpayCheckout = async (
     razorpayOrder: RazorpayOrderResponse
 ): Promise<RazorpayPaymentResponse> => {
     try {
-        console.log('💳 Opening Razorpay checkout for order:', orderDetails.orderNumber);
-
         // Razorpay checkout options
         const options = {
             description: `Order #${orderDetails.orderNumber}`,
@@ -130,21 +125,13 @@ export const openRazorpayCheckout = async (
             timeout: 300, // 5 minutes
             modal: {
                 ondismiss: () => {
-                    console.log('⚠️ Razorpay checkout dismissed');
+                    // Payment checkout dismissed
                 },
             },
         };
 
-        console.log('🔓 Opening Razorpay checkout with options:', {
-            orderId: options.order_id,
-            amount: options.amount,
-            name: options.prefill.name,
-        });
-
         // Open Razorpay checkout
         const data = await RazorpayCheckout.open(options);
-
-        console.log('✅ Payment successful:', data);
 
         return {
             razorpay_order_id: data.razorpay_order_id,
@@ -183,15 +170,12 @@ export const verifyPayment = async (
     paymentResponse: RazorpayPaymentResponse
 ): Promise<PaymentVerificationResponse> => {
     try {
-        console.log('🔐 Verifying payment for order:', orderId);
-
         const response = await apiClient.post('/payments/razorpay/verify', {
             orderId,
             ...paymentResponse,
         });
 
         if (response.data.success) {
-            console.log('✅ Payment verified successfully');
             return response.data;
         } else {
             throw new Error(response.data.message || 'Payment verification failed');
@@ -213,12 +197,9 @@ export const verifyPayment = async (
  */
 export const getPaymentStatus = async (orderId: string) => {
     try {
-        console.log('📊 Fetching payment status for order:', orderId);
-
         const response = await apiClient.get(`/payments/razorpay/status/${orderId}`);
 
         if (response.data.success) {
-            console.log('✅ Payment status fetched:', response.data.data.paymentStatus);
             return response.data.data;
         } else {
             throw new Error(response.data.message || 'Failed to get payment status');

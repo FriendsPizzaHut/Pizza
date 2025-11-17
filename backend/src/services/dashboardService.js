@@ -466,8 +466,6 @@ export const getDashboardOverview = async () => {
             return { ...cached, fromCache: true };
         }
 
-        console.log('📊 Fetching complete dashboard overview...');
-
         // Execute all queries in parallel for maximum performance
         const [stats, weeklyChart, hourlySales, topProducts, activities, systemStatus] = await Promise.all([
             getDashboardStats(),
@@ -490,8 +488,6 @@ export const getDashboardOverview = async () => {
 
         // Cache for 2 minutes (120 seconds)
         await setCache(cacheKey, overview, 120);
-
-        console.log('✅ Dashboard overview fetched and cached');
 
         return overview;
     } catch (error) {
@@ -517,7 +513,6 @@ export const invalidateDashboardCache = async () => {
             deleteCache('dashboard:hourly-sales:today'),
             deleteCache('dashboard:overview:combined'),
         ]);
-        console.log('✅ Dashboard cache invalidated');
     } catch (error) {
         console.error('Error invalidating dashboard cache:', error);
         // Don't throw - cache invalidation failure should not stop the operation

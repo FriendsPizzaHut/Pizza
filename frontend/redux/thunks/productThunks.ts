@@ -152,18 +152,10 @@ export const fetchAllProductsThunk = (filters?: {
  * Fetch a single product by ID
  */
 export const fetchProductByIdThunk = (productId: string) => async (dispatch: AppDispatch) => {
-    console.log('🚀 fetchProductByIdThunk started for productId:', productId);
     dispatch(fetchProductByIdStart());
     try {
-        console.log('📡 Calling productService.fetchProductById with:', productId);
         const product = await productService.fetchProductById(productId);
-        console.log('✅ fetchProductById success:', {
-            id: product._id,
-            name: product.name,
-            category: product.category
-        });
         dispatch(fetchProductByIdSuccess(product));
-        console.log('✅ fetchProductByIdSuccess dispatched');
         return { success: true, data: product };
     } catch (error: any) {
         console.error('❌ fetchProductByIdThunk error:', error);

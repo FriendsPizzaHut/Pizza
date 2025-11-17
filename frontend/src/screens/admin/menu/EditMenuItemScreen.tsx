@@ -252,11 +252,9 @@ export default function EditMenuItemScreen() {
 
             if (selectedImage && isLocalFileUri(selectedImage) && selectedImage !== itemData.imageUrl) {
                 setIsUploadingImage(true);
-                console.log('📤 Uploading new image to Cloudinary...');
 
                 try {
                     cloudinaryImageUrl = await uploadImage(selectedImage, 'product');
-                    console.log('✅ Image uploaded successfully:', cloudinaryImageUrl);
                 } catch (uploadError: any) {
                     setIsUploadingImage(false);
                     Alert.alert(

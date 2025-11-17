@@ -238,8 +238,8 @@ apiClient.interceptors.response.use(
                                     console.log('🔄 Attempting token refresh...');
                                 }
 
-                                // Call refresh endpoint
-                                const refreshResponse = await axios.post(`${getApiUrl()}/api/v1/auth/refresh`, {
+                                // Call refresh endpoint (baseURL already includes /api/v1)
+                                const refreshResponse = await axios.post(`${getApiUrl()}/auth/refresh`, {
                                     refreshToken: refreshTokenValue,
                                 });
 

@@ -58,14 +58,12 @@ class ErrorLogger {
                 //     enableAutoSessionTracking: true,
                 //     tracesSampleRate: 1.0,
                 // });
-                console.log('Sentry initialized (commented out - uncomment when ready)');
             }
 
             // Load previous errors from storage
             await this.loadErrorsFromStorage();
 
             this.isInitialized = true;
-            console.log('✅ ErrorLogger initialized');
         } catch (error) {
             console.error('Failed to initialize ErrorLogger:', error);
         }

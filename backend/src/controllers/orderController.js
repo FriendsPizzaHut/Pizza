@@ -405,8 +405,6 @@ export const getDeliveryAgentOrders = async (req, res, next) => {
         const deliveryAgentId = req.user.id;
         const { status, limit } = req.query;
 
-        console.log(`🚴 [DELIVERY AGENT ORDERS] Agent: ${deliveryAgentId}`);
-
         const orders = await orderService.getDeliveryAgentOrders(deliveryAgentId, {
             status,
             limit: limit ? parseInt(limit) : 20

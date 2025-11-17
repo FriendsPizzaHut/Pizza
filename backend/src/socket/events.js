@@ -25,7 +25,6 @@
 export const emitBusinessStatusUpdate = (businessData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -40,8 +39,6 @@ export const emitBusinessStatusUpdate = (businessData) => {
 
         // Broadcast to ALL connected clients
         global.socketEmit.emitToAll('business:status:update', payload);
-
-        console.log(`📢 Business status broadcasted: ${businessData.isOpen ? 'OPEN' : 'CLOSED'}`);
     } catch (error) {
         console.error('❌ Error emitting business status:', error.message);
     }
@@ -59,7 +56,6 @@ export const emitBusinessStatusUpdate = (businessData) => {
 export const emitNewOrder = (orderData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -83,8 +79,6 @@ export const emitNewOrder = (orderData) => {
         if (orderData.deliveryBoy) {
             global.socketEmit.emitToUser(orderData.deliveryBoy, 'order:assigned', payload);
         }
-
-        console.log(`📦 New order notification sent - Order: ${payload.orderNumber}`);
     } catch (error) {
         console.error('❌ Error emitting new order:', error.message);
     }
@@ -101,7 +95,6 @@ export const emitNewOrder = (orderData) => {
 export const emitOrderStatusUpdate = (orderData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -139,8 +132,6 @@ export const emitOrderStatusUpdate = (orderData) => {
         if (orderData.deliveryBoy) {
             global.socketEmit.emitToUser(orderData.deliveryBoy, 'order:status:update', payload);
         }
-
-        console.log(`📦 Order status update sent - Order: ${payload.orderNumber} → ${payload.status}`);
     } catch (error) {
         console.error('❌ Error emitting order status update:', error.message);
     }
@@ -157,7 +148,6 @@ export const emitOrderStatusUpdate = (orderData) => {
 export const emitDeliveryStatusUpdate = (deliveryData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -181,10 +171,8 @@ export const emitDeliveryStatusUpdate = (deliveryData) => {
 
         // If they're now available and there are pending orders, could trigger auto-assignment
         if (deliveryData.deliveryStatus === 'available') {
-            console.log(`🚴 Delivery agent ${deliveryData.name} is now available`);
+            // Silent - delivery agent now available
         }
-
-        console.log(`🚴 Delivery status update sent - ${payload.deliveryBoyName}: ${payload.status}`);
     } catch (error) {
         console.error('❌ Error emitting delivery status:', error.message);
     }
@@ -203,20 +191,9 @@ export const emitDeliveryStatusUpdate = (deliveryData) => {
  */
 export const emitDeliveryAgentStatusChange = (agentData) => {
     try {
-        console.log('🔔 ========================================');
-        console.log('🔔 emitDeliveryAgentStatusChange CALLED');
-        console.log('🔔 ========================================');
-        console.log('📥 Received agent data:', JSON.stringify(agentData, null, 2));
-
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized - ABORTING!');
             return;
         }
-
-        console.log('✅ global.socketEmit exists');
-        console.log('✅ Checking emitToRole function...');
-        console.log('  - Type:', typeof global.socketEmit.emitToRole);
-        console.log('  - Available methods:', Object.keys(global.socketEmit));
 
         const statusEmojis = {
             online: '🟢',
@@ -239,21 +216,11 @@ export const emitDeliveryAgentStatusChange = (agentData) => {
             timestamp: new Date()
         };
 
-        console.log('📤 Prepared payload:', JSON.stringify(payload, null, 2));
-        console.log('🎯 Broadcasting to ADMIN role...');
-
         // Broadcast to admin role for instant UI updates
         global.socketEmit.emitToRole('admin', 'delivery:agent:status:update', payload);
 
-        console.log('✅ Broadcasted to admin role');
-        console.log('🎯 Broadcasting to DELIVERY role...');
-
         // Also broadcast to all delivery agents (for coordination)
         global.socketEmit.emitToRole('delivery', 'delivery:agent:status:update', payload);
-
-        console.log('✅ Broadcasted to delivery role');
-        console.log(`🚴 Agent status change broadcasted - ${agentData.name}: ${agentData.state}`);
-        console.log('🔔 ========================================');
     } catch (error) {
         console.error('❌ Error emitting agent status change:', error.message);
         console.error('❌ Stack:', error.stack);
@@ -269,7 +236,6 @@ export const emitDeliveryAgentStatusChange = (agentData) => {
 export const emitDeliveryLocationUpdate = (locationData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -291,8 +257,6 @@ export const emitDeliveryLocationUpdate = (locationData) => {
 
         // Also emit to admin
         global.socketEmit.emitToRole('admin', 'delivery:location:update', payload);
-
-        console.log(`📍 Location update sent for order ${locationData.orderId}`);
     } catch (error) {
         console.error('❌ Error emitting location update:', error.message);
     }
@@ -307,7 +271,6 @@ export const emitDeliveryLocationUpdate = (locationData) => {
 export const emitDeliveryAssignment = (orderData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -354,8 +317,6 @@ export const emitDeliveryAssignment = (orderData) => {
             },
             message: `Your order is now out for delivery`,
         });
-
-        console.log(`🚴 Delivery assignment sent - Order: ${payload.orderNumber} → Agent: ${payload.deliveryAgent.name}`);
     } catch (error) {
         console.error('❌ Error emitting delivery assignment:', error.message);
     }
@@ -370,7 +331,6 @@ export const emitDeliveryAssignment = (orderData) => {
 export const emitPaymentReceived = (paymentData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -393,8 +353,6 @@ export const emitPaymentReceived = (paymentData) => {
         if (paymentData.user) {
             global.socketEmit.emitToUser(paymentData.user, 'payment:status:update', payload);
         }
-
-        console.log(`💳 Payment notification sent - Order: ${payload.orderId}`);
     } catch (error) {
         console.error('❌ Error emitting payment notification:', error.message);
     }
@@ -409,7 +367,6 @@ export const emitPaymentReceived = (paymentData) => {
 export const emitNewNotification = (notificationData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -424,8 +381,6 @@ export const emitNewNotification = (notificationData) => {
 
         // Emit to specific user
         global.socketEmit.emitToUser(notificationData.user, 'notification:new', payload);
-
-        console.log(`🔔 Notification sent to user ${notificationData.user}`);
     } catch (error) {
         console.error('❌ Error emitting notification:', error.message);
     }
@@ -440,7 +395,6 @@ export const emitNewNotification = (notificationData) => {
 export const emitOrderCancelled = (orderData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -462,8 +416,6 @@ export const emitOrderCancelled = (orderData) => {
         if (orderData.deliveryBoy) {
             global.socketEmit.emitToUser(orderData.deliveryBoy, 'order:cancelled', payload);
         }
-
-        console.log(`❌ Order cancellation sent - Order: ${payload.orderNumber}`);
     } catch (error) {
         console.error('❌ Error emitting order cancellation:', error.message);
     }
@@ -478,7 +430,6 @@ export const emitOrderCancelled = (orderData) => {
 export const emitNewOffer = (offerData) => {
     try {
         if (!global.socketEmit) {
-            console.log('⚠️  Socket not initialized');
             return;
         }
 
@@ -494,8 +445,6 @@ export const emitNewOffer = (offerData) => {
 
         // Broadcast to all customers
         global.socketEmit.emitToRole('customer', 'offer:new', payload);
-
-        console.log(`🎉 New offer broadcasted - Code: ${payload.code}`);
     } catch (error) {
         console.error('❌ Error emitting new offer:', error.message);
     }

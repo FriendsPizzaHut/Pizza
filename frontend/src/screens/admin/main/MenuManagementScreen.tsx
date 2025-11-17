@@ -202,8 +202,6 @@ export default function MenuManagementScreen() {
                     style: 'destructive',
                     onPress: () => {
                         // TODO: Implement delete functionality
-                        console.log('Deleting item:', itemId);
-                        // You can add the delete thunk here later
                         // dispatch(deleteProductThunk(itemId));
                     },
                 },
@@ -314,7 +312,9 @@ export default function MenuManagementScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.duplicateButton}
-                        onPress={() => console.log('Duplicate item:', item._id)}
+                        onPress={() => {
+                            // TODO: Implement duplicate functionality
+                        }}
                     >
                         <MaterialIcons name="content-copy" size={16} color="#FF9800" />
                         <Text style={styles.duplicateButtonText}>Duplicate</Text>

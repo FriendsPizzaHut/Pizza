@@ -81,10 +81,8 @@ export default function DeliveryAgentApprovalsScreen() {
     const fetchDeliveryAgents = async () => {
         try {
             setLoading(true);
-            console.log('📡 Fetching delivery agents for approval...');
 
             const response = await axiosInstance.get('/users?role=delivery');
-            console.log('✅ Full response:', JSON.stringify(response.data, null, 2));
 
             if (response.data && response.data.success) {
                 // Try different possible data structures
@@ -101,10 +99,8 @@ export default function DeliveryAgentApprovalsScreen() {
                     allAgents = response.data;
                 }
 
-                console.log(`  - Found ${allAgents.length} delivery agents`);
                 setAgents(allAgents);
             } else {
-                console.log('⚠️ Unexpected response structure');
                 setAgents([]);
             }
         } catch (error: any) {
@@ -171,30 +167,11 @@ export default function DeliveryAgentApprovalsScreen() {
     const handleApproveFromModal = async (agentId: string) => {
         try {
             setProcessingId(agentId);
-            console.log('🚀 [FRONTEND] Starting approval process');
-            console.log(`  - Agent ID: ${agentId}`);
-            console.log('  - API Endpoint: /users/' + agentId);
-            console.log('  - Request Payload:', {
-                isApproved: true,
-                isRejected: false,
-                rejectionReason: null,
-            });
-
             const response = await axiosInstance.patch(`/users/${agentId}`, {
                 isApproved: true,
                 isRejected: false,
                 rejectionReason: null,
                 isActive: true, // Activate account when approving
-            });
-
-            console.log('✅ [FRONTEND] Agent approved - Response received');
-            console.log('  - Response Status:', response.status);
-            console.log('  - Response Data:', JSON.stringify(response.data, null, 2));
-            console.log('  - Approval Fields in Response:', {
-                isApproved: response.data?.data?.isApproved,
-                isRejected: response.data?.data?.isRejected,
-                rejectionReason: response.data?.data?.rejectionReason,
-                isActive: response.data?.data?.isActive
             });
 
             // Update the selected agent state immediately
@@ -230,30 +207,11 @@ export default function DeliveryAgentApprovalsScreen() {
     const handleRejectFromModal = async (agentId: string, reason: string) => {
         try {
             setProcessingId(agentId);
-            console.log('🚫 [FRONTEND] Starting rejection process');
-            console.log(`  - Agent ID: ${agentId}`);
-            console.log(`  - Rejection Reason: ${reason}`);
-            console.log('  - API Endpoint: /users/' + agentId);
-            console.log('  - Request Payload:', {
-                isApproved: false,
-                isRejected: true,
-                rejectionReason: reason,
-            });
-
             const response = await axiosInstance.patch(`/users/${agentId}`, {
                 isApproved: false,
                 isRejected: true,
                 rejectionReason: reason,
                 isActive: false, // Deactivate account when rejecting
-            });
-
-            console.log('✅ [FRONTEND] Agent rejected - Response received');
-            console.log('  - Response Status:', response.status);
-            console.log('  - Response Data:', JSON.stringify(response.data, null, 2));
-            console.log('  - Rejection Fields in Response:', {
-                isApproved: response.data?.data?.isApproved,
-                isRejected: response.data?.data?.isRejected,
-                rejectionReason: response.data?.data?.rejectionReason
             });
 
             // Update the selected agent state immediately
@@ -289,14 +247,10 @@ export default function DeliveryAgentApprovalsScreen() {
     const updateApprovalStatus = async (agentId: string, isApproved: boolean) => {
         try {
             setProcessingId(agentId);
-            console.log(`📝 Updating approval status for agent ${agentId} to ${isApproved}`);
-
             const response = await axiosInstance.patch(`/users/${agentId}`, {
                 isApproved: isApproved,
                 isRejected: false,
             });
-
-            console.log('✅ Approval status updated:', response.data);
 
             Alert.alert(
                 'Success',

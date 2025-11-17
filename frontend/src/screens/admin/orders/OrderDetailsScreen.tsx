@@ -21,23 +21,14 @@ export default function OrderDetailsScreen() {
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false); // 🔥 PART 1.5: Button loading state
 
-    console.log('🔥 PART 1.1 - OrderDetailsScreen initialized');
-    console.log('  - Order ID from params:', orderId);
-
     // 🔥 PART 1.1: Fetch order data from API
     useEffect(() => {
         const fetchOrderDetails = async () => {
             try {
-                console.log('📡 PART 1.1 - Fetching order details...');
                 setLoading(true);
                 setError(null);
 
                 const response = await axiosInstance.get(`/orders/${orderId}`);
-
-                console.log('✅ PART 1.1 - Order details fetched successfully');
-                console.log('  - Order Number:', response.data.data.order.orderNumber);
-                console.log('  - Status:', response.data.data.order.status);
-                console.log('  - Full Order Data:', JSON.stringify(response.data.data.order, null, 2));
 
                 setOrderDetails(response.data.data.order);
             } catch (err: any) {
@@ -204,19 +195,15 @@ export default function OrderDetailsScreen() {
     // 🔥 PART 1.5: Accept Order Handler
     const handleAcceptOrder = async () => {
         try {
-            console.log('✅ PART 1.5 - Accepting order:', orderId);
             setActionLoading(true);
 
             const response = await axiosInstance.post(`/orders/${orderId}/accept`);
-
-            console.log('✅ PART 1.5 - Order accepted successfully');
 
             // Update local state with the new order data
             const updatedOrder = response.data.data?.order || response.data.data || response.data.order || response.data;
             setOrderDetails(updatedOrder);
 
             // Show success feedback
-            console.log('✅ Order status changed to:', updatedOrder.status);
             alert('Order accepted successfully!');
         } catch (err: any) {
             console.error('❌ PART 1.5 - Error accepting order:', err.message);
@@ -229,8 +216,6 @@ export default function OrderDetailsScreen() {
     // 🔥 PART 1.6: Reject Order Handler
     const handleRejectOrder = async () => {
         try {
-            console.log('❌ PART 1.6 - Rejecting order:', orderId);
-
             // TODO: Show confirmation dialog with reason input
             const confirmed = confirm('Are you sure you want to reject this order?');
             if (!confirmed) return;
@@ -241,13 +226,10 @@ export default function OrderDetailsScreen() {
                 reason: 'Rejected by admin' // TODO: Get from user input
             });
 
-            console.log('✅ PART 1.6 - Order rejected successfully');
-
             // Update local state with the new order data
             const updatedOrder = response.data.data?.order || response.data.data || response.data.order || response.data;
             setOrderDetails(updatedOrder);
 
-            console.log('✅ Order status changed to:', updatedOrder.status);
             alert('Order has been rejected');
         } catch (err: any) {
             console.error('❌ PART 1.6 - Error rejecting order:', err.message);
@@ -260,13 +242,7 @@ export default function OrderDetailsScreen() {
     // 🔥 PART 1.9: Share to Kitchen Handler
     const handleShareToKitchen = async () => {
         try {
-            console.log('📱 PART 1.9 - Sharing order to kitchen via WhatsApp');
-
             const success = await shareOrderToKitchen(orderDetails, '919060557296');
-
-            if (success) {
-                console.log('✅ PART 1.9 - Order shared successfully');
-            }
         } catch (err: any) {
             console.error('❌ PART 1.9 - Error sharing to WhatsApp:', err.message);
         }
@@ -293,11 +269,6 @@ export default function OrderDetailsScreen() {
             orderDetails.customer?.profileImage ||
             'https://ui-avatars.com/api/?name=' + encodeURIComponent(orderDetails.user?.name || 'User');
     };
-
-    console.log('🔥 PART 1.1 - Rendering order details');
-    console.log('  - Order Number:', orderDetails.orderNumber);
-    console.log('  - Customer:', orderDetails.user?.name);
-    console.log('  - Items:', orderDetails.items?.length);
 
     return (
         <View style={styles.container}>
@@ -418,15 +389,6 @@ export default function OrderDetailsScreen() {
 
                         // Custom toppings (from API)
                         const customToppings = item.customToppings || [];
-
-                        console.log('🍕 Rendering item:', {
-                            name: itemName,
-                            price: itemPrice,
-                            subtotal: itemSubtotal,
-                            quantity: itemQuantity,
-                            size: itemSize,
-                            toppings: customToppings.length
-                        });
 
                         return (
                             <View key={item._id || index} style={styles.itemCard}>

@@ -31,8 +31,6 @@ export const createOffer = async (offerData, adminId) => {
 
     await offer.save();
 
-    console.log(`✅ [OFFER] New offer created: ${offer.code} by admin ${adminId}`);
-
     return offer;
 };
 
@@ -73,8 +71,6 @@ export const getAllOffers = async (filters = {}) => {
         .populate('createdBy', 'name email')
         .sort({ createdAt: -1 });
 
-    console.log(`📊 [OFFER] Retrieved ${offers.length} offers with filters:`, filters);
-
     return offers;
 };
 
@@ -84,8 +80,6 @@ export const getAllOffers = async (filters = {}) => {
  */
 export const getActiveOffers = async () => {
     const offers = await Offer.getActiveOffers();
-
-    console.log(`🎁 [OFFER] Retrieved ${offers.length} active offers for customers`);
 
     return offers;
 };
@@ -143,8 +137,6 @@ export const updateOffer = async (offerId, updateData) => {
 
     await offer.save();
 
-    console.log(`✏️ [OFFER] Offer updated: ${offer.code}`);
-
     return offer;
 };
 
@@ -165,8 +157,6 @@ export const toggleOfferStatus = async (offerId) => {
     offer.isActive = !offer.isActive;
     await offer.save();
 
-    console.log(`🔄 [OFFER] Offer ${offer.code} status toggled to: ${offer.isActive ? 'Active' : 'Inactive'}`);
-
     return offer;
 };
 
@@ -186,8 +176,6 @@ export const deleteOffer = async (offerId) => {
 
     await offer.deleteOne();
 
-    console.log(`🗑️ [OFFER] Offer deleted: ${offer.code}`);
-
     return offer;
 };
 
@@ -198,15 +186,7 @@ export const deleteOffer = async (offerId) => {
  * @returns {Object} - Validation result
  */
 export const validateOfferCode = async (code, cartValue) => {
-    console.log(`🔍 [OFFER] Validating code: ${code} for cart value: ₹${cartValue}`);
-
     const result = await Offer.validateOffer(code, cartValue);
-
-    if (result.success) {
-        console.log(`✅ [OFFER] Code ${code} valid - Discount: ₹${result.discount}`);
-    } else {
-        console.log(`❌ [OFFER] Code ${code} invalid - ${result.message}`);
-    }
 
     return result;
 };
@@ -226,8 +206,6 @@ export const applyOfferToOrder = async (offerId) => {
     }
 
     await offer.incrementUsage();
-
-    console.log(`📈 [OFFER] Offer ${offer.code} usage count: ${offer.usageCount}`);
 
     return offer;
 };
@@ -252,8 +230,6 @@ export const getOfferStats = async () => {
         .sort({ usageCount: -1 })
         .limit(5)
         .select('code title usageCount');
-
-    console.log(`📊 [OFFER] Stats - Total: ${total}, Active: ${active}, Valid: ${valid}`);
 
     return {
         total,

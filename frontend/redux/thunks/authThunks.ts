@@ -64,8 +64,6 @@ export const logoutThunk = createAsyncThunk<void, void, { rejectValue: string }>
     'auth/logout',
     async (_, { rejectWithValue }) => {
         try {
-            console.log('🚪 [LOGOUT_THUNK] Starting logout process...');
-
             // authService.logout() now handles:
             // 1. Getting userId from storage
             // 2. Deactivating device token via NotificationService
@@ -74,7 +72,6 @@ export const logoutThunk = createAsyncThunk<void, void, { rejectValue: string }>
             // 5. Clearing local storage
             await authService.logout();
 
-            console.log('✅ [LOGOUT_THUNK] Logout completed successfully');
         } catch (error: any) {
             // Don't fail logout even if backend call fails
             console.error('⚠️ [LOGOUT_THUNK] Logout error:', error);

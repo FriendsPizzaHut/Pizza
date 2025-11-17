@@ -15,13 +15,9 @@ export const fetchDashboardOverview = createAsyncThunk(
     'dashboard/fetchOverview',
     async (_, { rejectWithValue }) => {
         try {
-            console.log('📊 Fetching dashboard overview...');
-
             const response = await axiosInstance.get('/dashboard/overview');
 
             if (response.data.success) {
-                console.log('✅ Dashboard overview fetched successfully');
-
                 return {
                     stats: response.data.data.stats,
                     weeklyChart: response.data.data.weeklyChart || [],
@@ -55,8 +51,6 @@ export const refreshDashboardStats = createAsyncThunk(
     'dashboard/refresh',
     async (_, { rejectWithValue }) => {
         try {
-            console.log('🔄 Refreshing dashboard...');
-
             // Add cache-busting parameter
             const response = await axiosInstance.get('/dashboard/overview', {
                 params: {
@@ -65,8 +59,6 @@ export const refreshDashboardStats = createAsyncThunk(
             });
 
             if (response.data.success) {
-                console.log('✅ Dashboard refreshed successfully');
-
                 return {
                     stats: response.data.data.stats,
                     weeklyChart: response.data.data.weeklyChart || [],

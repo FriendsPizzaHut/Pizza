@@ -4,7 +4,12 @@
  * Handles all authentication-related API calls with:
  * - Offline support (queues auth requests when offline)
  * - Error handling (network errors, validation errors, server crashes)
- * - Security (token management, secure storage)
+ *         // Store auth data securely
+        await storeAuthData(authData);
+
+        return authData;
+
+    } catch (error: any) {(token management, secure storage)
  * - Performance (caching, optimized requests)
  */
 
@@ -124,7 +129,6 @@ export const signup = async (data: SignupData): Promise<AuthResponse> => {
         if (responseData.requiresApproval || data.role === 'delivery') {
             // Delivery boy registered but needs admin approval
             // Don't store tokens, don't auto-login
-            console.log('Delivery boy registered, awaiting approval:', data.email);
 
             return {
                 success: true,
@@ -158,11 +162,6 @@ export const signup = async (data: SignupData): Promise<AuthResponse> => {
 
         // Store auth data securely
         await storeAuthData(authData);
-
-        // Log success
-        if (__DEV__) {
-            console.log('✅ Signup successful:', authData.user.email);
-        }
 
         return authData;
 
@@ -227,11 +226,6 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
         // Store auth data
         await storeAuthData(authData);
 
-        // Log success
-        if (__DEV__) {
-            console.log('✅ Login successful:', authData.user.email);
-        }
-
         return authData;
 
     } catch (error: any) {
@@ -258,10 +252,8 @@ export const logout = async (): Promise<void> => {
 
         // ✅ NEW: Deactivate device token first to stop receiving notifications
         if (userId) {
-            console.log('🔕 [LOGOUT] Deactivating device token for user:', userId);
             try {
                 await NotificationService.deactivateDeviceToken(userId);
-                console.log('✅ [LOGOUT] Device token deactivated');
             } catch (error) {
                 console.warn('⚠️ [LOGOUT] Failed to deactivate device token:', error);
                 // Continue with logout anyway
@@ -269,7 +261,6 @@ export const logout = async (): Promise<void> => {
         }
 
         // ✅ NEW: Cleanup notification listeners
-        console.log('🧹 [LOGOUT] Cleaning up notification listeners...');
         NotificationService.cleanup();
 
         // Try to notify backend (best effort, don't fail if offline)
@@ -279,7 +270,6 @@ export const logout = async (): Promise<void> => {
                 await apiClient.post(AUTH_ENDPOINTS.LOGOUT, {}, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                console.log('✅ [LOGOUT] Backend logout successful');
             } catch (error) {
                 // Silently fail - logout locally even if backend call fails
                 if (__DEV__) {
@@ -290,10 +280,6 @@ export const logout = async (): Promise<void> => {
 
         // Clear local storage
         await clearAuthData();
-
-        if (__DEV__) {
-            console.log('✅ Logout successful - All data cleared');
-        }
 
     } catch (error) {
         await errorLogger.logError(

@@ -17,8 +17,6 @@ import { deleteCachePattern } from '../services/cacheService.js';
  */
 export const cleanupExpiredData = async () => {
     try {
-        console.log('🧹 Starting cleanup job...');
-
         // Example: Clean up expired cache patterns
         await deleteCachePattern('session:expired:*');
         await deleteCachePattern('temp:*');
@@ -36,8 +34,6 @@ export const cleanupExpiredData = async () => {
         //   status: 'abandoned',
         //   updatedAt: { $lt: thirtyDaysAgo }
         // });
-
-        console.log('✅ Cleanup job completed successfully');
     } catch (error) {
         console.error('❌ Error in cleanup job:', error.message);
     }
@@ -49,8 +45,6 @@ export const cleanupExpiredData = async () => {
  */
 export const generateDailyStats = async () => {
     try {
-        console.log('📊 Generating daily statistics...');
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -76,8 +70,6 @@ export const generateDailyStats = async () => {
         //   date: today,
         //   ...orderStats[0]
         // });
-
-        console.log('✅ Daily statistics generated successfully');
     } catch (error) {
         console.error('❌ Error generating daily stats:', error.message);
     }
@@ -89,8 +81,6 @@ export const generateDailyStats = async () => {
  */
 export const processPendingNotifications = async () => {
     try {
-        console.log('📧 Processing pending notifications...');
-
         // Example: Get pending notifications from queue
         // const notifications = await Notification.find({ status: 'pending' }).limit(100);
 
@@ -108,8 +98,6 @@ export const processPendingNotifications = async () => {
         //     await notification.save();
         //   }
         // }
-
-        console.log('✅ Notifications processed successfully');
     } catch (error) {
         console.error('❌ Error processing notifications:', error.message);
     }

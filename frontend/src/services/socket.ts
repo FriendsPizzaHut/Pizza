@@ -31,7 +31,6 @@ class SocketService {
      */
     async connect(userId?: string): Promise<void> {
         if (this.socket?.connected) {
-            console.log('Socket already connected');
             return;
         }
 
@@ -64,7 +63,6 @@ class SocketService {
             // Setup event handlers
             this.setupEventHandlers();
 
-            console.log('🔌 Socket connection initiated');
         } catch (error) {
             console.error('Socket connection error:', error);
         }
@@ -80,12 +78,10 @@ class SocketService {
         this.socket.on(SOCKET_EVENTS.CONNECT, () => {
             this.isConnected = true;
             this.reconnectAttempts = 0;
-            console.log('✅ Socket connected:', this.socket?.id);
         });
 
         this.socket.on(SOCKET_EVENTS.DISCONNECT, (reason: string) => {
             this.isConnected = false;
-            console.log('❌ Socket disconnected:', reason);
         });
 
         this.socket.on('connect_error', (error: Error) => {
@@ -108,39 +104,32 @@ class SocketService {
 
         // Order events
         this.socket.on(SOCKET_EVENTS.ORDER_CREATED, (data: any) => {
-            console.log('📦 New order created:', data);
             this.notifyListeners(SOCKET_EVENTS.ORDER_CREATED, data);
         });
 
         this.socket.on(SOCKET_EVENTS.ORDER_UPDATED, (data: any) => {
-            console.log('📦 Order updated:', data);
             this.notifyListeners(SOCKET_EVENTS.ORDER_UPDATED, data);
         });
 
         this.socket.on(SOCKET_EVENTS.ORDER_STATUS_CHANGED, (data: any) => {
-            console.log('📦 Order status changed:', data);
             this.notifyListeners(SOCKET_EVENTS.ORDER_STATUS_CHANGED, data);
         });
 
         this.socket.on(SOCKET_EVENTS.ORDER_ASSIGNED, (data: any) => {
-            console.log('🚚 Order assigned to delivery:', data);
             this.notifyListeners(SOCKET_EVENTS.ORDER_ASSIGNED, data);
         });
 
         // Delivery events
         this.socket.on(SOCKET_EVENTS.DELIVERY_LOCATION_UPDATED, (data: any) => {
-            console.log('📍 Delivery location updated:', data);
             this.notifyListeners(SOCKET_EVENTS.DELIVERY_LOCATION_UPDATED, data);
         });
 
         this.socket.on(SOCKET_EVENTS.DELIVERY_ARRIVED, (data: any) => {
-            console.log('🎉 Delivery arrived:', data);
             this.notifyListeners(SOCKET_EVENTS.DELIVERY_ARRIVED, data);
         });
 
         // Notification events
         this.socket.on(SOCKET_EVENTS.NOTIFICATION_RECEIVED, (data: any) => {
-            console.log('🔔 Notification received:', data);
             this.notifyListeners(SOCKET_EVENTS.NOTIFICATION_RECEIVED, data);
         });
     }
@@ -154,7 +143,6 @@ class SocketService {
             this.socket = null;
             this.isConnected = false;
             this.eventListeners.clear();
-            console.log('🔌 Socket disconnected');
         }
     }
 

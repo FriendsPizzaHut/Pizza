@@ -45,7 +45,6 @@ activityLogSchema.statics.cleanupOldLogs = async function () {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     try {
         const result = await this.deleteMany({ timestamp: { $lt: oneDayAgo } });
-        console.log(`🧹 Cleaned up ${result.deletedCount} old activity logs`);
         return result;
     } catch (error) {
         console.error('❌ Error cleaning up activity logs:', error.message);

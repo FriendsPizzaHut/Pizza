@@ -24,9 +24,6 @@ import axiosInstance from '../../../api/axiosInstance';
 import { SOCKET_URL, SOCKET_OPTIONS } from '../../../config/socket.config';
 import { fetchUnreadCount } from '../../../../redux/thunks/notificationThunks';
 
-// 🔥 PART 5.1: axiosInstance imported (not used yet)
-console.log('✅ PART 5.1 - axiosInstance imported successfully');
-
 // Static mock data for demonstration
 const MOCK_ORDERS = [
     {
@@ -77,12 +74,6 @@ export default function OrderManagementScreen() {
     // Notification unread count
     const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
 
-    console.log('📍 PART 1 - User Info from Redux:');
-    console.log('  - userId:', userId);
-    console.log('  - name:', name);
-    console.log('  - email:', email);
-    console.log('  - role:', role);
-
     // 🔥 PART 3: Socket reference
     const socketRef = useRef<Socket | null>(null);
 
@@ -91,32 +82,19 @@ export default function OrderManagementScreen() {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false); // 🔥 PART 9: Refresh state
 
-    console.log('✅ PART 5.2 - State variables initialized');
-    console.log('  - orders count:', orders.length);
-    console.log('  - loading:', loading);
-    console.log('✅ PART 9 - Refresh state initialized:', refreshing);
-
     // Static orders - REMOVED, now using state above
     // const orders = MOCK_ORDERS;
 
     // 🔥 PART 5.3: Empty fetchOrders function (not called yet)
     const fetchOrders = async () => {
-        console.log('📡 PART 5.4 - fetchOrders function called');
-
         try {
             setLoading(true);
-            console.log('  - Setting loading to true');
-            console.log('  - Making API call to /orders');
 
             const response = await axiosInstance.get('/orders');
-            console.log('  - API response received');
-            console.log('  - Success:', response.data.success);
 
             if (response.data.success) {
                 const ordersData = response.data.data.orders || response.data.data || [];
-                console.log('  - Total orders from API:', ordersData.length);
                 setOrders(ordersData);
-                console.log('  - Orders state updated');
             }
         } catch (error: any) {
             console.error('❌ PART 5.4 - Error fetching orders:');
@@ -124,28 +102,20 @@ export default function OrderManagementScreen() {
             console.error('  - Error details:', error.response?.data || 'No details');
         } finally {
             setLoading(false);
-            console.log('  - Loading set to false');
         }
     };
 
-    console.log('✅ PART 5.4 - fetchOrders function with API logic created (not called yet)');
-
     // 🔥 PART 9: Pull-to-refresh handler
     const onRefresh = async () => {
-        console.log('🔄 PART 9 - Pull-to-refresh triggered');
         setRefreshing(true);
         await fetchOrders();
         setRefreshing(false);
-        console.log('✅ PART 9 - Refresh completed');
     };
 
     // 🔥 NEW: Accept Order Handler
     const handleAcceptOrder = async (orderId: string) => {
         try {
-            console.log('✅ Accepting order:', orderId);
-
             const response = await axiosInstance.post(`/orders/${orderId}/accept`);
-            console.log('✅ Order accepted successfully');
 
             // Update order in local state
             setOrders((prevOrders) =>
@@ -155,8 +125,6 @@ export default function OrderManagementScreen() {
                         : order
                 )
             );
-
-            console.log('✅ Order status updated in list');
         } catch (err: any) {
             console.error('❌ Error accepting order:', err.message);
             alert(err.response?.data?.message || 'Failed to accept order');
@@ -166,12 +134,9 @@ export default function OrderManagementScreen() {
     // 🔥 NEW: Reject Order Handler
     const handleRejectOrder = async (orderId: string) => {
         try {
-            console.log('❌ Rejecting order:', orderId);
-
             const response = await axiosInstance.post(`/orders/${orderId}/reject`, {
                 reason: 'Rejected by admin'
             });
-            console.log('✅ Order rejected successfully');
 
             // Update order in local state
             setOrders((prevOrders) =>
@@ -181,8 +146,6 @@ export default function OrderManagementScreen() {
                         : order
                 )
             );
-
-            console.log('✅ Order status updated in list');
         } catch (err: any) {
             console.error('❌ Error rejecting order:', err.message);
             alert(err.response?.data?.message || 'Failed to reject order');
@@ -192,10 +155,7 @@ export default function OrderManagementScreen() {
     // 🔥 PART 5.5: Call fetchOrders on mount (FIXED - data structure handled)    // 🔥 NEW: Mark Ready Handler
     const handleMarkReady = async (orderId: string) => {
         try {
-            console.log('🍕 Marking order as ready:', orderId);
-
             const response = await axiosInstance.post(`/orders/${orderId}/mark-ready`);
-            console.log('✅ Order marked as ready');
 
             // Update order in local state with the actual response data
             const updatedOrder = response.data.data?.order || response.data.data || response.data.order || response.data;
@@ -207,8 +167,6 @@ export default function OrderManagementScreen() {
                         : order
                 )
             );
-
-            console.log('✅ Order status updated in list');
         } catch (err: any) {
             console.error('❌ Error marking order ready:', err.message);
             alert(err.response?.data?.message || 'Failed to update order status');
@@ -217,7 +175,6 @@ export default function OrderManagementScreen() {
 
     // 🔥 PART 5.5: Call fetchOrders on mount (FIXED - data structure handled)
     useEffect(() => {
-        console.log('🔄 PART 5.5 - Component mounted, calling fetchOrders...');
         fetchOrders();
         // Fetch unread notification count
         dispatch(fetchUnreadCount());
@@ -226,12 +183,8 @@ export default function OrderManagementScreen() {
     // 🔥 PART 3: Socket connection useEffect
     useEffect(() => {
         if (!userId) {
-            console.log('⚠️ PART 3 - No userId found, skipping socket connection');
             return;
         }
-
-        console.log('🔌 PART 3 - Initiating socket connection...');
-        console.log('  - Connecting to:', SOCKET_URL);
 
         // Create socket connection
         socketRef.current = io(SOCKET_URL, SOCKET_OPTIONS);
@@ -240,30 +193,20 @@ export default function OrderManagementScreen() {
 
         // Connection event
         socket.on('connect', () => {
-            console.log('✅ PART 3 - Socket connected successfully!');
-            console.log('  - Socket ID:', socket.id);
-            console.log('  - Transport:', socket.io.engine.transport.name);
-
             // 🔥 PART 4: Register as admin
-            console.log('📍 PART 4 - Registering as admin...');
             socket.emit('register', {
                 userId: userId,
                 role: role || 'admin'
             });
-            console.log('  - Sent registration with userId:', userId);
-            console.log('  - Role:', role || 'admin');
         });
 
         // 🔥 PART 4: Listen for registration confirmation
         socket.on('registered', (data) => {
-            console.log('✅ PART 4 - Registration confirmed by server!');
-            console.log('  - Response:', JSON.stringify(data, null, 2));
+            // Registration confirmed
         });
 
         // Disconnect event
         socket.on('disconnect', (reason) => {
-            console.log('❌ PART 3 - Socket disconnected');
-            console.log('  - Reason:', reason);
         });
 
         // Connection error event
@@ -274,22 +217,14 @@ export default function OrderManagementScreen() {
 
         // 🔥 PART 6: Listen for new orders
         socket.on('order:new', (data) => {
-            console.log('📦 PART 6 - NEW ORDER RECEIVED:', data);
             const newOrder = data.order || data;
-            console.log('  - Order Number:', newOrder.orderNumber);
-            console.log('  - Customer:', newOrder.user?.name);
 
             // Add new order to the top of the list
             setOrders((prevOrders) => [newOrder, ...prevOrders]);
-            console.log('  - Order added to list');
         });
 
-        // 🔥 PART 7: Listen for order status updates
-        socket.on('order:status:changed', (data) => {
-            console.log('🔄 PART 7 - ORDER STATUS UPDATED:', data);
-            console.log('  - Order ID:', data.orderId);
-            console.log('  - New Status:', data.status);
-
+        // 🔥 PART 7: Listen for status updates
+        socket.on('order:status:update', (data) => {
             // Update the order in the list
             setOrders((prevOrders) =>
                 prevOrders.map((order) =>
@@ -298,15 +233,10 @@ export default function OrderManagementScreen() {
                         : order
                 )
             );
-            console.log('  - Order status updated in list');
         });
 
         // 🔥 PART 8: Listen for delivery assignments
         socket.on('order:assigned', (data) => {
-            console.log('🚴 PART 8 - ORDER ASSIGNED TO DELIVERY:', data);
-            console.log('  - Order ID:', data.orderId);
-            console.log('  - Delivery Agent:', data.deliveryAgent?.name);
-
             // Update the order in the list
             setOrders((prevOrders) =>
                 prevOrders.map((order) =>
@@ -325,12 +255,10 @@ export default function OrderManagementScreen() {
                         : order
                 )
             );
-            console.log('  - Delivery assignment updated in list');
         });
 
         // Cleanup on unmount
         return () => {
-            console.log('🧹 PART 3 - Cleaning up socket connection');
             if (socket) {
                 socket.off('connect');
                 socket.off('disconnect');

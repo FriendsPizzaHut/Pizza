@@ -53,8 +53,6 @@ export default function initSocket(server) {
     // io.use(verifySocketToken); // Uncomment when JWT auth is needed
 
     io.on('connection', (socket) => {
-        console.log(`🟢 New client connected: ${socket.id}`);
-
         // ============================================
         // USER REGISTRATION
         // ============================================
@@ -65,7 +63,6 @@ export default function initSocket(server) {
         socket.on('register', ({ userId, role }) => {
             try {
                 if (!userId) {
-                    console.log('⚠️  Registration failed: userId missing');
                     return;
                 }
 
@@ -84,9 +81,6 @@ export default function initSocket(server) {
 
                 // Join user-specific room
                 socket.join(`user:${userId}`);
-
-                console.log(`✅ User registered: ${userId} (${userRole}) - Socket: ${socket.id}`);
-                console.log(`📊 Connected users: ${connectedUsers.size}`);
 
                 // Notify user of successful registration
                 socket.emit('registered', {
@@ -110,7 +104,6 @@ export default function initSocket(server) {
          */
         socket.on('join:order', (orderId) => {
             socket.join(`order:${orderId}`);
-            console.log(`📦 Socket ${socket.id} joined order room: ${orderId}`);
         });
 
         /**
@@ -118,7 +111,6 @@ export default function initSocket(server) {
          */
         socket.on('leave:order', (orderId) => {
             socket.leave(`order:${orderId}`);
-            console.log(`📦 Socket ${socket.id} left order room: ${orderId}`);
         });
 
         /**
@@ -127,7 +119,6 @@ export default function initSocket(server) {
          */
         socket.on('join:delivery', (deliveryId) => {
             socket.join(`delivery:${deliveryId}`);
-            console.log(`🚴 Socket ${socket.id} joined delivery room: ${deliveryId}`);
         });
 
         // ============================================
@@ -145,8 +136,6 @@ export default function initSocket(server) {
                     location: { latitude, longitude },
                     timestamp: new Date()
                 });
-
-                console.log(`📍 Location update for order ${orderId}`);
             } catch (error) {
                 console.error('❌ Location update error:', error.message);
             }
@@ -184,14 +173,6 @@ export default function initSocket(server) {
                         break;
                     }
                 }
-
-                if (disconnectedUserId) {
-                    console.log(`🔴 User ${disconnectedUserId} (${disconnectedRole}) disconnected - Reason: ${reason}`);
-                } else {
-                    console.log(`🔴 Socket ${socket.id} disconnected - Reason: ${reason}`);
-                }
-
-                console.log(`📊 Connected users: ${connectedUsers.size}`);
             } catch (error) {
                 console.error('❌ Disconnect handler error:', error.message);
             }
@@ -211,8 +192,6 @@ export default function initSocket(server) {
             socket.emit('pong', { timestamp: Date.now() });
         });
     });
-
-    console.log('✅ Socket.IO initialized with enhanced features (Prompt 9)');
 
     // Expose helper functions globally for use in controllers
     setupGlobalHelpers();
@@ -235,10 +214,8 @@ function setupGlobalHelpers() {
                         ...data,
                         timestamp: new Date()
                     });
-                    console.log(`📤 Emitted "${event}" to user ${userId}`);
                     return true;
                 }
-                console.log(`⚠️  User ${userId} not connected`);
                 return false;
             } catch (error) {
                 console.error(`❌ Error emitting to user ${userId}:`, error.message);
@@ -254,7 +231,6 @@ function setupGlobalHelpers() {
                         ...data,
                         timestamp: new Date()
                     });
-                    console.log(`📤 Emitted "${event}" to role: ${role}`);
                     return true;
                 }
                 return false;
@@ -272,7 +248,6 @@ function setupGlobalHelpers() {
                         ...data,
                         timestamp: new Date()
                     });
-                    console.log(`📤 Emitted "${event}" to order ${orderId}`);
                     return true;
                 }
                 return false;
@@ -290,7 +265,6 @@ function setupGlobalHelpers() {
                         ...data,
                         timestamp: new Date()
                     });
-                    console.log(`📢 Broadcasted "${event}" to all clients`);
                     return true;
                 }
                 return false;
@@ -358,6 +332,5 @@ export const disconnectUser = (userId) => {
     if (user && user.socket) {
         user.socket.disconnect(true);
         connectedUsers.delete(userId.toString());
-        console.log(`🔌 Forcefully disconnected user: ${userId}`);
     }
 };

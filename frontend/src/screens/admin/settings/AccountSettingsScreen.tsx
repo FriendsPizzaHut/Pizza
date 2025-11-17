@@ -19,15 +19,6 @@ export default function AccountSettingsScreen() {
     // Avatar upload state
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-    // Debug: Log current auth state
-    useEffect(() => {
-        console.log('=== ADMIN ACCOUNT SETTINGS AUTH STATE ===');
-        console.log('Name:', name);
-        console.log('User ID:', userId);
-        console.log('Profile Image:', profileImage);
-        console.log('=== END AUTH STATE ===\n');
-    }, [profileImage]);
-
     // Personal Information State
     const [personalInfo, setPersonalInfo] = useState({
         fullName: name || 'Admin User',
@@ -86,28 +77,15 @@ export default function AccountSettingsScreen() {
                 setIsUploadingAvatar(true);
 
                 try {
-                    console.log('=== AVATAR UPLOAD STARTED (Admin Settings) ===');
-                    console.log('User ID:', userId);
-                    console.log('Image URI:', imageUri);
-
-                    console.log('\n📤 [STEP 1] Uploading to Cloudinary...');
                     const cloudinaryUrl = await uploadImage(imageUri, 'avatar');
-                    console.log('✅ [STEP 1] Cloudinary upload successful!');
-                    console.log('   URL:', cloudinaryUrl);
 
                     if (!cloudinaryUrl) {
                         throw new Error('Cloudinary URL is empty!');
                     }
 
-                    console.log('\n💾 [STEP 2] Updating backend database...');
                     const response = await updateProfileImage(userId!, cloudinaryUrl);
-                    console.log('✅ [STEP 2] Backend update successful!');
 
-                    console.log('\n🔄 [STEP 3] Updating Redux store...');
                     dispatch(updateProfileImageAction(cloudinaryUrl));
-                    console.log('✅ [STEP 3] Redux updated!');
-
-                    console.log('\n=== AVATAR UPLOAD COMPLETE ===\n');
 
                     Alert.alert('Success', 'Profile picture updated successfully!');
                 } catch (error: any) {

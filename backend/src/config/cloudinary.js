@@ -18,11 +18,6 @@ if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !pr
     console.error('  CLOUDINARY_CLOUD_NAME=your-cloud-name');
     console.error('  CLOUDINARY_API_KEY=your-api-key');
     console.error('  CLOUDINARY_API_SECRET=your-api-secret');
-} else {
-    console.log('✅ Cloudinary credentials loaded:', {
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: process.env.CLOUDINARY_API_KEY?.substring(0, 6) + '...',
-    });
 }
 
 // Configure Cloudinary
@@ -64,12 +59,7 @@ export const uploadToCloudinary = async (filePath, type = 'general', options = {
         // Add upload preset if using unsigned upload
         if (useUnsigned) {
             uploadOptions.upload_preset = process.env.CLOUDINARY_UPLOAD_PRESET;
-            console.log('📤 Using unsigned upload (faster):', { filePath, folder, type, preset: useUnsigned });
-        } else {
-            console.log('📤 Using signed upload:', { filePath, folder, type });
         }
-
-        console.log('⏱️  This may take 5-30 seconds depending on network speed...');
 
         const startTime = Date.now();
 
@@ -79,8 +69,6 @@ export const uploadToCloudinary = async (filePath, type = 'general', options = {
             : await cloudinary.uploader.upload(filePath, uploadOptions);
 
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-        console.log(`✅ Cloudinary upload successful in ${duration}s:`, result.secure_url);
 
         return {
             success: true,

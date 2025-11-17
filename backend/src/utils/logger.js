@@ -203,7 +203,6 @@ logger.on('error', (error) => {
 export const closeLogger = () => {
     return new Promise((resolve) => {
         logger.end(() => {
-            console.log('✅ Logger closed');
             resolve();
         });
     });

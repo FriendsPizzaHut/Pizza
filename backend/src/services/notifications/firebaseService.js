@@ -70,11 +70,6 @@ export const sendToDevices = async (tokens, notification, data = {}) => {
             return { success: false, error: 'No valid FCM tokens' };
         }
 
-        console.log('🔍 [FIREBASE-DEBUG] sendToDevices called');
-        console.log('   📊 Tokens count:', fcmTokens.length);
-        console.log('   📋 Notification:', notification);
-        console.log('   📦 Data:', data);
-
         // Convert all data values to strings (Firebase requirement)
         const stringData = {};
         if (data) {
@@ -111,13 +106,9 @@ export const sendToDevices = async (tokens, notification, data = {}) => {
             },
         };
 
-        console.log('📦 [FIREBASE-DEBUG] Prepared FCM message:', JSON.stringify(message, null, 2));
-        console.log('🚀 [FIREBASE-DEBUG] Sending to FCM API...');
-
         // Send to multiple devices
         const results = await Promise.allSettled(
             fcmTokens.map((token, index) => {
-                console.log(`   📤 [FIREBASE-DEBUG] Sending to token #${index}: ${token.substring(0, 30)}...`);
                 return admin.messaging().send({
                     ...message,
                     token,
@@ -125,26 +116,15 @@ export const sendToDevices = async (tokens, notification, data = {}) => {
             })
         );
 
-        console.log('✅ [FIREBASE-DEBUG] FCM API calls completed');
-        console.log('📊 [FIREBASE-DEBUG] Results:', results.map((r, i) => ({
-            token: i,
-            status: r.status,
-            messageId: r.status === 'fulfilled' ? r.value : undefined,
-            error: r.status === 'rejected' ? r.reason.message : undefined
-        })));
-
         // Process results
         const successful = results.filter(r => r.status === 'fulfilled').length;
         const failed = results.filter(r => r.status === 'rejected').length;
 
-        console.log(`📊 [FIREBASE-DEBUG] Summary: ${successful} successful, ${failed} failed`);
         logger.info(`[FIREBASE] Sent notifications: ${successful} successful, ${failed} failed`);
 
         // Log failures
         results.forEach((result, index) => {
             if (result.status === 'rejected') {
-                console.log(`❌ [FIREBASE-DEBUG] Token ${index} FAILED:`, result.reason.message);
-                console.log(`   Error code:`, result.reason.code);
                 logger.error(`[FIREBASE] Failed to send to token ${index}:`, result.reason.message);
 
                 // Handle invalid tokens - mark as inactive

@@ -41,11 +41,9 @@ export default function OfferManagementScreen() {
     // Fetch offers from API
     const fetchOffers = async () => {
         try {
-            console.log('🔄 Fetching offers from API...');
             const response = await axiosInstance.get('/offers/admin');
 
             if (response.data.success) {
-                console.log(`✅ Loaded ${response.data.count} offers`);
                 // Transform backend data to frontend format
                 const transformedOffers = response.data.data.map((offer: any) => ({
                     id: offer._id,
@@ -76,7 +74,6 @@ export default function OfferManagementScreen() {
     // Load offers when screen comes into focus
     useFocusEffect(
         useCallback(() => {
-            console.log('🔄 OfferManagementScreen focused - Refreshing offers');
             fetchOffers();
         }, [])
     );
@@ -95,11 +92,9 @@ export default function OfferManagementScreen() {
 
     const handleToggleStatus = async (id: string) => {
         try {
-            console.log(`🔄 Toggling offer status: ${id}`);
             const response = await axiosInstance.patch(`/offers/admin/${id}/toggle`);
 
             if (response.data.success) {
-                console.log('✅ Offer status toggled');
                 // Update local state
                 setOffers((prev) =>
                     prev.map((offer) =>
@@ -131,11 +126,9 @@ export default function OfferManagementScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            console.log(`🗑️ Deleting offer: ${id}`);
                             const response = await axiosInstance.delete(`/offers/admin/${id}`);
 
                             if (response.data.success) {
-                                console.log('✅ Offer deleted');
                                 setOffers((prev) => prev.filter((offer) => offer.id !== id));
                                 Alert.alert('Success', 'Offer deleted successfully');
                             }

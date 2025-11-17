@@ -509,9 +509,6 @@ export const deleteOrder = async (orderId) => {
  * @returns {Array} - List of orders assigned to the agent
  */
 export const getDeliveryAgentOrders = async (deliveryAgentId, filters = {}) => {
-    console.log(`📦 [GET DELIVERY AGENT ORDERS] Agent ID: ${deliveryAgentId}`);
-    console.log(`   Filters:`, filters);
-
     const { status, limit = 20 } = filters;
 
     // Build query
@@ -533,8 +530,6 @@ export const getDeliveryAgentOrders = async (deliveryAgentId, filters = {}) => {
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
-
-    console.log(`   ✅ Found ${orders.length} orders for delivery agent`);
 
     // Transform orders to match frontend format
     const transformedOrders = orders.map(order => ({

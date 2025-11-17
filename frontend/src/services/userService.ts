@@ -34,16 +34,10 @@ export const updateProfileImage = async (
     profileImageUrl: string
 ): Promise<UpdateProfileImageResponse> => {
     try {
-        console.log('📤 [USER SERVICE] Updating profile image');
-        console.log('  - User ID:', userId);
-        console.log('  - Image URL:', profileImageUrl);
-
         const response = await apiClient.put(
             `/users/${userId}/profile-image`,
             { profileImage: profileImageUrl }
         );
-
-        console.log('✅ [USER SERVICE] Profile image updated successfully');
 
         // Update stored user data
         const storedUser = await AsyncStorage.getItem('@user_data');
@@ -51,12 +45,10 @@ export const updateProfileImage = async (
             const userData = JSON.parse(storedUser);
             userData.profileImage = profileImageUrl;
             await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
-            console.log('💾 [USER SERVICE] Updated stored user data');
         }
 
         return response.data;
     } catch (error: any) {
-        console.error('❌ [USER SERVICE] Profile image update failed:', error);
         throw {
             message: error.response?.data?.message || 'Failed to update profile image',
             statusCode: error.response?.status || 500,

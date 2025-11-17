@@ -111,7 +111,6 @@ class OptimizedSocketManager {
                     store.setSocketStatus(true, false);
                     store.updateSocketActivity();
 
-                    console.log('🔌 Socket connected successfully');
                     resolve();
                 });
 
@@ -136,7 +135,6 @@ class OptimizedSocketManager {
 
         // Connection events
         this.socket.on('disconnect', (reason) => {
-            console.log('🔌 Socket disconnected:', reason);
             this.isConnected = false;
             this.updateConnectionStatusDebounced();
 
@@ -146,7 +144,6 @@ class OptimizedSocketManager {
         });
 
         this.socket.on('reconnect', () => {
-            console.log('🔌 Socket reconnected');
             this.isConnected = true;
             this.isReconnecting = false;
             this.reconnectAttempts = 0;
@@ -154,7 +151,6 @@ class OptimizedSocketManager {
         });
 
         this.socket.on('reconnect_attempt', (attemptNumber) => {
-            console.log(`🔌 Reconnection attempt ${attemptNumber}`);
             this.reconnectAttempts = attemptNumber;
         });
 
@@ -369,7 +365,6 @@ class OptimizedSocketManager {
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
         this.reconnectTimer = setTimeout(() => {
-            console.log(`🔌 Attempting reconnection (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
             this.connect().catch(() => {
                 this.reconnectAttempts++;
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {

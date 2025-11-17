@@ -23,16 +23,6 @@ export default function ProfileScreen() {
     // Avatar upload state
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-    // Debug: Log current auth state on mount and when profileImage changes
-    useEffect(() => {
-        console.log('=== PROFILE SCREEN AUTH STATE ===');
-        console.log('Name:', name);
-        console.log('Email:', email);
-        console.log('User ID:', userId);
-        console.log('Profile Image:', profileImage);
-        console.log('=== END AUTH STATE ===\n');
-    }, [profileImage]);
-
     /**
      * Handle avatar image selection and upload
      */
@@ -63,36 +53,15 @@ export default function ProfileScreen() {
                 // Upload immediately without confirmation
                 setIsUploadingAvatar(true);
                 try {
-                    console.log('=== AVATAR UPLOAD STARTED ===');
-                    console.log('User ID:', userId);
-                    console.log('Current profileImage:', profileImage);
-                    console.log('Image URI:', imageUri);
-
-                    console.log('\n📤 [STEP 1] Uploading to Cloudinary...');
                     const cloudinaryUrl = await uploadImage(imageUri, 'avatar');
-                    console.log('✅ [STEP 1] Cloudinary upload successful!');
-                    console.log('   URL:', cloudinaryUrl);
-                    console.log('   URL type:', typeof cloudinaryUrl);
-                    console.log('   URL length:', cloudinaryUrl?.length);
 
                     if (!cloudinaryUrl) {
                         throw new Error('Cloudinary URL is empty!');
                     }
 
-                    console.log('\n💾 [STEP 2] Updating backend database...');
-                    console.log('   Calling updateProfileImage with:');
-                    console.log('   - userId:', userId);
-                    console.log('   - cloudinaryUrl:', cloudinaryUrl);
-
                     const response = await updateProfileImage(userId!, cloudinaryUrl);
-                    console.log('✅ [STEP 2] Backend update successful!');
-                    console.log('   Response:', JSON.stringify(response, null, 2));
 
-                    console.log('\n🔄 [STEP 3] Updating Redux store...');
                     dispatch(updateProfileImageAction(cloudinaryUrl));
-                    console.log('✅ [STEP 3] Redux updated!');
-
-                    console.log('\n=== AVATAR UPLOAD COMPLETE ===\n');
 
                     Alert.alert('Success', 'Profile picture updated successfully!');
                 } catch (error: any) {
@@ -132,7 +101,6 @@ export default function ProfileScreen() {
                     onPress: async () => {
                         try {
                             await dispatch(logoutThunk() as any);
-                            console.log('✅ Admin logged out successfully');
                         } catch (error) {
                             console.error('Logout error:', error);
                         }
@@ -221,7 +189,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                     style={styles.editButton}
                     activeOpacity={0.8}
-                    onPress={() => console.log('Edit Profile')}
+                    onPress={() => navigation.navigate('AccountSettings')}
                 >
                     <MaterialIcons name="edit" size={18} color="#2d2d2d" />
                 </TouchableOpacity>

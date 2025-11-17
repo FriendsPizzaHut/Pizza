@@ -25,6 +25,12 @@ import { emitPaymentReceived } from '../socket/events.js';
  */
 export const createRazorpayOrder = async (req, res, next) => {
     try {
+        logger.info('📥 Razorpay create-order request:', {
+            userId: req.user?.id,
+            userRole: req.user?.role,
+            body: req.body
+        });
+
         const { orderId, amount } = req.body;
 
         // Validation
@@ -40,6 +46,14 @@ export const createRazorpayOrder = async (req, res, next) => {
             throw error;
         }
 
+        // Check if user is authenticated
+        if (!req.user || !req.user.id) {
+            logger.error('❌ User not authenticated in request');
+            const error = new Error('Authentication required');
+            error.statusCode = 401;
+            throw error;
+        }
+
         // Check if Razorpay is configured
         if (!razorpayService.isRazorpayConfigured()) {
             const error = new Error('Payment gateway not configured. Please contact support.');
@@ -50,13 +64,24 @@ export const createRazorpayOrder = async (req, res, next) => {
         // Verify order exists and belongs to user
         const order = await Order.findById(orderId);
         if (!order) {
+            logger.error('❌ Order not found:', orderId);
             const error = new Error('Order not found');
             error.statusCode = 404;
             throw error;
         }
 
+        logger.info('✅ Order found:', {
+            orderId: order._id,
+            orderUserId: order.user.toString(),
+            requestUserId: req.user.id
+        });
+
         // Check if user owns this order (security check)
         if (order.user.toString() !== req.user.id && req.user.role !== 'admin') {
+            logger.error('❌ Unauthorized access attempt:', {
+                orderUserId: order.user.toString(),
+                requestUserId: req.user.id
+            });
             const error = new Error('Unauthorized to access this order');
             error.statusCode = 403;
             throw error;
@@ -89,11 +114,19 @@ export const createRazorpayOrder = async (req, res, next) => {
         });
 
         // Return Razorpay order details with key
+        logger.info('✅ Razorpay order created successfully:', razorpayOrder.razorpayOrderId);
+
         sendResponse(res, 201, 'Razorpay order created successfully', {
             ...razorpayOrder,
             key: process.env.RAZORPAY_KEY_ID, // Frontend needs this
         });
     } catch (error) {
+        logger.error('❌ Error in createRazorpayOrder:', {
+            message: error.message,
+            statusCode: error.statusCode,
+            stack: error.stack,
+            user: req.user?.id
+        });
         next(error);
     }
 };

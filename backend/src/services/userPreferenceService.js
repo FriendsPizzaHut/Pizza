@@ -132,7 +132,6 @@ export const updateUserPreferences = async (userId, orderId) => {
             ((prevAvg * (totalOrders - 1)) + totalItems) / totalOrders;
 
         await user.save();
-        console.log(`✅ Updated preferences for user ${userId}`);
 
         return user.orderingBehavior;
     } catch (error) {

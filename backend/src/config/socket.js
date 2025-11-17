@@ -31,23 +31,19 @@ export const initSocket = (server) => {
 
     // Connection event handler
     io.on('connection', (socket) => {
-        console.log(`✅ New socket connection: ${socket.id}`);
-
         // Handle client joining specific rooms (e.g., order room, shop room)
         socket.on('join-room', (roomId) => {
             socket.join(roomId);
-            console.log(`Socket ${socket.id} joined room: ${roomId}`);
         });
 
         // Handle client leaving specific rooms
         socket.on('leave-room', (roomId) => {
             socket.leave(roomId);
-            console.log(`Socket ${socket.id} left room: ${roomId}`);
         });
 
         // Handle disconnection
         socket.on('disconnect', (reason) => {
-            console.log(`❌ Socket disconnected: ${socket.id}, Reason: ${reason}`);
+            // Silent disconnect
         });
 
         // Handle connection errors
@@ -56,7 +52,6 @@ export const initSocket = (server) => {
         });
     });
 
-    console.log('✅ Socket.IO initialized successfully');
     return io;
 };
 

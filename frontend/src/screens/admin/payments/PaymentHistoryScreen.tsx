@@ -71,7 +71,6 @@ export default function PaymentHistoryScreen() {
     const fetchPayments = async () => {
         try {
             setIsLoading(true);
-            console.log('📊 Fetching payment history...');
 
             const response = await axiosInstance.get('/payments', {
                 params: {
@@ -80,8 +79,6 @@ export default function PaymentHistoryScreen() {
                     sortOrder: 'desc',
                 }
             });
-
-            console.log('✅ Payments fetched:', response.data);
 
             if (response.data.success) {
                 setPayments(response.data.data || []);
@@ -106,11 +103,7 @@ export default function PaymentHistoryScreen() {
 
     const fetchCashCollectionsByAgent = async () => {
         try {
-            console.log('💰 Fetching cash collections by agent...');
-
             const response = await axiosInstance.get('/payments/cash-collections-by-agent');
-
-            console.log('✅ Cash collections fetched:', response.data);
 
             if (response.data.success) {
                 setDeliveryAgents(response.data.data || []);

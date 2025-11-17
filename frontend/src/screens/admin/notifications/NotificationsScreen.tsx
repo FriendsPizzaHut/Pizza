@@ -58,13 +58,12 @@ export default function NotificationsScreen() {
         const socket = io(SOCKET_URL, SOCKET_OPTIONS);
 
         const handleNewNotification = (notification: any) => {
-            console.log('🔔 New notification received:', notification);
             dispatch(addNewNotification(notification));
         };
 
         // Connect event
         socket.on('connect', () => {
-            console.log('✅ Notifications Socket connected');
+            // Socket connected
         });
 
         // Listen for new notifications
@@ -74,7 +73,6 @@ export default function NotificationsScreen() {
         return () => {
             socket.off('notification:new', handleNewNotification);
             socket.disconnect();
-            console.log('🔌 Notifications Socket disconnected');
         };
     }, [dispatch]);
 

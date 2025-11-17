@@ -21,10 +21,6 @@ import Notification from '../models/Notification.js';
  * @returns {Object} - Updated user
  */
 export const updateProfileImage = async (userId, profileImage) => {
-    console.log('🖼️ [USER SERVICE] Updating profile image');
-    console.log('  - User ID:', userId);
-    console.log('  - Profile Image URL:', profileImage);
-
     // Find user and update profile image
     const user = await User.findByIdAndUpdate(
         userId,
@@ -36,15 +32,10 @@ export const updateProfileImage = async (userId, profileImage) => {
     ).select('-password');
 
     if (!user) {
-        console.error('❌ [USER SERVICE] User not found');
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
     }
-
-    console.log('✅ [USER SERVICE] Profile image updated successfully');
-    console.log('  - User:', user.name);
-    console.log('  - New Profile Image:', user.profileImage);
 
     return user;
 };
@@ -148,7 +139,13 @@ export const getAllUsers = async (query = {}) => {
  * @returns {Object} - User data with stats
  */
 export const getUserById = async (userId) => {
-    const user = await User.findById(userId).select('-password').lean();
+    const user = await User.findById(userId)
+        .select('-password')
+        .populate({
+            path: 'orderingBehavior.mostOrderedItems.productId',
+            select: 'name imageUrl category pricing isAvailable'
+        })
+        .lean();
 
     if (!user) {
         const error = new Error('User not found');
@@ -226,43 +223,21 @@ export const getUserById = async (userId) => {
  * @returns {Object} - Updated user
  */
 export const updateUser = async (userId, updateData) => {
-    console.log('🔍 [USER SERVICE] Update user called');
-    console.log('  - User ID:', userId);
-    console.log('  - Update Data (raw):', JSON.stringify(updateData, null, 2));
-
     // Prevent updating sensitive fields
     delete updateData.password;
     delete updateData.role;
 
-    console.log('  - Update Data (after security filters):', JSON.stringify(updateData, null, 2));
-    console.log('  - Approval fields present:', {
-        isApproved: 'isApproved' in updateData ? updateData.isApproved : 'NOT PRESENT',
-        isRejected: 'isRejected' in updateData ? updateData.isRejected : 'NOT PRESENT',
-        rejectionReason: 'rejectionReason' in updateData ? updateData.rejectionReason : 'NOT PRESENT'
-    });
-
     // Fetch user before update to see current state
     const userBefore = await User.findById(userId).select('-password');
-    console.log('  - User BEFORE update:', {
-        _id: userBefore?._id,
-        name: userBefore?.name,
-        role: userBefore?.role,
-        isApproved: userBefore?.isApproved,
-        isRejected: userBefore?.isRejected,
-        rejectionReason: userBefore?.rejectionReason
-    });
 
     // Determine which model to use based on user role
     let UserModel = User;
     if (userBefore?.role === 'delivery') {
         UserModel = DeliveryBoy;
-        console.log('  - Using DeliveryBoy discriminator model');
     } else if (userBefore?.role === 'customer') {
         UserModel = Customer;
-        console.log('  - Using Customer discriminator model');
     } else if (userBefore?.role === 'admin') {
         UserModel = Admin;
-        console.log('  - Using Admin discriminator model');
     }
 
     // Use $set operator explicitly for discriminator fields
@@ -281,15 +256,6 @@ export const updateUser = async (userId, updateData) => {
         error.statusCode = 404;
         throw error;
     }
-
-    console.log('  - User AFTER update:', {
-        _id: user._id,
-        name: user.name,
-        role: user.role,
-        isApproved: user.isApproved,
-        isRejected: user.isRejected,
-        rejectionReason: user.rejectionReason
-    });
 
     return user;
 };
@@ -331,22 +297,13 @@ export const deleteUser = async (userId) => {
  * @returns {Array} - List of delivery agents with status
  */
 export const getDeliveryAgents = async () => {
-    console.log('🚚 [GET DELIVERY AGENTS] Fetching all delivery agents...');
-
     // Find all users with role 'delivery' (get all first to debug)
     const allDeliveryAgents = await User.find({ role: 'delivery' })
         .select('name email phone profileImage vehicleInfo status totalDeliveries assignedOrders isApproved isRejected isActive')
         .lean();
 
-    console.log(`📊 [GET DELIVERY AGENTS] Found ${allDeliveryAgents.length} total delivery agents`);
-
     // Filter only approved agents
     const deliveryAgents = allDeliveryAgents.filter(agent => agent.isApproved === true);
-
-    console.log(`✅ [GET DELIVERY AGENTS] ${deliveryAgents.length} approved agents`);
-    allDeliveryAgents.forEach(agent => {
-        console.log(`   - ${agent.name}: isApproved=${agent.isApproved}, isActive=${agent.isActive}, isOnline=${agent.status?.isOnline}`);
-    });
 
     // Calculate current active deliveries for each agent
     const agentsWithStatus = await Promise.all(
@@ -394,11 +351,6 @@ export const getDeliveryAgents = async () => {
         if (a.status === 'busy' && b.status !== 'busy') return -1;
         if (a.status !== 'busy' && b.status === 'busy') return 1;
         return a.activeDeliveries - b.activeDeliveries;
-    });
-
-    console.log(`📤 [GET DELIVERY AGENTS] Returning ${agentsWithStatus.length} agents`);
-    agentsWithStatus.forEach(agent => {
-        console.log(`   ✈️  ${agent.name}: status=${agent.status}, approved=${agent.isApproved}, online=${agent.isOnline}`);
     });
 
     return agentsWithStatus;

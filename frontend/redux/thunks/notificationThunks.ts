@@ -20,9 +20,7 @@ export const fetchNotifications = createAsyncThunk(
     'notifications/fetch',
     async (params: NotificationParams = {}, { rejectWithValue }) => {
         try {
-            console.log('🔔 Fetching notifications...', params);
             const response = await notificationService.getNotifications(params);
-            console.log('✅ Notifications fetched successfully:', response);
             return response;
         } catch (error: any) {
             console.error('❌ Fetch notifications error:', error);
@@ -42,9 +40,7 @@ export const fetchUnreadCount = createAsyncThunk(
     'notifications/fetchUnreadCount',
     async (_, { rejectWithValue }) => {
         try {
-            console.log('🔔 Fetching unread count...');
             const count = await notificationService.getUnreadCount();
-            console.log('✅ Unread count fetched:', count);
             return count;
         } catch (error: any) {
             console.error('❌ Fetch unread count error:', error);
@@ -64,9 +60,7 @@ export const markNotificationAsRead = createAsyncThunk(
     'notifications/markAsRead',
     async (notificationId: string, { rejectWithValue }) => {
         try {
-            console.log('🔔 Marking notification as read:', notificationId);
             const notification = await notificationService.markAsRead(notificationId);
-            console.log('✅ Notification marked as read');
             return notification;
         } catch (error: any) {
             console.error('❌ Mark as read error:', error);
@@ -86,9 +80,7 @@ export const markAllNotificationsAsRead = createAsyncThunk(
     'notifications/markAllAsRead',
     async (_, { rejectWithValue }) => {
         try {
-            console.log('🔔 Marking all notifications as read...');
             const result = await notificationService.markAllAsRead();
-            console.log('✅ All notifications marked as read:', result);
             return result;
         } catch (error: any) {
             console.error('❌ Mark all as read error:', error);
@@ -108,9 +100,7 @@ export const deleteNotificationAsync = createAsyncThunk(
     'notifications/delete',
     async (notificationId: string, { rejectWithValue }) => {
         try {
-            console.log('🔔 Deleting notification:', notificationId);
             await notificationService.deleteNotification(notificationId);
-            console.log('✅ Notification deleted');
             return notificationId; // Return ID for optimistic update
         } catch (error: any) {
             console.error('❌ Delete notification error:', error);

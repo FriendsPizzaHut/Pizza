@@ -115,7 +115,6 @@ export const getSystemStatus = async (req, res, next) => {
  */
 export const getDashboardOverview = async (req, res, next) => {
     try {
-        console.log('📊 Dashboard overview requested by admin');
         const overview = await dashboardService.getDashboardOverview();
         sendResponse(res, 200, 'Dashboard overview retrieved successfully', overview);
     } catch (error) {

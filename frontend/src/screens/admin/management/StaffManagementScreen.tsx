@@ -61,12 +61,10 @@ export default function StaffManagementScreen() {
 
     const handleAddStaff = () => {
         // Handle add staff
-        console.log('Add staff');
     };
 
     const handleEditStaff = (staffId: string) => {
         // Handle edit staff
-        console.log('Edit staff:', staffId);
     };
 
     const handleToggleStatus = (staffId: string) => {
@@ -75,7 +73,7 @@ export default function StaffManagementScreen() {
             'Are you sure you want to change this staff member\'s status?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Confirm', onPress: () => console.log('Status changed for:', staffId) },
+                { text: 'Confirm', onPress: () => { /* TODO: Implement status change */ } },
             ]
         );
     };
@@ -169,7 +167,7 @@ export default function StaffManagementScreen() {
 
     const renderRolesView = () => (
         <View>
-            <TouchableOpacity style={styles.addButton} onPress={() => console.log('Add role')}>
+            <TouchableOpacity style={styles.addButton} onPress={() => { /* TODO: Implement add role */ }}>
                 <Text style={styles.addButtonText}>➕ Add New Role</Text>
             </TouchableOpacity>
 
@@ -195,7 +193,7 @@ export default function StaffManagementScreen() {
 
                     <TouchableOpacity
                         style={styles.editRoleButton}
-                        onPress={() => console.log('Edit role:', role.name)}
+                        onPress={() => { /* TODO: Implement edit role */ }}
                     >
                         <Text style={styles.editRoleButtonText}>✏️ Edit Role</Text>
                     </TouchableOpacity>

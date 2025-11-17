@@ -102,21 +102,8 @@ export const updateOnlineStatus = async (req, res) => {
             rating: agent.rating
         };
 
-        console.log('🎯 ========================================');
-        console.log('🎯 EMITTING SOCKET EVENT');
-        console.log('🎯 ========================================');
-        console.log('📡 Status data to emit:', JSON.stringify(statusData, null, 2));
-        console.log('📡 Agent ID:', agent._id);
-        console.log('📡 Agent Name:', agent.name);
-        console.log('📡 Is Online:', agent.status.isOnline);
-        console.log('📡 State:', agent.status.state);
-
-        // ✅ Emit real-time socket event to admin
+        // Emit real-time socket event to admin
         emitDeliveryAgentStatusChange(statusData);
-
-        console.log(`✅ Socket event emitted successfully`);
-        console.log(`🚴 Delivery agent ${agent.name} is now ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-        console.log('🎯 ========================================');
 
         return res.status(200).json({
             success: true,
@@ -142,15 +129,11 @@ export const updateOnlineStatus = async (req, res) => {
  */
 export const getAgentStatus = async (req, res) => {
     try {
-        console.log('🔍 DEBUG - req.user:', req.user);
         const deliveryAgentId = req.user.id || req.user._id;
-        console.log('🔍 DEBUG - deliveryAgentId:', deliveryAgentId);
 
         const agent = await User.findById(deliveryAgentId).select('name email phone status vehicleInfo rating totalDeliveries role');
-        console.log('🔍 DEBUG - agent found:', agent ? { id: agent._id, role: agent.role } : 'null');
 
         if (!agent || agent.role !== 'delivery') {
-            console.log('❌ DEBUG - Authorization failed. Agent role:', agent?.role);
             return res.status(403).json({
                 success: false,
                 message: 'Access denied. Only delivery agents can view status.'

@@ -117,7 +117,6 @@ export const deleteCachePattern = async (pattern) => {
 export const clearAllCache = async () => {
     try {
         await redis.flushdb();
-        console.log('✅ All cache cleared');
         return true;
     } catch (error) {
         console.error('❌ Cache CLEAR ALL error:', error.message);
